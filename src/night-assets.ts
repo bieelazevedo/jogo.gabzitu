@@ -75,7 +75,8 @@ export class Actor{
   });
   this.mixer=new T.AnimationMixer(this.model);
  }
- bone(name:string){return this.model.getObjectByName(name)!;}
+ /** GLTFLoader sanitises node names ("handslot.r" becomes "handslotr"), so look up both spellings. */
+ bone(name:string){return this.model.getObjectByName(name)??this.model.getObjectByName(T.PropertyBinding.sanitizeNodeName(name))!;}
  /** Attaches a prop from the item packs to a bone (e.g. 'handslot.r'). */
  hold(item:string,bone:string,transform?:(o:T.Object3D)=>void){const o=prop(this.assets,item);o.traverse(c=>{if(c instanceof T.Mesh){const m=(c.material as T.MeshStandardMaterial).clone();this.materials.push(m);c.material=m;}});transform?.(o);this.bone(bone)?.add(o);return o;}
  has(clip:string){return this.assets.clips.has(clip);}
