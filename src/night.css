@@ -29,4 +29,4 @@
 .night .hunt-stick.dodge-ready .hunt-stick-ring{border-color:#bfe8ff99;box-shadow:0 0 10px #8fd3ff40}
 .night .hunt-stick.dodge-tap .hunt-stick-ring{animation:night-dodge-tap .35s ease-out}
 @keyframes night-dodge-tap{0%{box-shadow:0 0 0 0 #bfe8ffcc}100%{box-shadow:0 0 0 22px #bfe8ff00}}
-.night .hunt-stick small:after{content:' · 2× ESQUIVA';opacity:.75}
+.night .hunt-stick small{white-space:nowrap}.night .hunt-stick small:after{content:' · 2× esquiva';opacity:.7;font-size:.85em;letter-spacing:0}

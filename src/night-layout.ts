@@ -45,16 +45,16 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D){
  scatter('tree_oak_dark',[[-36,26,0,1.1],[-23,11,2,1],[-45,0,4,1.2]],NATURE);
  scatter('tree_dead_large',[[-25,18,.5],[-44,-8,2]]);
  scatter('pumpkin_orange_jackolantern',[[-21,21,.6,.7],[-31,9,2.4,.6],[-42,12,1,.7],[-16,13,4,.55]]);
- scatter('stump_oldTall',[[-14,16,1],[-33,4,2],[-40,25,3]],NATURE);scatter('log_large',[[-28,22,1.2],[-20,3,.3]],NATURE);
+ scatter('stump_oldTall',[[-14,16,1],[-33,4,2],[-40,25,3]],3.4);
  scatter('statue_head',[[-31,17,2.4,1.1]],NATURE);scatter('statue_ring',[[-22,27,.6]],NATURE);
  // Undergrowth everywhere outside paths, camps, portals and springs.
  const PATHS=[[0,27,-29,14],[-29,14,-24,-25],[-24,-25,25,-27],[25,-27,28,8],[28,8,0,27],[0,27,-24,-25]];
  const segment=(x:number,z:number,[ax,az,bx,bz]:number[])=>{const dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));return Math.hypot(x-ax-t*dx,z-az-t*dz);};
  const open=(x:number,z:number)=>PATHS.every(p=>segment(x,z,p)>3)&&NIGHT_CAMPS.every(c=>Math.hypot(c.x-x,c.z-z)>5)&&[...NIGHT_PORTALS,...NIGHT_SPRINGS].every(p=>Math.hypot(p.x-x,p.z-z)>3.5)&&NIGHT_OBSTACLES.every(o=>Math.hypot(o.x-x,o.z-z)>o.r+1)&&Math.hypot(x,z-27)>9;
- const cover:Record<string,Place[]>={plant_bushDetailed:[],plant_bushLarge:[],plant_bushTriangle:[],grass_leafsLarge:[],grass:[],flower_purpleA:[],flower_redA:[],flower_yellowA:[],mushroom_redGroup:[],mushroom_tanTall:[],rock_largeA:[]};
- const kinds=Object.keys(cover);for(let i=0;i<520;i++){const x=(hash(i*3.1)-.5)*92,z=(hash(i*7.7+1)-.5)*92;if(!open(x,z))continue;const forest=x<-8&&z>-6,kind=kinds[Math.floor(hash(i*13.3)*kinds.length)];if(!forest&&/mushroom|bushTriangle/.test(kind))continue;cover[kind].push([x,z,hash(i)*6.3,.8+hash(i*5)*.6]);}
+ const cover:Record<string,Place[]>={plant_bushDetailed:[],plant_bushLarge:[],grass:[],flower_purpleA:[],flower_redA:[],flower_yellowA:[],mushroom_redGroup:[],mushroom_tanTall:[],rock_largeA:[]};
+ const kinds=Object.keys(cover);for(let i=0;i<520;i++){const x=(hash(i*3.1)-.5)*92,z=(hash(i*7.7+1)-.5)*92;if(!open(x,z))continue;const forest=x<-8&&z>-6,kind=kinds[Math.floor(hash(i*13.3)*kinds.length)];if(!forest&&/mushroom/.test(kind))continue;cover[kind].push([x,z,hash(i)*6.3,.8+hash(i*5)*.6]);}
  // Ground cover reads at roughly knee height; bushes a little taller.
- const coverScale:Record<string,number>={plant_bushDetailed:3.2,plant_bushLarge:3.4,plant_bushTriangle:3,grass_leafsLarge:2.2,grass:2.6,flower_purpleA:2.4,flower_redA:2.4,flower_yellowA:2.4,mushroom_redGroup:3,mushroom_tanTall:3.2,rock_largeA:2.2};
+ const coverScale:Record<string,number>={plant_bushDetailed:2.6,plant_bushLarge:2.8,grass:2.2,flower_purpleA:2.4,flower_redA:2.4,flower_yellowA:2.4,mushroom_redGroup:3,mushroom_tanTall:3.2,rock_largeA:2.2};
  for(const [kind,places] of Object.entries(cover))scatter(kind,places,coverScale[kind]);
 
  // Village without tomorrow: houses on the three solid footprints, a well and work yards.

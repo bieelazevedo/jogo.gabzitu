@@ -61,7 +61,8 @@ export class HeroActor{
   else this.actor.play('Idle',{fade:.25});
   this.lastAction=p.action;this.lastCombo=p.combo;this.lastTime=p.actionTime;
   const tail=this.tail[0];tail.rotation.y=Math.sin(time*3.2)*.35*(1+p.moving*.6);tail.rotation.x=-.1+Math.sin(time*2.1)*.06-p.moving*.25;
-  this.actor.flash(p.hit>0?0xff3b30:p.shield>0?0x1d6c70:0,p.hit>0?Math.min(.2,p.hit):p.shield>0?.25:0);
+  // A brief red pulse on the first frames of a hit only; a lingering tint reads as a pink character.
+  const flash=p.hit>.18;this.actor.flash(flash?0xff3b30:p.shield>0?0x1d6c70:0,flash?.18:p.shield>0?.18:0);
   this.hands.forEach((h,i)=>{const channel=p.action>0?1.6:1;h.scale.setScalar((.55+Math.sin(time*9+i*2)*.12)*channel);});
   this.actor.update(dt);
  }
@@ -108,10 +109,12 @@ const ENEMIES:{model:CharacterName;right:string;left?:string;scale:number;attack
  {model:'Skeleton_Warrior',right:'Skeleton_Axe',left:'Skeleton_Shield_Large_A',scale:1.35,attack:'2H_Melee_Attack_Chop',wind:1},
 ];
 export class EnemyActor{
- readonly actor:Actor;private kind:typeof ENEMIES[number];private lastWind=0;private lastHit=0;private hitUntil=0;
+ readonly actor:Actor;private kind:typeof ENEMIES[number];private lastWind=0;private lastHit=0;private hitUntil=0;private charge:T.Sprite;
  constructor(assets:NightAssets,e:NightEnemy,parent:T.Object3D){
   this.kind=ENEMIES[e.kind]||ENEMIES[0];this.actor=new Actor(assets,this.kind.model,{scale:this.kind.scale});this.actor.hold(this.kind.right,'handslot.r');if(this.kind.left)this.actor.hold(this.kind.left,'handslot.l');
   this.actor.root.position.set(e.x,0,e.z);parent.add(this.actor.root);this.actor.play('Idle');
+  // Wind-up glow in the weapon hand: the attack is readable before it lands.
+  this.charge=new T.Sprite(new T.SpriteMaterial({map:fxTexture('glow'),color:[0xff6a50,0xffb070,0xc38aff,0xffb55f][e.kind]??0xff6a50,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));this.charge.visible=false;this.actor.bone('handslot.r')?.add(this.charge);
  }
  get root(){return this.actor.root;}
  update(e:NightEnemy,dt:number,time:number){
@@ -124,9 +127,9 @@ export class EnemyActor{
   else if(time<this.hitUntil)this.actor.play('Hit_A',{loop:false,fade:.05});
   else if(e.moving>.1)this.actor.play(e.aggro>0?'Running_C':'Walking_D_Skeletons',{fade:.2,speed:(e.slow>0?.55:1)*Math.max(.6,e.moving)});
   else this.actor.play(e.aggro>0?'Idle_Combat':'Idle',{fade:.3});
-  this.lastWind=e.wind;
+  this.lastWind=e.wind;this.charge.visible=e.hp>0&&e.wind>0;if(this.charge.visible){const k=1-e.wind/this.kind.wind;this.charge.scale.setScalar((.4+k*1.3)*(1+Math.sin(time*30)*.08));}
   this.actor.flash(e.hit>0?0xffb08a:e.slow>0?0x2d4f9c:0,e.hit>0?.45:e.slow>0?.3:0);
   this.actor.update(dt);
  }
- dispose(){this.actor.dispose();}
+ dispose(){this.charge.material.dispose();this.actor.dispose();}
 }
