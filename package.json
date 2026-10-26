@@ -1,0 +1,24 @@
+{
+  "name": "muralhas-e-bigodes",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build && node scripts/build-offline.mjs",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "qa:browser": "node scripts/browser-qa.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/three": "0.180.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.0",
+    "vitest": "^5.0.5"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
+    "three": "0.180.0"
+  }
+}

@@ -1,0 +1,7 @@
+import {it,expect} from 'vitest';
+import {LEVELS,CATS} from '../src/data';
+import {command,createState,dist,position,step} from '../src/simulation';
+import {movementRadius} from '../src/mobility';
+import type {Enemy} from '../src/types';
+it('o lutador alcança um alvo além do alcance da base, respeita a zona e regressa',()=>{const s=createState(1,'campaign',[['knight']]);command(s,0,{type:'build',kind:'knight',spot:0});const t=s.towers[0],l=LEVELS[0],base=l.spots[0];let progress=.1;for(let p=.01;p<1;p+=.001){const d=dist(base,position(l.paths[0],p));if(d>CATS.knight.range+12&&d<CATS.knight.range+22){progress=p;break;}}const e:Enemy={id:s.nextId++,kind:'dog',path:0,progress,hp:100000,maxHp:100000,armor:0,marked:0,slow:0,slowTime:0,poison:0,poisonTime:0,burn:0,burnTime:0,broken:0,spawnWave:0,summon:false,phase:0,bossClock:0,hit:0};s.enemies.push(e);for(let i=0;i<90;i++){e.progress=progress;step(s);expect(Math.hypot(t.offset?.x||0,t.offset?.y||0)).toBeLessThanOrEqual(32.001);}expect(t.casts).toBeGreaterThan(0);expect(e.hp).toBeLessThan(e.maxHp);s.enemies=[];for(let i=0;i<60;i++)step(s);expect(Math.hypot(t.offset?.x||0,t.offset?.y||0)).toBeCloseTo(0);});
+it('magos avançam menos e os suportes mantêm a base',()=>{expect(movementRadius('ice')).toBe(16);expect(movementRadius('adminMage')).toBe(16);expect(movementRadius('commander')).toBe(0);expect(movementRadius('bard')).toBe(0);expect(movementRadius('guardian')).toBe(0);});

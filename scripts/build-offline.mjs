@@ -1,0 +1,13 @@
+import {readFile,writeFile,readdir} from 'node:fs/promises';
+const root=new URL('../dist/',import.meta.url);
+async function files(dir,prefix=''){const result=[];for(const e of await readdir(dir,{withFileTypes:true})){if(e.isDirectory())result.push(...await files(new URL(e.name+'/',dir),prefix+e.name+'/'));else if(e.name!=='sw.js'&&e.name!=='legollas-reference.png')result.push('/'+prefix+e.name);}return result;}
+const assets=await files(root),version=Date.now();
+await writeFile(new URL('sw.js',root),`const CACHE='bigodes-safe-${version}';const FILES=${JSON.stringify(assets)};
+// A followed redirect keeps URL history even in CacheStorage. Safari rejects it
+// for navigation requests with redirect=manual. Rebuild every served response.
+async function clean(response){if(!response||response.status===0||response.type==='opaqueredirect')throw Error('Unusable offline response');const headers=new Headers(response.headers);headers.delete('content-encoding');headers.delete('content-length');return new Response(await response.arrayBuffer(),{status:response.status,statusText:response.statusText,headers});}
+self.addEventListener('install',e=>e.waitUntil((async()=>{const c=await caches.open(CACHE);await Promise.all(FILES.map(async path=>{const response=await fetch(path,{cache:'reload',redirect:'follow'});if(!response.ok)throw Error('Cache failed: '+path);if(path==='/index.html'&&!(await response.clone().text()).includes('id="app"'))throw Error('Not the game shell');await c.put(path,await clean(response));}));await self.skipWaiting();})()));
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('bigodes-')&&k!==CACHE).map(k=>caches.delete(k))))));
+self.addEventListener('message',e=>{if(e.data==='ACTIVATE')self.skipWaiting();});
+self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==self.location.origin)return;e.respondWith((async()=>{const c=await caches.open(CACHE);if(e.request.mode==='navigate'){const shell=await c.match('/index.html');if(shell)return clean(shell);}const cached=await c.match(e.request,{ignoreSearch:true,ignoreVary:true});if(cached)return clean(cached);try{return await clean(await fetch(e.request));}catch{if(e.request.mode==='navigate'){const shell=await c.match('/index.html');if(shell)return clean(shell);}return new Response('Sem ligação. Volta a tentar quando tiveres rede.',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}});}})());});`);
+console.log('Offline: '+assets.length+' recursos; respostas sem histórico de redirecionamentos.');

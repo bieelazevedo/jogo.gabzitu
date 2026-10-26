@@ -1,0 +1,19 @@
+Muralhas & Bigodes — Quinta do Caos / animal models
+
+CC0: Cat, Shiba Inu, Cow, Chicken, Pig, Sheep, Horse by Quaternius.
+https://quaternius.com/ — https://creativecommons.org/publicdomain/zero/1.0/
+Cat https://poly.pizza/m/qKICY6xla2
+Dog https://poly.pizza/m/y4wdQpg767
+Cow https://poly.pizza/m/5XSc2Fka3F
+Chicken https://poly.pizza/m/ineV9pU5VL
+Pig https://poly.pizza/m/TNvG3QUFlp
+Sheep https://poly.pizza/m/C39AUXUUes
+Horse https://poly.pizza/m/F8HAAcLeBL
+
+CC BY 3.0: Goose, Duck, Goat by Poly by Google.
+https://creativecommons.org/licenses/by/3.0/
+Goose https://poly.pizza/m/9wn3If7Qgb4
+Duck https://poly.pizza/m/6HpauUCfIAb
+Goat https://poly.pizza/m/d7dImmjtF8E
+Modifications: scale, positioning, animation integration and gameplay adaptation.
+All source authors retain their rights. No endorsement is implied.

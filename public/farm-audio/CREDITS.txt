@@ -1,0 +1,5 @@
+QUINTA DO CAOS — ORIGINAL AUDIO
+22 original dialogue lines, synthesized locally with the installed Microsoft Helia pt-PT system voice. Original text catalog: assets/source/farm-audio-originals.json.
+No television, music, influencer or viral video recordings were copied. Cultural references without authorized recordings remain metadata-only ideas.
+Animal sounds, footsteps, wind, tension pulse and comic effects are synthesized by project code.
+Player microphone recordings are temporary in-memory session data and are never included in these public assets.

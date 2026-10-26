@@ -1,0 +1,8 @@
+Farm Buildings by Quaternius — CC0 1.0
+Barn: https://poly.pizza/m/vSqQNA7ez6
+Farm (house): https://poly.pizza/m/INctJkmEAl
+Original pack: https://quaternius.com/packs/farmbuildings.html
+License verified on each model page: Public Domain (CC0).
+https://creativecommons.org/publicdomain/zero/1.0/
+Downloaded 2026-10-25. Models scaled to the game collision volumes.
+Other farm geometry, animal rigs, animations and natural effects are original project code.
