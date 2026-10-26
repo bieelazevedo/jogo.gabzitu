@@ -5,6 +5,7 @@ export const NIGHT_CLASSES=[
  {id:'reaver',name:'Rubro',role:'Duelista vampírico',color:0xdb7893,magic:false,power:'Garras rubras',passive:'Rouba 8% do dano físico efetivamente causado.'},
  {id:'witch',name:'Umbra',role:'Mago drenador',color:0xb79fe8,magic:true,power:'Eclipse drenante',passive:'Rouba 7% do dano mágico; eficácia reduzida em área.'},
  {id:'ranger',name:'Íris',role:'Arqueira',color:0xa9c878,magic:false,power:'Chuva de flechas',passive:'Flechas perseguidoras. Alcance de 17 metros.'},
+ {id:'chaos',name:'Carmesim',role:'Feiticeira do caos',color:0xe0314f,magic:true,power:'Onda do caos',passive:'Caos instável: cada 4.º feitiço sai 40% mais forte.'},
 ] as const;
 export type NightClass=typeof NIGHT_CLASSES[number]['id'];
 export const classFor=(id:NightClass)=>NIGHT_CLASSES.find(c=>c.id===id)||NIGHT_CLASSES[0];
@@ -33,7 +34,10 @@ export const NIGHT_SHOP=[
  {id:'flask',name:'Frasco da Ordem',description:'Recupera uma carga de poção (máx. 3)',cost:25,max:99},
  {id:'meteor',name:'Magia: estrela cadente',description:'Habilidade extra: meteoro numa área de 4 m',cost:100,max:1},
  {id:'garden',name:'Magia: jardim astral',description:'Habilidade extra: cura aliados numa área de 8 m',cost:90,max:1},
- {id:'ward',name:'Magia: manto protetor',description:'Habilidade extra: escudos para aliados próximos',cost:90,max:1}
+ {id:'ward',name:'Magia: manto protetor',description:'Habilidade extra: escudos para aliados próximos',cost:90,max:1},
+ {id:'chain',name:'Magia: relâmpago em cadeia',description:'Habilidade extra: salta entre até 4 inimigos',cost:95,max:1},
+ {id:'nova',name:'Magia: nova gélida',description:'Habilidade extra: explosão de gelo que abranda tudo à volta',cost:85,max:1},
+ {id:'blink',name:'Magia: passo sombrio',description:'Habilidade extra: teletransporte curto com escudo e impacto',cost:80,max:1}
 ] as const;
 export type ShopId=typeof NIGHT_SHOP[number]['id'];
 export type NightOrder='follow'|'attack'|'defend'|'help'|'regroup'|'explore';
@@ -52,5 +56,17 @@ export const CLASS_SKILLS:Record<NightClass,{defense:string;control:string;descr
  guardian:{defense:'Muralha viva',control:'Desafio real',description:'Escudos de grupo; provoca inimigos próximos e reduz o dano deles.'},
  reaver:{defense:'Pacto de sangue',control:'Marca rubra',description:'Fúria que aumenta dano e vampirismo; enfraquece inimigos.'},
  witch:{defense:'Véu arcano',control:'Inverno roxo',description:'Escudo pessoal; lentidão e enfraquecimento em área.'},
- ranger:{defense:'Vento favorável',control:'Flecha enredante',description:'Recupera vigor e protege; abranda alvos para manter distância.'}
+ ranger:{defense:'Vento favorável',control:'Flecha enredante',description:'Recupera vigor e protege; abranda alvos para manter distância.'},
+ chaos:{defense:'Levitação carmesim',control:'Prisão de runas',description:'Levita protegida; puxa inimigos para uma prisão de runas e enfraquece-os.'}
+};
+/** Spells bought in the sanctuary; each gets its own action button and cooldown. */
+export const EXTRA_SPELLS=['meteor','garden','ward','chain','nova','blink'] as const;
+export type ExtraSpell=typeof EXTRA_SPELLS[number];
+export const EXTRA_INFO:Record<ExtraSpell,{label:string;icon:string;cooldown:number;color:number}>={
+ meteor:{label:'Meteoro',icon:'meteor',cooldown:20,color:0xffb669},
+ garden:{label:'Jardim',icon:'garden',cooldown:20,color:0x86edc1},
+ ward:{label:'Manto',icon:'ward',cooldown:20,color:0x99c7ff},
+ chain:{label:'Relâmpago',icon:'chain',cooldown:14,color:0x9fd8ff},
+ nova:{label:'Nova',icon:'nova',cooldown:16,color:0xaee8ff},
+ blink:{label:'Passo',icon:'blink',cooldown:9,color:0xc9a0ff},
 };

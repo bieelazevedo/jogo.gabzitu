@@ -173,7 +173,7 @@ this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)
    const count=big?14:5;for(let i=0;i<count;i++){const spark=new T.Sprite(sparkMaterial);spark.position.set(e.x,big?.4:2,e.z);this.scene.add(spark);const a=i/count*Math.PI*2;this.effects.push({mesh:spark,age:0,life:.45+(i%3)*.1,kind:'spark',velocity:new T.Vector3(Math.sin(a)*(big?8:3),2+(i%4),Math.cos(a)*(big?8:3))});}
    if(e.kind==='hurt'&&e.owner===this.local)this.shake=.18;else if(big)this.shake=.12;
    // Visual-only hit stop: animations freeze for a few frames when the local hero lands a blow.
-   if(e.kind==='hit'&&e.owner===this.local){this.hitStop=e.value>=40?.09:.05;this.shake=Math.max(this.shake,.05);}
+   if(e.kind==='hit'&&e.owner===this.local&&e.value>=18){this.hitStop=e.value>=40?.09:.05;this.shake=Math.max(this.shake,.05);}
   }
   this.sound(e.kind==='slash'?'slash':e.kind==='cast'?'cast':e.kind==='hit'?'hit':e.kind==='hurt'?'hurt':e.kind==='dodge'?'dodge':e.kind==='heal'?'heal':e.kind==='phase'?'roar':e.kind==='impact'?'slam':e.kind==='ultimate'?'ultimate':e.kind==='stagger'?'break':'');
  }

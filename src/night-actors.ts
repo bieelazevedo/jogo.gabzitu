@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {Actor,type CharacterName,type NightAssets} from './night-assets';
+import {Actor,fxTexture,type CharacterName,type NightAssets} from './night-assets';
 import type {NightClass} from './night-data';
 import type {HuntBoss} from './hunt-simulation';
 import type {NightEnemy,NightPlayer} from './night-simulation';
@@ -9,7 +9,7 @@ const turn=(a:number,b:number,t:number)=>a+Math.atan2(Math.sin(b-a),Math.cos(b-a
 /** Speed that makes a clip reach `at` (fraction of its length) after `seconds`. */
 const fit=(actor:Actor,clip:string,seconds:number,at=1)=>Math.min(3.2,Math.max(.6,actor.duration(clip)*at/Math.max(.05,seconds)));
 
-type HeroLook={model:CharacterName;items:string[];tint?:number;fur:number;attack:string[];power:string;ultimate:string;utility:string;hex:string};
+type HeroLook={model:CharacterName;items:string[];hide?:string[];tint?:number;fur:number;attack:string[];power:string;ultimate:string;utility:string;hex:string};
 /** Simulation action ids: 1 attack, 2 power, 3 ultimate, 4 dodge, 5 utility, 6 hex, 7 extra spell. */
 const HEROES:Record<NightClass,HeroLook>={
  blade:{model:'Knight',items:['1H_Sword'],fur:0xd99b52,attack:['1H_Melee_Attack_Slice_Diagonal','1H_Melee_Attack_Slice_Horizontal','1H_Melee_Attack_Chop'],power:'2H_Melee_Attack_Spin',ultimate:'1H_Melee_Attack_Jump_Chop',utility:'Block',hex:'1H_Melee_Attack_Stab'},
@@ -17,6 +17,7 @@ const HEROES:Record<NightClass,HeroLook>={
  guardian:{model:'Barbarian',items:['1H_Axe','Barbarian_Round_Shield'],fur:0x9aa3ad,attack:['1H_Melee_Attack_Chop','1H_Melee_Attack_Slice_Horizontal','2H_Melee_Attack_Chop'],power:'1H_Melee_Attack_Jump_Chop',ultimate:'2H_Melee_Attack_Spin',utility:'Blocking',hex:'Taunt'},
  reaver:{model:'Rogue',items:['Knife','Knife_Offhand'],tint:0xffc9cf,fur:0x8c5f6c,attack:['Dualwield_Melee_Attack_Slice','Dualwield_Melee_Attack_Chop','Dualwield_Melee_Attack_Stab'],power:'Dualwield_Melee_Attack_Chop',ultimate:'2H_Melee_Attack_Spin',utility:'Taunt',hex:'Dualwield_Melee_Attack_Stab'},
  witch:{model:'Mage',items:['1H_Wand','Spellbook_open'],tint:0xbca8ff,fur:0x4b4560,attack:['Spellcast_Shoot'],power:'Spellcast_Long',ultimate:'Spellcast_Summon',utility:'Spellcast_Raise',hex:'Spellcast_Shoot'},
+ chaos:{model:'Mage',items:[],hide:['Mage_Hat'],tint:0xff9a9a,fur:0x8a2a35,attack:['Spellcast_Shoot'],power:'Spellcast_Long',ultimate:'Spellcast_Summon',utility:'Spellcast_Raise',hex:'Spellcast_Summon'},
  ranger:{model:'Rogue_Hooded',items:['2H_Crossbow'],tint:0xdaf2c8,fur:0xc49a6c,attack:['2H_Ranged_Shoot'],power:'2H_Ranged_Shoot',ultimate:'Spellcast_Raise',utility:'Dodge_Backward',hex:'Throw'},
 };
 
@@ -38,10 +39,19 @@ export class HeroActor{
  readonly actor:Actor;readonly look:HeroLook;private tail:T.Object3D[];private geometries:T.BufferGeometry[];
  private lastAction=0;private lastCombo=0;private lastTime=0;private hitUntil=0;private lastHit=0;
  constructor(assets:NightAssets,classId:NightClass,parent:T.Object3D){
-  this.look=HEROES[classId];this.actor=new Actor(assets,this.look.model,{items:this.look.items,tint:this.look.tint});
+  this.look=HEROES[classId];this.actor=new Actor(assets,this.look.model,{items:this.look.items,hide:this.look.hide,tint:this.look.tint});if(classId==='chaos')this.chaosLook();
   ({tail:this.tail,geometries:this.geometries}=catFeatures(this.actor,this.look.fur));parent.add(this.actor.root);this.actor.play('Idle');
  }
  get root(){return this.actor.root;}
+ /** Carmesim: a pointed crimson tiara and hands that burn with chaos light. */
+ private chaosLook(){
+  const gold=new T.MeshStandardMaterial({color:0xb01c32,metalness:.6,roughness:.35,emissive:0x5a0010,emissiveIntensity:.6});this.actor.materials.push(gold);
+  const crown=new T.Group();crown.position.set(0,.98,.12);const band=new T.TorusGeometry(.42,.035,5,20,Math.PI);const spike=new T.ConeGeometry(.07,.42,4);this.geometries.push(band,spike);
+  const b=new T.Mesh(band,gold);b.rotation.set(-.25,0,0);crown.add(b);for(const [x,h,r] of [[0,.5,0],[-.24,.36,.35],[.24,.36,-.35]] as const){const c=new T.Mesh(spike,gold);c.position.set(x,.12+h*.35,.32);c.scale.y=h/.42;c.rotation.set(-.35,0,r);crown.add(c);}
+  this.actor.bone('head')?.add(crown);
+  for(const slot of ['handslot.l','handslot.r']){const glow=new T.Sprite(new T.SpriteMaterial({map:fxTexture('glow'),color:0xff2a4a,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));glow.scale.setScalar(.7);this.actor.bone(slot)?.add(glow);this.hands.push(glow);}
+ }
+ private hands:T.Sprite[]=[];
  private clipFor(p:NightPlayer){const l=this.look;switch(p.action){case 1:return l.attack[Math.max(0,p.combo-1)%l.attack.length];case 2:return l.power;case 3:return l.ultimate;case 4:return 'Dodge_Forward';case 5:return l.utility;case 6:return l.hex;case 7:return 'Spellcast_Long';default:return '';}}
  update(p:NightPlayer,dt:number,time:number,y:number){
   const r=this.actor.root;r.position.x=ease(r.position.x,p.x,dt*20);r.position.z=ease(r.position.z,p.z,dt*20);r.position.y=ease(r.position.y,y,dt*18);r.rotation.y=turn(r.rotation.y,p.facing,dt*15);
@@ -56,9 +66,10 @@ export class HeroActor{
   this.lastAction=p.action;this.lastCombo=p.combo;this.lastTime=p.actionTime;
   const tail=this.tail[0];tail.rotation.y=Math.sin(time*3.2)*.35*(1+p.moving*.6);tail.rotation.x=-.1+Math.sin(time*2.1)*.06-p.moving*.25;
   this.actor.flash(p.hit>0?0xff3b30:p.shield>0?0x1d6c70:0,p.hit>0?Math.min(.2,p.hit):p.shield>0?.25:0);
+  this.hands.forEach((h,i)=>{const channel=p.action>0?1.6:1;h.scale.setScalar((.55+Math.sin(time*9+i*2)*.12)*channel);});
   this.actor.update(dt);
  }
- dispose(){this.actor.dispose();this.geometries.forEach(g=>g.dispose());}
+ dispose(){this.hands.forEach(h=>h.material.dispose());this.actor.dispose();this.geometries.forEach(g=>g.dispose());}
 }
 
 const BOSS_FORMS:{model:CharacterName;scale:number;tint:number;right:string;left?:string;eyes:number}[]=[

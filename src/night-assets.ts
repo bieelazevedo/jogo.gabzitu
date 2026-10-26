@@ -63,12 +63,12 @@ type PlayOptions={loop?:boolean;fade?:number;speed?:number;restart?:boolean};
 export class Actor{
  readonly root=new T.Group();readonly model:T.Object3D;readonly mixer:T.AnimationMixer;readonly materials:T.MeshStandardMaterial[]=[];
  private actions=new Map<string,T.AnimationAction>();private current?:T.AnimationAction;active='';
- constructor(private assets:NightAssets,name:CharacterName,options:{items?:string[];tint?:number;scale?:number}={}){
+ constructor(private assets:NightAssets,name:CharacterName,options:{items?:string[];hide?:string[];tint?:number;scale?:number}={}){
   this.model=cloneSkinned(assets.characters[name]);this.root.add(this.model);this.model.scale.setScalar(options.scale??1);
   const materials=new Map<T.Material,T.MeshStandardMaterial>();
   this.model.traverse(o=>{
    if(!(o instanceof T.Mesh))return;
-   const slot=o.parent?.name||'';if(options.items&&/handslot/.test(slot)&&!options.items.includes(o.name)){o.visible=false;return;}
+   const slot=o.parent?.name||'';if(options.items&&/handslot/.test(slot)&&!options.items.includes(o.name)||options.hide?.includes(o.name)){o.visible=false;return;}
    const source=o.material as T.MeshStandardMaterial;let m=materials.get(source);if(!m){m=source.clone();if(options.tint!==undefined)m.color.multiply(new T.Color(options.tint));materials.set(source,m);this.materials.push(m);}o.material=m;
   });
   this.mixer=new T.AnimationMixer(this.model);
