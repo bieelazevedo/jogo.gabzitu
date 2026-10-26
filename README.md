@@ -126,7 +126,40 @@ Coop: Criar sala → Partilhar convite → o amigo entra → ambos Estou pronto 
 Corpo a corpo avança até 32 unidades e os magos até 16, regressando à base. Suportes permanecem fixos; seleção mostra beneficiários. Novas bases próximas e alcances revistos aumentam as opções de colocação.
 
 
-## Gato Nightreign — caçada 3D experimental
+## Gato Nightreign — Expedição da Coroa Partida
+
+Modo cooperativo de ação 3D para telemóvel (1–5 jogadores, vagas preenchidas com bots): santuário → exploração → chefe, em três luas.
+
+### Visual
+- Personagens, inimigos, chefes, edifícios, natureza e adereços são modelos 3D prontos com licença CC0 (KayKit de Kay Lousberg e Kenney Nature Kit), em `public/models` (~4 MB, compressão meshopt e texturas WebP). Gerados por `node scripts/build-models.mjs`.
+- Efeitos de magia e impacto usam o Kenney Particle Pack (CC0) em `public/fx`.
+- Ícones de habilidades: game-icons.net (CC BY 3.0), extraídos por `node scripts/build-icons.mjs` para `src/night-skill-icons.ts`.
+- Créditos completos em `public/CREDITS.md` e no menu do modo.
+- Se os modelos não carregarem, o jogo volta automaticamente à geometria simples original.
+
+### Heróis
+Garra Lunar (duelista), Astral (curandeiro), Bastião (guardião), Rubro (duelista vampírico), Umbra (mago drenador), Íris (arqueira) e **Carmesim** (feiticeira do caos):
+- Feixe do caos: segurar Atacar canaliza um feixe que drena vida, fica mais forte no mesmo alvo e ramifica nos níveis 5 e 10 (e com a melhoria Fio carmesim).
+- Onda do caos, Levitação carmesim, Prisão de runas e passiva Caos instável (cada 4.º feitiço +40%).
+- Especial **Realidade reescrita**: zona de 10 m durante 8 s com dano contínuo; aliados lá dentro ficam invulneráveis e recuperam vida.
+
+### Controlos
+- Joystick à esquerda; **dois toques rápidos no joystick = esquiva** (na direção do arrasto). O anel do joystick acende quando há vigor para esquivar.
+- Botões de habilidade com ícone por classe; cada magia comprada no santuário ganha o seu próprio botão com recarga.
+- Teclado: WASD ou setas, J atacar, E poder, Espaço saltar, Z esquivar, Shift correr.
+
+### Dificuldade
+Inimigos com sequências de golpes (comuns a partir da 2.ª lua, elites sempre), no máximo dois a atacar o mesmo herói, castigo a quem ataca sem parar, arqueiros que antecipam o movimento e acampamentos maiores nas luas seguintes. O chefe encadeia mais golpes com preparação variável. Esquiva perfeita dá energia e vigor. Medição com uma equipa de três bots: Aventura 5/5 vitórias, Normal 5/5, Caçada 2/5.
+
+### Publicar (Netlify, gratuito)
+1. netlify.com → entrar com o GitHub → **Add new site → Import from Git** → escolher este repositório → **Deploy** (o `netlify.toml` já define `npm run build` e a pasta `dist`).
+2. Supabase → Authentication → URL Configuration: acrescentar o novo endereço (ex.: `https://nome.netlify.app`) em *Site URL* e *Redirect URLs*.
+A base de dados não muda. Os links de convite e emails usam automaticamente o endereço onde o jogo está aberto.
+
+### Desenvolvimento
+`npm run dev` e abrir `/dev/night.html` (expedição sem conta) ou `/dev/showcase.html` (vitrine de heróis, inimigos e chefes). Estas páginas não entram na build.
+
+## Caçada 3D clássica (modo original)
 Modo independente da campanha: menu Gato Nightreign → criar/entrar numa caçada → ambos prontos → iniciar. O criador controla Garra Lunar (corpo a corpo + golpe forte); o convidado controla Astral (ataque à distância + cura em área). Treino com aliado IA disponível. Arrastar o analógico move; ataque básico automático, esquiva com invulnerabilidade breve e poder com recarga. Teclado: WASD/setas, Espaço, E. Ficar perto do parceiro caído durante 3 segundos reanima-o.
 
 Uma arena original e um chefe, Devorador de Sachês, com duas fases e três padrões sinalizados. Sem copiar personagens ou recursos de outros jogos. Geometria 3D estilizada procedural com Three.js, carregado num módulo separado, resolução limitada e desenho a até 30 fps. Não é ainda uma campanha de ação completa nem arte final.
@@ -135,7 +168,7 @@ A simulação corre no anfitrião a 30 passos/s; os clientes enviam intenções 
 
 
 ### Atualização do combate 3D
-Ataque manual (segurar botão ou J/F), combo de três golpes, projéteis do Astral, esquiva com vigor, poderes com entrada em fila e especial carregado por dano (Q). O chefe possui cinco padrões sinalizados, investida/salto, postura quebrável e fase de fúria. Modelos articulados com passos, rotação de braços/armas, capa, cauda e animações de preparação/impacto; partículas, indicadores de dano e áudio próprio. Geometria do cenário e partes estáticas dos modelos agrupadas por material. Estados enviados no canal de frames, inputs no canal de controlo; protocolo mb-6 exige ambos atualizados. Treze testes de combate incluem vitória de dupla coordenada. A atualização continua experimental; sem teste físico de iPhone.
+Ataque manual (segurar botão ou J/F), combo de três golpes, projéteis do Astral, esquiva com vigor, poderes com entrada em fila e especial carregado por dano (Q). O chefe possui cinco padrões sinalizados, investida/salto, postura quebrável e fase de fúria. Modelos articulados com passos, rotação de braços/armas, capa, cauda e animações de preparação/impacto; partículas, indicadores de dano e áudio próprio. Geometria do cenário e partes estáticas dos modelos agrupadas por material. Estados enviados no canal de frames, inputs no canal de controlo; protocolo mb-6 exige ambos atualizados. Treze testes de combate incluem vitória de dupla coordenada. Sem teste físico de iPhone.
 
 
 ### Três caçadas

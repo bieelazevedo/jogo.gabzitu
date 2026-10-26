@@ -169,3 +169,12 @@ Verificacao final: 127 testes passaram em 17 ficheiros com dois workers. A prime
 - Movimento: NippleJS 1.0.4 (MIT), joystick analógico com zona morta de 10%, integrado sem React/Rapier. Referências consultadas: https://github.com/yoannmoinet/nipplejs e https://github.com/pmndrs/ecctrl/blob/main/docs/api-reference.md . Ecctrl não instalado por exigir outra arquitetura.
 - Correr por botão/Shift, consumo de vigor e recuperação; salto separado (Espaço, esquiva Z), gravidade no host, sem saltos infinitos nem passagem através de edifícios. Ícones SVG originais em botões circulares, ataque destacado, recarga em anel. Inspirado no padrão de controlos móvel MOBA, sem copiar recursos de Wild Rift/Mobile Legends.
 - Protocolo final desta revisão: night-4. O pedido de publicar com economia de limite permanece prioritário; sem novas expansões nesta entrega.
+
+
+## 26/10/2026 — Revisão visual e de jogabilidade do Gato Nightreign (Claude)
+- Modelos CC0 (KayKit, Kenney Nature Kit) substituem a geometria procedimental em heróis, inimigos, chefes, mapa e arena; efeitos com Kenney Particle Pack; ícones game-icons.net (CC BY 3.0).
+- Nova heroína Carmesim (feixe canalizado, Realidade reescrita), três magias novas (relâmpago em cadeia, nova gélida, passo sombrio) e botões individuais para magias compradas.
+- Esquiva por duplo toque no joystick; combate mais exigente (combos, fichas de ataque, castigo, reforços, chefe mais agressivo) e bots aliados mais competentes.
+- Efeitos próprios por habilidade, golpe inimigo e ataque do chefe; avisos no chão com runas que enchem.
+- Desempenho medido em viewport de telemóvel (Chromium sem GPU): 130–200 desenhos por imagem e 200–250 mil triângulos em exploração. Continua pendente o teste físico em iPhone/Android.
+- Protocolo night-6: todos os jogadores devem estar na mesma versão.
