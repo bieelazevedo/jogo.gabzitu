@@ -18,7 +18,8 @@ export const nightAssetsFailed=()=>failed;
 /** Skinned body parts share one skeleton and material; merging them keeps each character to a few draw calls. */
 function mergeSkinned(template:T.Object3D){
  const groups=new Map<string,T.SkinnedMesh[]>();
- template.traverse(o=>{if(o instanceof T.SkinnedMesh&&!Array.isArray(o.material)){const key=o.skeleton.uuid+':'+o.material.uuid;groups.set(key,[...(groups.get(key)||[]),o]);}});
+ template.traverse(o=>{if(o instanceof T.SkinnedMesh&&!Array.isArray(o.material)){// GLTFLoader gives every part its own Skeleton object over the same bones, so group by bones.
+  const key=o.skeleton.bones.map(b=>b.uuid).join()+':'+o.material.uuid;groups.set(key,[...(groups.get(key)||[]),o]);}});
  for(const meshes of groups.values()){
   if(meshes.length<2)continue;const first=meshes[0];
   if(meshes.some(m=>!m.bindMatrix.equals(first.bindMatrix)||m.parent!==first.parent||!m.matrix.equals(first.matrix)))continue;
@@ -49,6 +50,10 @@ export function loadNightAssets():Promise<NightAssets>{
  pending.catch(e=>{failed=true;console.warn('Modelos 3D indisponíveis; a usar geometria simples.',e);});
  return pending;
 }
+
+const fxCache=new Map<string,T.Texture>();
+/** CC0 Kenney particle textures in public/fx (glow, flare, spark, star, slash, magic, rune, ring, smoke, scorch, trace, twirl, fire). */
+export function fxTexture(name:string){let t=fxCache.get(name);if(!t){t=new T.TextureLoader().load(import.meta.env.BASE_URL+'fx/'+name+'.webp');t.colorSpace=T.SRGBColorSpace;fxCache.set(name,t);}return t;}
 
 /** Static copy of a prop (unique pieces only; repeated props should use instancing). */
 export function prop(assets:NightAssets,name:string){const node=assets.props.get(name);const copy=node?node.clone():new T.Group();copy.position.set(0,0,0);copy.rotation.set(0,0,0);copy.scale.set(1,1,1);return copy;}

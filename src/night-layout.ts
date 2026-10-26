@@ -100,10 +100,10 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D){
  // The forest wall on the east/west borders matches the obstacle ring; a denser forest and mountains lie beyond.
  scatter('tree_single_A',NIGHT_OBSTACLES.filter(o=>Math.abs(o.x)>40&&!(o.x===-40&&o.z===7)).map((o,i)=>[o.x,o.z,i,1.1+hash(i)*.3] as Place),VILLAGE);
  const outer:Place[]=[],clumps:Place[]=[];
- for(let i=0;i<120;i++){const x=Math.sin(i*18.731)*55,z=Math.cos(i*7.347)*55;if(Math.abs(x)<48&&Math.abs(z)<47)continue;(i%3?outer:clumps).push([x,z,i,1+hash(i)*.5]);}
- for(let i=0;i<26;i++){const a=i/26*Math.PI*2,r=50+hash(i)*4;clumps.push([Math.sin(a)*r,Math.cos(a)*r,i,1.2]);}
+ for(let i=0;i<120;i+=2){const x=Math.sin(i*18.731)*55,z=Math.cos(i*7.347)*55;if(Math.abs(x)<48&&Math.abs(z)<47)continue;(i%3?outer:clumps).push([x,z,i,1+hash(i)*.5]);}
+ for(let i=0;i<18;i++){const a=i/18*Math.PI*2,r=50+hash(i)*4;clumps.push([Math.sin(a)*r,Math.cos(a)*r,i,1.2]);}
  scatter('tree_single_B',outer,VILLAGE*1.1);scatter('trees_B_large',clumps.filter((_,i)=>i%2===0),VILLAGE);scatter('trees_A_large',clumps.filter((_,i)=>i%2===1),VILLAGE);
- const mountains:Place[]=[];for(let i=0;i<22;i++){const a=i/22*Math.PI*2,r=68+hash(i)*8;mountains.push([Math.sin(a)*r,Math.cos(a)*r,a,1+hash(i+9)*.6,-1]);}
+ const mountains:Place[]=[];for(let i=0;i<14;i++){const a=i/14*Math.PI*2,r=68+hash(i)*8;mountains.push([Math.sin(a)*r,Math.cos(a)*r,a,1+hash(i+9)*.6,-1]);}
  scatter('mountain_A_grass_trees',mountains.filter((_,i)=>i%3===0),VILLAGE*2.2);scatter('mountain_B_grass_trees',mountains.filter((_,i)=>i%3===1),VILLAGE*2.2);scatter('mountain_C',mountains.filter((_,i)=>i%3===2),VILLAGE*2.4);
  return meshes;
 }

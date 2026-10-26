@@ -100,6 +100,6 @@ export function launchNight(options:Options){
   const follow=visual.players[me()];if(lookPointer<0&&now>manualUntil){if(!moving&&target&&(input.attack||follow.action>0))yaw=nightCombatFollow(yaw,follow,target,dt);}scene.updateNight(visual,Math.min(dt,.05),me(),yaw,zoom,pitch);hud(now);
  }
  function stop(){if(closed)return;closed=true;cancelAnimationFrame(raf);cleanupControls();room?.close();codeHost?.close();scene?.dispose();root.remove();options.onExit();}
- if(import.meta.env.DEV)(window as unknown as {__night:unknown}).__night={state:()=>state,input:(i:Partial<NightInput>)=>{input={...input,...i};}};
+ if(import.meta.env.DEV)(window as unknown as {__night:unknown}).__night={state:()=>state,scene:()=>scene,input:(i:Partial<NightInput>)=>{input={...input,...i};}};
  renderMenu();raf=requestAnimationFrame(frame);return stop;
 }

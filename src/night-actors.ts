@@ -23,13 +23,15 @@ const HEROES:Record<NightClass,HeroLook>={
 /** Cat ears and tail keep the Ordem do Novelo identity on top of the human adventurer models. */
 function catFeatures(actor:Actor,fur:number){
  const furMat=new T.MeshStandardMaterial({color:fur,roughness:.8}),inner=new T.MeshStandardMaterial({color:0xd98c96,roughness:.9});actor.materials.push(furMat,inner);
- const ear=new T.ConeGeometry(.2,.42,4),earInner=new T.ConeGeometry(.11,.26,4),segment=new T.CapsuleGeometry(.1,.2,3,6);
+ const ear=new T.ConeGeometry(.2,.42,4),earInner=new T.ConeGeometry(.11,.26,4);
  const head=actor.bone('head');
  for(const side of [-1,1]){const e=new T.Mesh(ear,furMat);e.position.set(side*.33,1.12,-.02);e.rotation.set(-.1,0,-side*.32);const i=new T.Mesh(earInner,inner);i.position.set(0,-.04,.07);e.add(i);head?.add(e);}
- // The tail hangs from the actor root: hip bone axes differ per rig and would point it sideways.
- const tail:T.Object3D[]=[];let parent:T.Object3D=new T.Group();parent.position.set(0,.9,-.34);parent.rotation.x=-1.75;actor.root.add(parent);
- for(let i=0;i<5;i++){const joint=new T.Group();joint.position.y=i?.24:0;joint.rotation.x=i?.38:0;const s=new T.Mesh(segment,furMat);s.position.y=.12;s.scale.setScalar(1-i*.1);joint.add(s);parent.add(joint);tail.push(joint);parent=joint;}
- return {tail,geometries:[ear,earInner,segment]};
+ // A single curved tube reads as a tail; it hangs from the actor root because hip bone axes differ per rig.
+ const curve=new T.CatmullRomCurve3([new T.Vector3(0,0,0),new T.Vector3(0,.08,-.3),new T.Vector3(0,.4,-.5),new T.Vector3(0,.75,-.42),new T.Vector3(0,.92,-.2)]);
+ const tube=new T.TubeGeometry(curve,14,.085,6,false),tip=new T.SphereGeometry(.1,8,6);
+ const base=new T.Group();base.position.set(0,.88,-.3);actor.root.add(base);const tailMesh=new T.Mesh(tube,furMat);const end=new T.Mesh(tip,furMat);end.position.set(0,.92,-.2);base.add(tailMesh,end);
+ const tail=[base];
+ return {tail,geometries:[ear,earInner,tube,tip]};
 }
 
 export class HeroActor{
@@ -52,7 +54,7 @@ export class HeroActor{
   else if(p.moving>.1){const running=p.running>0||p.moving>.6;this.actor.play(running?'Running_A':'Walking_A',{fade:.18,speed:running?(p.running?1.25:1)*Math.max(.7,p.moving):.6+p.moving});}
   else this.actor.play('Idle',{fade:.25});
   this.lastAction=p.action;this.lastCombo=p.combo;this.lastTime=p.actionTime;
-  this.tail.forEach((t,i)=>{t.rotation.z=Math.sin(time*4-i*.7)*.22*(1+p.moving);t.rotation.x=i?.38+Math.sin(time*3-i)*.08:0;});
+  const tail=this.tail[0];tail.rotation.y=Math.sin(time*3.2)*.35*(1+p.moving*.6);tail.rotation.x=-.1+Math.sin(time*2.1)*.06-p.moving*.25;
   this.actor.flash(p.hit>0?0xff3b30:p.shield>0?0x1d6c70:0,p.hit>0?Math.min(.2,p.hit):p.shield>0?.25:0);
   this.actor.update(dt);
  }
