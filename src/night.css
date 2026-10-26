@@ -23,3 +23,10 @@
 .night svg.gi path{fill:currentColor;stroke:none}
 .night .hunt-actions .hunt-attack svg.gi{width:32px;height:32px}
 @media(orientation:portrait){.night-spells{right:12px;bottom:calc(160px + env(safe-area-inset-bottom));flex-wrap:wrap-reverse;max-width:186px;justify-content:flex-start}}
+/* Dodge lives on the stick: a double tap rolls. The ring shows when a dodge is available. */
+.night .hunt-actions .night-control{grid-column:2;grid-row:2}
+.night .hunt-stick .hunt-stick-ring{transition:box-shadow .2s,border-color .2s}
+.night .hunt-stick.dodge-ready .hunt-stick-ring{border-color:#bfe8ff99;box-shadow:0 0 10px #8fd3ff40}
+.night .hunt-stick.dodge-tap .hunt-stick-ring{animation:night-dodge-tap .35s ease-out}
+@keyframes night-dodge-tap{0%{box-shadow:0 0 0 0 #bfe8ffcc}100%{box-shadow:0 0 0 22px #bfe8ff00}}
+.night .hunt-stick small:after{content:' · 2× ESQUIVA';opacity:.75}

@@ -31,6 +31,7 @@ export const NIGHT_SHOP=[
  {id:'siphon',name:'Selo drenante',description:'+4% de vampirismo mágico por nível',cost:80,max:3},
  {id:'bloom',name:'Semente astral',description:'+20% de cura e +1 vida/s fora de combate',cost:70,max:3},
  {id:'haste',name:'Relógio lunar',description:'−8% de recarga por nível',cost:75,max:3},
+ {id:'weave',name:'Fio carmesim',description:'Carmesim: o feixe ramifica para mais um inimigo por nível',cost:90,max:2},
  {id:'flask',name:'Frasco da Ordem',description:'Recupera uma carga de poção (máx. 3)',cost:25,max:99},
  {id:'meteor',name:'Magia: estrela cadente',description:'Habilidade extra: meteoro numa área de 4 m',cost:100,max:1},
  {id:'garden',name:'Magia: jardim astral',description:'Habilidade extra: cura aliados numa área de 8 m',cost:90,max:1},
