@@ -1,6 +1,6 @@
 import * as T from 'three';
 import {NIGHT_CAMPS,NIGHT_OBSTACLES,NIGHT_PORTALS,NIGHT_SPRINGS} from './night-data';
-import type {NightAssets} from './night-assets';
+import {fxTexture,type NightAssets} from './night-assets';
 
 /** [x, z, rotationY, scale, y] */
 type Place=[number,number,number?,number?,number?];
@@ -120,12 +120,49 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D){
  return meshes;
 }
 
-/** Boss arena dressing: pillars with braziers and banners around the ring, arched walls behind. */
-export function dressNightArena(assets:NightAssets,root:T.Object3D){
- const group=new T.Group();root.add(group);
- const add=(name:string,x:number,z:number,r=0,s=1,y=0)=>{for(const part of assets.parts(name)){const mesh=new T.Mesh(part.geometry,part.material);mesh.applyMatrix4(part.matrix);const holder=new T.Group();holder.position.set(x,y,z);holder.rotation.y=r;holder.scale.setScalar(s);holder.add(mesh);group.add(holder);}};
- for(let i=0;i<12;i++){const a=i/12*Math.PI*2,x=Math.sin(a)*15,z=Math.cos(a)*15;add(i%2?'pillar':'pillar_decorated',x,z,a+Math.PI,1);if(i%2===0)add('banner_patternB_blue',x*.93,z*.93,a+Math.PI,.8,1.4);else add('torch_lit',x*.92,z*.92,a+Math.PI,1.4,2.4);}
- for(let i=0;i<16;i++){const a=i/16*Math.PI*2+.2;add(i%4===0?'wall_pillar':'wall_arched',Math.sin(a)*20,Math.cos(a)*20,a+Math.PI,1.3);}
- for(let i=0;i<8;i++){const a=i/8*Math.PI*2+.4;add(i%2?'grave_B':'gravestone',Math.sin(a)*17.4,Math.cos(a)*17.4,a+Math.PI,.9);}
- return group;
+export type NightArena={group:T.Group;update:(time:number,dt:number)=>void;fog:number;sky:number;dispose:()=>void};
+/**
+ * Boss arenas, one per moon, built from KayKit/Kenney models. The fighting floor is a 15 m disc (the
+ * simulation clamps everyone to 14 m); scenery stands outside it so nothing blocks the fight.
+ */
+export function dressNightArena(assets:NightAssets,root:T.Object3D,stage=1):NightArena{
+ const group=new T.Group();root.add(group);const owned:T.Material[]=[];
+ const add=(name:string,x:number,z:number,r=0,s=1,y=0)=>{const holder=new T.Group();holder.position.set(x,y,z);holder.rotation.y=r;holder.scale.setScalar(s);for(const part of assets.parts(name)){const mesh=new T.Mesh(part.geometry,part.material);mesh.applyMatrix4(part.matrix);holder.add(mesh);}group.add(holder);return holder;};
+ const ring=(count:number,radius:number,fn:(x:number,z:number,a:number,i:number)=>void,offset=0)=>{for(let i=0;i<count;i++){const a=i/count*Math.PI*2+offset;fn(Math.sin(a)*radius,Math.cos(a)*radius,a,i);}};
+ const inward=(a:number)=>a+Math.PI;
+ const decal=(map:string,color:number,size:number,opacity:number,additive=true,y=.03)=>{const m=new T.MeshBasicMaterial({map:fxTexture(map),color,transparent:true,opacity,depthWrite:false,side:T.DoubleSide,blending:additive?T.AdditiveBlending:T.NormalBlending});owned.push(m);const mesh=new T.Mesh(new T.PlaneGeometry(size,size),m);mesh.rotation.x=-Math.PI/2;mesh.position.y=y;group.add(mesh);return mesh;};
+ // Floor: 4 m dungeon tiles covering the fighting disc, rubble tiles for the ruined courtyard.
+ const tile=stage===2?'floor_tile_large_rocks':'floor_tile_large';const tiles:[number,number][]=[];for(let x=-16;x<=16;x+=4)for(let z=-16;z<=16;z+=4)if(Math.hypot(x,z)<17)tiles.push([x,z]);
+ for(const part of assets.parts(tile)){const mesh=new T.InstancedMesh(part.geometry,part.material,tiles.length),m=new T.Matrix4();tiles.forEach(([x,z],i)=>{m.makeTranslation(x,-.06,z);mesh.setMatrixAt(i,m.multiply(part.matrix));});mesh.computeBoundingSphere();group.add(mesh);}
+ // The edge of the fight is a glowing ring so players read the limit without walls in the way.
+ decal('ring',stage===3?0xb98cff:0xf3cd8a,30,.5);
+ const animated:{update:(t:number,dt:number)=>void}[]=[];
+ const flames=(x:number,y:number,z:number,color=0xff8a3c,size=1.1)=>{const m=new T.SpriteMaterial({map:fxTexture('fire'),color,transparent:true,depthWrite:false,blending:T.AdditiveBlending});owned.push(m);const f=new T.Sprite(m);f.position.set(x,y,z);f.scale.setScalar(size);group.add(f);const light=new T.PointLight(color,4,9,1.8);light.position.set(x,y+.3,z);group.add(light);const seed=Math.random()*10;animated.push({update:t=>{f.scale.set(size*(.9+Math.sin(t*9+seed)*.1),size*(1.1+Math.sin(t*13+seed)*.15),1);light.intensity=3.5+Math.sin(t*11+seed)*.8;}});};
+ if(stage===1){// Claustro da Lua: gothic cloister of arches, graves and candles under the moon.
+  ring(10,16.5,(x,z,a,i)=>{add(i%2?'arch':'pillar',x,z,inward(a),i%2?1.05:1);});
+  ring(10,18.5,(x,z,a,i)=>{add(['grave_A','gravestone','grave_B','gravemarker_A'][i%4],x,z,inward(a),1);},.31);
+  ring(6,15.4,(x,z,a)=>{add('candle_triple',x,z,a,1.2);flames(x,1.1,z,0xffc070,.5);},.52);
+  add('crypt',0,-25,0,1);add('shrine_candles',-5,-19,.3);add('shrine_candles',5,-19,-.3);
+  ring(8,24,(x,z,a,i)=>add(i%2?'tree_dead_large':'tree_dead_medium',x,z,a*3,1.4));
+  ring(4,16,(x,z,a)=>{add('post_lantern',x,z,inward(a),1.1);},Math.PI/4);
+  decal('magic',0x9fd8ff,10,.18);
+ }else if(stage===2){// Pátio das Cinzas: a burnt courtyard with collapsed houses, braziers and drifting embers.
+  ring(7,21,(x,z,a,i)=>add(i%2?'building_destroyed':'building_home_B_red',x,z,inward(a),VILLAGE*1.2));
+  ring(12,16.6,(x,z,a,i)=>{if(i%3===1)return;add('wall_straight',x,z,inward(a)+Math.PI/2,VILLAGE*.9);});
+  ring(6,15.2,(x,z,a)=>{add('barrel_large',x,z,a,.55);flames(x,1.6,z);});
+  for(let i=0;i<7;i++){const a=i*2.1,r=3+i%3*3.5;decal('scorch',0x1a1410,3+i%3,.75,false,.035+i*.002).position.set(Math.sin(a)*r,.035+i*.002,Math.cos(a)*r);}
+  add('crates_stacked',-17,9,.6,.9);add('keg_decorated',16,-10,2,.8);add('sword_shield',12,13,2.2,.9,.4);add('sword_shield',-13,-12,5,.9,.4);
+  // Embers rise forever from the ruins.
+  const count=90,pos=new Float32Array(count*3),geo=new T.BufferGeometry();for(let i=0;i<count;i++){pos[i*3]=(hash(i)-.5)*40;pos[i*3+1]=hash(i+50)*8;pos[i*3+2]=(hash(i+99)-.5)*40;}geo.setAttribute('position',new T.BufferAttribute(pos,3));
+  const em=new T.PointsMaterial({map:fxTexture('spark'),color:0xff8a3c,size:.45,transparent:true,depthWrite:false,blending:T.AdditiveBlending});owned.push(em);const embers=new T.Points(geo,em);group.add(embers);
+  animated.push({update:(t,dt)=>{for(let i=0;i<count;i++){let y=pos[i*3+1]+dt*(.8+hash(i)*1.2);if(y>9)y=0;pos[i*3+1]=y;pos[i*3]+=Math.sin(t+i)*dt*.3;}geo.attributes.position.needsUpdate=true;}});
+ }else{// Santuário do Eclipse: ornate colonnade, banners and a vast rune circle turning under the eclipse.
+  ring(12,16.2,(x,z,a,i)=>{add(i%2?'pillar_decorated':'column',x,z,inward(a),i%2?1.05:2.2);if(i%2)add(i%4===1?'banner_patternB_blue':'banner_thin_red',x*.94,z*.94,inward(a),.85,1.6);});
+  ring(16,21,(x,z,a,i)=>add(i%4===0?'wall_pillar':'wall_arched',x,z,inward(a),1.35));
+  ring(6,15,(x,z,a)=>{add('torch_lit',x,z,inward(a),1.4,1.8);flames(x,3,z,0xc49bff,.8);},.26);
+  const big=decal('magic',0xb98cff,26,.55),runes=decal('rune',0xe0c8ff,14,.6);
+  const floating:T.Sprite[]=[];for(let i=0;i<14;i++){const m=new T.SpriteMaterial({map:fxTexture(i%2?'rune':'magic'),color:0xc9a8ff,transparent:true,opacity:.7,depthWrite:false,blending:T.AdditiveBlending});owned.push(m);const sp=new T.Sprite(m);sp.scale.setScalar(1.4);group.add(sp);floating.push(sp);}
+  animated.push({update:t=>{big.rotation.z=t*.08;runes.rotation.z=-t*.15;floating.forEach((sp,i)=>{const a=t*.25+i/14*Math.PI*2;sp.position.set(Math.sin(a)*18.5,4+Math.sin(t*.8+i)*1.2,Math.cos(a)*18.5);});}});
+ }
+ return {group,fog:[0x101c2b,0x241a28,0x141329][stage-1],sky:[0x101c2b,0x241a28,0x141329][stage-1],update:(t,dt)=>{if(group.visible)animated.forEach(a=>a.update(t,dt));},dispose:()=>{group.removeFromParent();group.traverse(o=>{if(o instanceof T.Mesh&&o.geometry.type==='PlaneGeometry')o.geometry.dispose();if(o instanceof T.Points)o.geometry.dispose();if(o instanceof T.PointLight)o.dispose();});owned.forEach(m=>m.dispose());}};
 }

@@ -1,7 +1,7 @@
 import {NightEffects} from './night-effects';
 import {loadNightAssets,nightAssets,nightAssetsFailed,fxTexture} from './night-assets';
 import {HeroActor,BossActor} from './night-actors';
-import {dressNightArena} from './night-layout';
+import {dressNightArena,type NightArena} from './night-layout';
 import {nightBoom} from './night-camera';
 import {NIGHT_OBSTACLES} from './night-data';
 import {NightWorld} from './night-world';
@@ -20,7 +20,7 @@ export class HuntScene {
  readonly scene=new T.Scene();readonly camera=new T.PerspectiveCamera(43,1,.1,160);
  private materials:T.Material[]=[];private geometries:T.BufferGeometry[]=[];private textures:T.Texture[]=[];
  private nightEffects?:NightEffects;private nightBeacon?:T.Group;private night?:NightState;private world?:NightWorld;private arenaObjects:T.Object3D[]=[];private classKey="";private orbit=0;private zoomLevel=1;private elevation=.42;private nightStage=0;
- private heroModels:HeroActor[]=[];private bossModel?:BossActor;private bossForm=0;private assetWait=0;private hitStop=0;private arenaFloor:T.Material[]=[];private hemi!:T.HemisphereLight;private key!:T.DirectionalLight;private rim!:T.DirectionalLight;private loading?:HTMLElement;
+ private heroModels:HeroActor[]=[];private bossModel?:BossActor;private bossForm=0;private assetWait=0;private hitStop=0;private arena?:NightArena;private arenaFloor:T.Material[]=[];private hemi!:T.HemisphereLight;private key!:T.DirectionalLight;private rim!:T.DirectionalLight;private loading?:HTMLElement;
  private heroes:Rig[]=[];private boss!:Rig;private warning!:T.Mesh;private boundary!:T.Mesh;
  private projectileMeshes=new Map<number,T.Group>();private effects:{mesh:T.Object3D;age:number;life:number;kind:string;velocity:T.Vector3}[]=[];
  private labels:{element:HTMLElement;x:number;z:number;age:number;life:number}[]=[];
@@ -146,7 +146,7 @@ export class HuntScene {
    const assets=nightAssets();if(assets){
     // Textured models read better under a cooler moon key and a softer sky fill than flat-shaded primitives.
     this.hemi.intensity=1.5;this.hemi.color.setHex(0x9fc4ff);this.hemi.groundColor.setHex(0x2a2238);this.key.color.setHex(0xc9dcff);this.key.intensity=2.6;this.key.position.set(-10,16,6);this.rim.color.setHex(0xffa56b);this.rim.intensity=1.6;this.renderer.toneMappingExposure=1.1;
-this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)||this.arenaFloor.includes(o.material as T.Material)||o.material instanceof T.MeshBasicMaterial;if(!keep)o.removeFromParent();return keep;});this.arenaObjects.push(dressNightArena(assets,this.scene));}}
+this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)||o.material instanceof T.MeshBasicMaterial&&!this.arenaFloor.includes(o.material);if(!keep)o.removeFromParent();return keep;});}}
   const assets=nightAssets();const key=s.players.map(p=>p.classId).join(',')+(assets?':models':'');if(key!==this.classKey){this.classKey=key;this.heroModels.forEach(h=>h.dispose());this.heroModels=[];this.heroes.forEach(r=>{r.root.removeFromParent();r.shadow.removeFromParent();});this.heroes=s.players.map(p=>this.cat(classFor(p.classId).magic));this.heroes.forEach((r,i)=>{r.materials[2].color.setHex(classFor(s.players[i].classId).color);const role=s.players[i].classId;
    r.materials[0].flatShading=false;r.materials[1].flatShading=false;
    if(role==='ranger'){r.weapon.visible=false;const bow=this.pivot(r.arms[0],0,-.4,.15);const arc=this.add(new T.TorusGeometry(.62,.045,5,24,Math.PI),this.gold,bow);arc.rotation.z=-Math.PI/2;this.block(bow,this.cyan,0,0,0,.025,1.2,.025);this.compact(bow);r.materials[0].color.setHex(0xab9781);}
@@ -155,10 +155,10 @@ this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)
    if(role==='witch'){const halo=this.ring(r.head,this.gold,.72,.025,0,.25);halo.rotation.x=.5;this.add(new T.OctahedronGeometry(.17),this.cyan,r.head,-.65,.3,0);r.materials[0].color.setHex(0x8e8bb0);}
    r.root.position.set(s.players[i].x,0,s.players[i].z);
    if(assets){const model=new HeroActor(assets,role,this.scene);model.root.position.copy(r.root.position);model.root.add(r.aura,r.slash);r.root.visible=false;this.heroModels[i]=model;}});}
-  const arena=s.phase==='boss'||s.phase==='won';this.arenaObjects.forEach(o=>o.visible=arena);this.boss.root.visible=this.boss.shadow.visible=arena;
+  const arena=s.phase==='boss'||s.phase==='won';this.arenaObjects.forEach(o=>o.visible=arena);if(this.arena){this.arena.group.visible=arena;this.arena.update(s.time,dt);}this.boss.root.visible=this.boss.shadow.visible=arena;
   if(assets&&arena&&this.bossForm!==s.stage){this.bossModel?.dispose();this.bossModel=new BossActor(assets,s.stage,this.scene);this.bossModel.root.position.set(s.boss.x,0,s.boss.z);this.bossForm=s.stage;}
-  if(this.bossModel){this.bossModel.root.visible=arena;this.boss.root.visible=false;}this.marker.visible=this.boundary.visible=arena;
-  if(this.nightStage!==s.stage){this.nightStage=s.stage;this.boss.root.scale.setScalar(1+(s.stage-1)*.09);this.boss.materials[2].color.setHex([0x8f3b55,0x9b4e27,0x503b8c][s.stage-1]);this.boss.materials[0].color.setHex([0x65506d,0x5a3d38,0x36385c][s.stage-1]);this.renderer.setClearColor([0x101c2b,0x241a28,0x141329][s.stage-1]);}
+  if(this.bossModel){this.bossModel.root.visible=arena;this.boss.root.visible=false;}this.marker.visible=arena;this.boundary.visible=arena&&!this.arena;
+  if(this.nightStage!==s.stage){this.nightStage=s.stage;if(assets){this.arena?.dispose();this.arena=dressNightArena(assets,this.scene,s.stage);this.scene.fog=new T.FogExp2(this.arena.fog,.016);}this.boss.root.scale.setScalar(1+(s.stage-1)*.09);this.boss.materials[2].color.setHex([0x8f3b55,0x9b4e27,0x503b8c][s.stage-1]);this.boss.materials[0].color.setHex([0x65506d,0x5a3d38,0x36385c][s.stage-1]);this.renderer.setClearColor([0x101c2b,0x241a28,0x141329][s.stage-1]);}
   if(this.nightBeacon){this.nightBeacon.visible=!!s.order;if(s.order){const leader=s.players[s.order.owner],fixed=s.order.kind==='defend';this.nightBeacon.position.set(fixed?s.order.x:leader.x,.15+Math.sin(s.time*3)*.12,fixed?s.order.z:leader.z);}}
   this.nightEffects?.update(s,dt);this.world.update(s,dt,this.target);this.update(nightVisual(s),dt);
  }
@@ -193,5 +193,5 @@ this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)
   for(const label of this.labels){label.age+=dt;const p=new T.Vector3(label.x,3+label.age*2,label.z).project(this.camera);label.element.style.transform=`translate(${(p.x*.5+.5)*this.canvas.clientWidth}px,${(-p.y*.5+.5)*this.canvas.clientHeight}px)`;label.element.style.opacity=String(1-label.age/label.life);}this.labels=this.labels.filter(l=>{if(l.age>=l.life){l.element.remove();return false;}return true;});
   this.renderer.render(this.scene,this.camera);
  }
- dispose(){this.heroModels.forEach(h=>h.dispose());this.bossModel?.dispose();this.loading?.remove();this.sizeObserver?.disconnect();this.nightEffects?.dispose();this.world?.dispose();this.labels.forEach(l=>l.element.remove());new Set(this.geometries).forEach(g=>g.dispose());new Set(this.materials).forEach(m=>m.dispose());this.textures.forEach(t=>t.dispose());this.renderer.dispose();}
+ dispose(){this.arena?.dispose();this.heroModels.forEach(h=>h.dispose());this.bossModel?.dispose();this.loading?.remove();this.sizeObserver?.disconnect();this.nightEffects?.dispose();this.world?.dispose();this.labels.forEach(l=>l.element.remove());new Set(this.geometries).forEach(g=>g.dispose());new Set(this.materials).forEach(m=>m.dispose());this.textures.forEach(t=>t.dispose());this.renderer.dispose();}
 }
