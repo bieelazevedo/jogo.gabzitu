@@ -1,0 +1,4 @@
+/* manipulation removes double-tap zoom without cancelling button clicks. */
+.game-shell,.hunt,.farm{touch-action:none;overscroll-behavior:none}
+.game-shell button,.hunt button,.farm button,.game-shell [role="button"],.hunt [role="button"],.farm [role="button"]{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.game-shell canvas,.hunt>canvas,.farm canvas,.hunt-stick{touch-action:none}

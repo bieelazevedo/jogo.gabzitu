@@ -1,3 +1,9 @@
+import {NightEffects} from './night-effects';
+import {nightBoom} from './night-camera';
+import {NIGHT_OBSTACLES} from './night-data';
+import {NightWorld} from './night-world';
+import {classFor,rangedClass} from './night-data';
+import {nightVisual,type NightState} from './night-simulation';
 import * as T from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {huntArena,type Hunter,type HuntBoss,type HuntState,type HuntEvent} from './hunt-simulation';
@@ -6,9 +12,11 @@ type Rig={root:T.Group;body:T.Group;head:T.Group;arms:T.Group[];legs:T.Group[];t
 const ease=(a:number,b:number,t:number)=>a+(b-a)*Math.min(1,t);
 function angle(a:number,b:number,t:number){return a+Math.atan2(Math.sin(b-a),Math.cos(b-a))*Math.min(1,t);}
 export class HuntScene {
+ private sizeObserver?:ResizeObserver;
  readonly renderer:T.WebGLRenderer;
  readonly scene=new T.Scene();readonly camera=new T.PerspectiveCamera(43,1,.1,160);
  private materials:T.Material[]=[];private geometries:T.BufferGeometry[]=[];private textures:T.Texture[]=[];
+ private nightEffects?:NightEffects;private nightBeacon?:T.Group;private night?:NightState;private world?:NightWorld;private arenaObjects:T.Object3D[]=[];private classKey="";private orbit=0;private zoomLevel=1;private elevation=.42;private nightStage=0;
  private heroes:Rig[]=[];private boss!:Rig;private warning!:T.Mesh;private boundary!:T.Mesh;
  private projectileMeshes=new Map<number,T.Group>();private effects:{mesh:T.Object3D;age:number;life:number;kind:string;velocity:T.Vector3}[]=[];
  private labels:{element:HTMLElement;x:number;z:number;age:number;life:number}[]=[];
@@ -16,16 +24,16 @@ export class HuntScene {
  private gold!:T.MeshStandardMaterial;private cyan!:T.MeshStandardMaterial;private ember!:T.MeshStandardMaterial;
  private sphere=new T.SphereGeometry(1,12,8);private box=new T.BoxGeometry(1,1,1);private capsule=new T.CapsuleGeometry(.12,.45,3,6);
  constructor(private canvas:HTMLCanvasElement,private labelRoot:HTMLElement,private local:number,private sound:(kind:string)=>void,private arenaId=1){
-  this.renderer=new T.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});
+  this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
   this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
   this.renderer.setClearColor(huntArena(arenaId).sky);this.scene.fog=new T.FogExp2(huntArena(arenaId).sky,.018);
   this.geometries.push(this.sphere,this.box,this.capsule);
   this.scene.add(new T.HemisphereLight(0xb9ddff,0x28263a,2.6));const key=new T.DirectionalLight(0xffddb2,3.5);key.position.set(-6,12,9);this.scene.add(key);const rim=new T.DirectionalLight(0x5cb6db,2);rim.position.set(4,6,-12);this.scene.add(rim);
   this.gold=this.material(0xe7bc70,.55);this.cyan=this.material(0x8aefff,.2,0x3cb3e7,.7);this.ember=this.material(0xff9871,.1,0xff4e38,.65);
-  this.environment();this.heroes=[this.cat(false),this.cat(true)];this.boss=this.monster();
+  this.environment();this.arenaObjects=this.scene.children.filter(o=>!(o instanceof T.Light));this.heroes=[this.cat(false),this.cat(true)];this.boss=this.monster();
   this.warning=this.add(new T.RingGeometry(.01,5.6,64),new T.MeshBasicMaterial({color:0xff7658,transparent:true,opacity:.25,side:T.DoubleSide,depthWrite:false}),this.scene,0,.04,0);this.warning.rotation.x=-Math.PI/2;
   this.marker=this.add(new T.RingGeometry(2.5,2.58,48),new T.MeshBasicMaterial({color:0xf3cd8a,transparent:true,opacity:.5,side:T.DoubleSide}),this.scene);this.marker.rotation.x=-Math.PI/2;
-  this.camera.position.set(0,16,19);this.camera.lookAt(0,.6,0);this.resize();
+  this.camera.position.set(0,16,19);this.camera.lookAt(0,.6,0);this.resize();this.sizeObserver=new ResizeObserver(()=>this.resize());this.sizeObserver.observe(this.canvas);
  }
  private material(color:number,metalness=0,emissive=0,intensity=0){const m=new T.MeshStandardMaterial({color,roughness:.7,metalness,emissive,emissiveIntensity:intensity,flatShading:true});this.materials.push(m);return m;}
  private add(g:T.BufferGeometry,m:T.Material,parent:T.Object3D,x=0,y=0,z=0,sx=1,sy=sx,sz=sx){if(!this.geometries.includes(g))this.geometries.push(g);if(!this.materials.includes(m))this.materials.push(m);const o=new T.Mesh(g,m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);parent.add(o);return o;}
@@ -82,10 +90,10 @@ export class HuntScene {
   let tail=this.pivot(r.body,0,1.1,-1);for(let i=0;i<5;i++){const p=this.pivot(tail,0,0,i?-.65:0);this.ball(p,light,0,0,-.35,.23-i*.026,.2-i*.02,.52);r.tail.push(p);tail=p;}
   r.cape=this.add(new T.ConeGeometry(1.6,2.8,6,1,true),cloth,r.body,0,2.1,-.6);r.cape.scale.z=.55;r.shadow.scale.setScalar(2.7);r.aura.visible=false;r.slash.visible=false;this.compact(r.head);this.compact(r.weapon);this.compact(r.body,r.cape);return r;
  }
- resize(){const w=this.canvas.clientWidth,h=this.canvas.clientHeight;this.renderer.setSize(w,h,false);this.aspect=w/h;this.camera.aspect=this.aspect;this.camera.updateProjectionMatrix();}
- private animateHero(r:Rig,p:Hunter,dt:number,time:number){
+ resize(){const w=this.canvas.clientWidth,h=this.canvas.clientHeight;if(w<1||h<1)return;this.renderer.setSize(w,h,false);this.aspect=w/h;this.camera.aspect=this.aspect;this.camera.updateProjectionMatrix();}
+ private animateHero(r:Rig,p:Hunter,dt:number,time:number){const previousY=r.root.position.y;const joints=[r.body,r.head,...r.arms,...r.legs],previous=joints.map(j=>({x:j.rotation.x,y:j.rotation.y,z:j.rotation.z}));
   r.root.position.x=ease(r.root.position.x,p.x,dt*20);r.root.position.z=ease(r.root.position.z,p.z,dt*20);r.root.rotation.y=angle(r.root.rotation.y,p.facing,dt*15);
-  const run=Math.sin(time*13)*p.moving,progress=p.actionTime/(p.duration||1),swing=Math.sin(Math.min(1,progress)*Math.PI);
+  const run=Math.sin(time*(this.night?.players[this.heroes.indexOf(r)]?.running?18:13))*p.moving,progress=p.actionTime/(p.duration||1),swing=Math.sin(Math.min(1,progress)*Math.PI);
   r.root.rotation.z=ease(r.root.rotation.z,p.hp<=0?1.45:0,dt*12);r.root.position.y=p.hp<=0?-.35:p.dash>0?.1:Math.abs(run)*.11;
   r.body.rotation.x=p.dash>0?-progress*Math.PI*2:p.action===2?-.22*swing:0;r.body.rotation.y=p.action===1?Math.sin(progress*Math.PI*2)*.28*(p.combo%2?-1:1):0;
   r.head.rotation.x=Math.sin(time*2)*.025;r.legs[0].rotation.x=run*.65;r.legs[1].rotation.x=-run*.65;
@@ -94,29 +102,54 @@ export class HuntScene {
   if(p.action===1||p.action===2||p.action===3)r.arms[1].rotation.x=-1.4*swing;
   r.arms[0].rotation.z=p.action===3?.9*swing:0;r.cape.rotation.x=-.15-p.moving*.2+Math.sin(time*6)*.08;r.tail.forEach((t,i)=>{t.rotation.y=Math.sin(time*4-i*.6)*.24;t.rotation.x=-.08;});
   r.aura.material=this.materials.includes(r.aura.material as T.Material)?r.aura.material:this.cyan;r.aura.visible=p.hp>0;r.aura.scale.setScalar(p.shield>0?1.3:1);r.aura.rotation.z=time*.4;
-  r.slash.visible=p.action===1&&p.actionTime>.08&&progress<.85&&this.heroes.indexOf(r)===0;r.slash.rotation.z=-progress*Math.PI*2;r.slash.scale.setScalar(p.combo===3?1.4:1);
+  r.slash.visible=p.action===1&&p.actionTime>.08&&progress<.85&&(this.night?!rangedClass(this.night.players[this.heroes.indexOf(r)].classId):this.heroes.indexOf(r)===0);r.slash.rotation.z=-progress*Math.PI*2;r.slash.scale.setScalar(p.combo===3?1.4:1);
+  if(this.night&&p.hp>0){r.head.rotation.y=0;r.body.position.z=0;r.weapon.rotation.z=0;r.root.position.y=ease(previousY,r.root.position.y+this.night.players[this.heroes.indexOf(r)].y,dt*18);const hero=this.night.players[this.heroes.indexOf(r)],mage=classFor(hero.classId).magic,u=Math.min(1,p.actionTime/(p.duration||1)),strike=Math.min(.7,Math.max(.15,hero.impactAt/(p.duration||1))),wind=Math.min(1,u/strike),release=Math.max(0,Math.min(1,(u-strike)/.24)),recover=Math.max(0,(u-strike-.24)/(1-strike-.24)),swing=wind*(1-release)+release*(1-recover);
+   if(p.action===1){if(hero.classId==='ranger'){r.arms[0].rotation.x=-1.2;r.arms[0].rotation.z=-.15;r.arms[1].rotation.x=-.8;r.arms[1].rotation.z=.9*wind-.6*release*(1-recover);r.body.rotation.y=-.35;r.head.rotation.y=.2;}else if(mage){r.arms[1].rotation.x=-.6-wind*.7+release*.9;r.arms[0].rotation.x=-.55*swing;r.body.rotation.x=.12*swing;r.weapon.rotation.z=Math.sin(u*Math.PI)*.18;}
+    else if(hero.classId==='reaver'){r.arms[p.combo%2].rotation.x=-1.3*wind+2.2*release*(1-recover);r.arms[1-p.combo%2].rotation.x=-.45;r.body.rotation.y=(p.combo%2?1:-1)*(.5*wind-1.1*release*(1-recover));}
+    else{const side=p.combo%2?1:-1;r.arms[1].rotation.x=p.combo===3?-2.6*wind+3.5*release*(1-recover):-.8*swing;r.arms[1].rotation.z=p.combo===3?-.12:side*(1.2*wind-2.1*release*(1-recover));r.body.rotation.y=side*(.35*wind-.7*release*(1-recover));r.arms[0].rotation.x=hero.classId==='guardian'?-.9*swing:-.4*swing;}
+    const lunge=Math.sin(Math.min(1,release)*Math.PI)*(1-recover)*.18;r.body.position.z=lunge;r.head.rotation.x=-.12*swing;
+   }else{r.body.position.z=0;r.weapon.rotation.z=0;}
+   if(p.action===4){r.body.rotation.x=-Math.min(1,progress)*Math.PI*2;r.legs[0].rotation.x=-.9;r.legs[1].rotation.x=.7;r.arms[0].rotation.x=r.arms[1].rotation.x=-.7;r.cape.rotation.x=-.6;}
+   if(p.action>=2&&p.action!==4){const charge=Math.sin(u*Math.PI);r.arms[0].rotation.x=-1.6*charge;r.arms[1].rotation.x=-2.1*charge;r.arms[0].rotation.z=(mage?.5:.9)*charge;r.arms[1].rotation.z=-.4*charge;r.body.rotation.x=-.18*charge;r.head.rotation.x=-.2*charge;if(p.action===5){r.arms[0].rotation.x=-1.1*charge;r.arms[1].rotation.x=-.65*charge;r.body.rotation.x=.15*charge;}else if(p.action===6){r.body.rotation.y=Math.sin(u*Math.PI)*.55;r.arms[1].rotation.x=-1.8*charge;r.arms[0].rotation.z=.8*charge;}else if(hero.classId==='ranger'){r.arms[0].rotation.x=-1.9*charge;r.arms[1].rotation.z=1.1*charge;r.body.rotation.y=-.25*charge;}r.aura.scale.setScalar(1+charge*(p.action===3?2:1));}
+  }
+  if(this.night){const blend=1-Math.exp(-28*dt);joints.forEach((j,i)=>{j.rotation.x=previous[i].x+(j.rotation.x-previous[i].x)*blend;j.rotation.y=previous[i].y+(j.rotation.y-previous[i].y)*blend;j.rotation.z=previous[i].z+(j.rotation.z-previous[i].z)*blend;});}
   r.shadow.position.set(r.root.position.x,.005,r.root.position.z);r.shadow.scale.setScalar(p.dash>0?.8:1);
   for(const m of r.materials){m.emissive.setHex(p.hit>0?0xff6b67:p.shield>0?0x154647:0);m.emissiveIntensity=p.hit>0?.7:.5;}
  }
  private animateBoss(b:HuntBoss,dt:number,time:number,status:string){
-  const r=this.boss;r.root.position.x=ease(r.root.position.x,b.x,dt*(b.attack===4?12:7));r.root.position.z=ease(r.root.position.z,b.z,dt*8);r.root.rotation.y=angle(r.root.rotation.y,b.angle,dt*5);const wind=b.stage===1?1-b.timer/b.total:0,recover=b.stage===2?b.timer/b.total:0;
+  const r=this.boss;r.body.rotation.y=0;r.arms[0].rotation.x=0;r.root.position.x=ease(r.root.position.x,b.x,dt*(b.attack===4?12:7));r.root.position.z=ease(r.root.position.z,b.z,dt*8);r.root.rotation.y=angle(r.root.rotation.y,b.angle,dt*5);const wind=b.stage===1?1-b.timer/b.total:0,recover=b.stage===2?b.timer/b.total:0;
   r.root.position.y=b.attack===2&&b.stage===1?Math.sin(wind*Math.PI)*3:0;
   r.body.rotation.x=ease(r.body.rotation.x,status==='won'?1.25:b.stage===4?.3:wind*-.22+recover*.35,dt*8);r.body.rotation.z=b.stage===4?Math.sin(time*10)*.06:0;
   r.head.rotation.x=wind*-.25+Math.sin(time*2)*.04;r.head.rotation.z=b.stage===4?.2:0;
   r.arms[1].rotation.x=ease(r.arms[1].rotation.x,b.stage===1?-2.1*wind:b.stage===2?.8:0,dt*12);r.arms[0].rotation.z=Math.sin(time*2)*.05+(b.stage===1?wind*.8:0);r.arms[1].rotation.z=b.attack===1?Math.sin(wind*Math.PI)*1.2:0;
-  r.legs.forEach((l,i)=>l.rotation.x=b.stage===0?Math.sin(time*4+i*Math.PI)*.13:0);r.tail.forEach((t,i)=>t.rotation.y=Math.sin(time*2-i*.4)*.18);r.cape.rotation.x=-.12+Math.sin(time*3)*.05;
+  r.legs.forEach((l,i)=>l.rotation.x=b.stage===0?Math.sin(time*5+i*Math.PI)*.22:b.stage===1&&b.attack===2?-.5*wind:b.stage===2?.35*recover:0);if(b.stage===1&&b.attack===4){r.body.rotation.x=-.35*wind;r.arms[0].rotation.x=-.8*wind;}if(b.stage===1&&b.attack===3){r.arms[0].rotation.z=wind*1.4;r.arms[1].rotation.z=-wind*1.4;r.head.rotation.x=-wind*.3;}if(b.stage===1&&b.attack===5){r.body.rotation.y=Math.sin(wind*Math.PI)*.4;r.arms[0].rotation.x=-wind*1.6;}r.tail.forEach((t,i)=>t.rotation.y=Math.sin(time*2-i*.4)*.18);r.cape.rotation.x=-.12+Math.sin(time*3)*.05;
   for(const m of r.materials){m.emissive.setHex(b.hit>0?0xffd5a0:b.phase===2?0x7c172e:0);m.emissiveIntensity=b.hit>0?.75:b.phase===2?.18:0;}
   r.shadow.position.set(r.root.position.x,.004,r.root.position.z);this.marker.position.set(b.x,.03,b.z);this.marker.rotation.z=time*.15;
  }
  private telegraph(b:HuntBoss,time:number){
   this.warning.visible=b.stage===1;if(!this.warning.visible)return;const key=b.attack;if(this.warning.userData.key!==key){this.warning.geometry.dispose();let g:T.BufferGeometry;if(key===4)g=new T.PlaneGeometry(4.5,Math.hypot(b.tx-b.x,b.tz-b.z)+2);else g=new T.RingGeometry(key===3?4.7:.01,key===3?22:key===2?3.5:key===5?7.2:5.6,64);this.warning.geometry=g;this.geometries.push(g);this.warning.userData.key=key;}
   this.warning.position.set(b.attack===2?b.tx:b.x,.04,b.attack===2?b.tz:b.z);this.warning.rotation.set(-Math.PI/2,0,0);
-  if(b.attack===4){this.warning.position.set((b.x+b.tx)/2,.04,(b.z+b.tz)/2);this.warning.rotation.z=-Math.atan2(b.tx-b.x,b.tz-b.z);}
+  if(b.attack===4){this.warning.position.set((b.x+b.tx)/2,.04,(b.z+b.tz)/2);this.warning.rotation.z=Math.atan2(b.tx-b.x,b.tz-b.z);}
   const m=this.warning.material as T.MeshBasicMaterial;m.opacity=.13+(1-b.timer/b.total)*.26+Math.sin(time*17)*.035;m.color.setHex(b.attack===3?0x9677ff:0xff6650);
  }
+ movementHeading(){const e=this.camera.matrixWorld.elements;return Math.atan2(e[8],e[10]);}
+ updateNight(s:NightState,dt:number,local:number,yaw=0,zoom=1,pitch=.42){
+  this.local=local;this.night=s;this.orbit=yaw;this.zoomLevel=zoom;this.elevation=pitch;if(!this.world){this.nightEffects=new NightEffects();this.scene.add(this.nightEffects.root);this.world=new NightWorld();this.scene.add(this.world.root);this.nightBeacon=this.pivot(this.scene);const beaconRing=this.ring(this.nightBeacon,this.gold,1.3,.05,0,.15);beaconRing.rotation.x=Math.PI/2;const tip=this.add(new T.ConeGeometry(.3,.6,4),this.cyan,this.nightBeacon,0,3,0);tip.rotation.z=Math.PI;this.arenaObjects.forEach(o=>o.scale.multiplyScalar(1.12));}
+  const key=s.players.map(p=>p.classId).join(',');if(key!==this.classKey){this.classKey=key;this.heroes.forEach(r=>{r.root.removeFromParent();r.shadow.removeFromParent();});this.heroes=s.players.map(p=>this.cat(classFor(p.classId).magic));this.heroes.forEach((r,i)=>{r.materials[2].color.setHex(classFor(s.players[i].classId).color);const role=s.players[i].classId;
+   r.materials[0].flatShading=false;r.materials[1].flatShading=false;
+   if(role==='ranger'){r.weapon.visible=false;const bow=this.pivot(r.arms[0],0,-.4,.15);const arc=this.add(new T.TorusGeometry(.62,.045,5,24,Math.PI),this.gold,bow);arc.rotation.z=-Math.PI/2;this.block(bow,this.cyan,0,0,0,.025,1.2,.025);this.compact(bow);r.materials[0].color.setHex(0xab9781);}
+   if(role==='guardian'){const shield=this.pivot(r.arms[0],0,-.35,.2);this.add(new T.CylinderGeometry(.58,.58,.16,6),this.gold,shield).rotation.x=Math.PI/2;this.add(new T.CylinderGeometry(.47,.47,.18,6),r.materials[2],shield).rotation.x=Math.PI/2;this.add(new T.OctahedronGeometry(.18),this.cyan,shield,0,0,.16);this.compact(shield);}
+   if(role==='reaver'){r.weapon.visible=false;for(const arm of r.arms){const claws=this.pivot(arm,0,-.5,.12);for(let j=-1;j<=1;j++){const claw=this.add(new T.ConeGeometry(.055,.7,5),this.gold,claws,j*.12,-.28,.2);claw.rotation.x=.5;claw.rotation.z=Math.PI;}this.compact(claws);}r.materials[0].color.setHex(0x8c6674);}
+   if(role==='witch'){const halo=this.ring(r.head,this.gold,.72,.025,0,.25);halo.rotation.x=.5;this.add(new T.OctahedronGeometry(.17),this.cyan,r.head,-.65,.3,0);r.materials[0].color.setHex(0x8e8bb0);}
+   r.root.position.set(s.players[i].x,0,s.players[i].z);});}
+  const arena=s.phase==='boss'||s.phase==='won';this.arenaObjects.forEach(o=>o.visible=arena);this.boss.root.visible=this.boss.shadow.visible=arena;this.marker.visible=this.boundary.visible=arena;
+  if(this.nightStage!==s.stage){this.nightStage=s.stage;this.boss.root.scale.setScalar(1+(s.stage-1)*.09);this.boss.materials[2].color.setHex([0x8f3b55,0x9b4e27,0x503b8c][s.stage-1]);this.boss.materials[0].color.setHex([0x65506d,0x5a3d38,0x36385c][s.stage-1]);this.renderer.setClearColor([0x101c2b,0x241a28,0x141329][s.stage-1]);}
+  if(this.nightBeacon){this.nightBeacon.visible=!!s.order;if(s.order){const leader=s.players[s.order.owner],fixed=s.order.kind==='defend';this.nightBeacon.position.set(fixed?s.order.x:leader.x,.15+Math.sin(s.time*3)*.12,fixed?s.order.z:leader.z);}}
+  this.nightEffects?.update(s,dt);this.world.update(s,dt);this.update(nightVisual(s),dt);
+ }
  private spawn(e:HuntEvent){
-  if(e.kind==='hit'||e.kind==='hurt'||e.kind==='heal'){const el=document.createElement('span');el.className='hunt-number '+e.kind;el.textContent=(e.kind==='heal'?'+':'')+Math.round(e.value);this.labelRoot.append(el);this.labels.push({element:el,x:e.x+(e.owner===0?-.9:.9)+(e.id%3-1)*.25,z:e.z,age:0,life:.85});if(this.labels.length>24)this.labels.shift()!.element.remove();}
-  if(['hit','hurt','impact','ultimate','stagger','phase'].includes(e.kind)){
+  if(e.kind==='hit'||e.kind==='hurt'||e.kind==='heal'&&e.value>0){const el=document.createElement('span');el.className='hunt-number '+e.kind;el.textContent=(e.kind==='heal'?'+':'')+Math.round(e.value);this.labelRoot.append(el);this.labels.push({element:el,x:e.x+(e.owner===0?-.9:.9)+(e.id%3-1)*.25,z:e.z,age:0,life:.85});if(this.labels.length>24)this.labels.shift()!.element.remove();}
+  if(['hit','hurt','heal','impact','ultimate','stagger','phase'].includes(e.kind)){
    const big=['impact','ultimate','phase'].includes(e.kind),color=e.kind==='heal'?0x88ffcc:e.kind==='hurt'?0xff7668:e.owner===1?0x82e9ff:0xffd795;
    const material=new T.MeshBasicMaterial({color,transparent:true,opacity:.8,side:T.DoubleSide,depthWrite:false,blending:T.AdditiveBlending});this.materials.push(material);
    const ring=this.add(new T.RingGeometry(big?.7:.2,big?1:.45,32),material,this.scene,e.x,.1,e.z);ring.rotation.x=-Math.PI/2;this.effects.push({mesh:ring,age:0,life:big?.7:.3,kind:'ring',velocity:new T.Vector3()});
@@ -126,17 +159,20 @@ export class HuntScene {
   this.sound(e.kind==='slash'?'slash':e.kind==='cast'?'cast':e.kind==='hit'?'hit':e.kind==='hurt'?'hurt':e.kind==='dodge'?'dodge':e.kind==='heal'?'heal':e.kind==='phase'?'roar':e.kind==='impact'?'slam':e.kind==='ultimate'?'ultimate':e.kind==='stagger'?'break':'');
  }
  update(s:HuntState,dt:number){
-  this.clock+=dt;const time=this.clock;if(this.clock-this.hudTime>2){this.hudTime=this.clock;this.sound('ambience');}for(const e of s.events)if(e.id>this.eventId){this.eventId=e.id;this.spawn(e);}this.heroes.forEach((r,i)=>this.animateHero(r,s.players[i],dt,time));this.animateBoss(s.boss,dt,time,s.status);this.telegraph(s.boss,time);
-  const local=s.players[this.local],b=s.boss;const centre=new T.Vector3((local.x+b.x)*.3,0,(local.z+b.z)*.3);this.target.lerp(centre,Math.min(1,dt*3));const portrait=this.aspect<1;const spread=Math.hypot(local.x-b.x,local.z-b.z);const distance=portrait?32:19+Math.max(0,spread-7)*.4;
-  const destination=new T.Vector3(this.target.x,distance*.8,this.target.z+distance);this.camera.position.lerp(destination,Math.min(1,dt*3));this.shake=Math.max(0,this.shake-dt);if(this.shake>0){this.camera.position.x+=Math.sin(time*110)*this.shake;this.camera.position.y+=Math.cos(time*90)*this.shake;}
-  this.camera.lookAt(this.target.x,.6,this.target.z);this.boundary.material=this.cyan;this.cyan.emissiveIntensity=.65+Math.sin(time*2)*.12;
+  this.clock+=dt;const time=this.clock;if(this.clock-this.hudTime>2){this.hudTime=this.clock;this.sound('ambience');}for(const e of s.events)if(e.id>this.eventId){this.eventId=e.id;this.spawn(e);}this.heroes.forEach((r,i)=>this.animateHero(r,s.players[i],dt,time));this.animateBoss(s.boss,dt,time,s.status);this.telegraph(s.boss,time);if(this.night&&this.night.phase!=='boss')this.warning.visible=false;
+  const local=s.players[this.local],b=s.boss;const centre=new T.Vector3((local.x+b.x)*.3,0,(local.z+b.z)*.3);if(!this.night)this.target.lerp(centre,Math.min(1,dt*3));const portrait=this.aspect<1;const spread=Math.hypot(local.x-b.x,local.z-b.z);const distance=portrait?32:19+Math.max(0,spread-7)*.4;
+  if(this.night){const rig=this.heroes[this.local],focus=new T.Vector3(rig?.root.position.x??local.x,0,rig?.root.position.z??local.z);if(this.target.distanceTo(focus)>20)this.target.copy(focus);else this.target.lerp(focus,1-Math.exp(-18*dt));}
+  let zoom=this.night?(portrait?8.5:6.8)*this.zoomLevel:distance;if(this.night&&this.night.phase!=='boss')zoom=nightBoom(this.target.x,this.target.z,this.orbit,zoom,NIGHT_OBSTACLES);
+  const destination=this.night?new T.Vector3(this.target.x+Math.sin(this.orbit)*zoom,1.65+zoom*Math.tan(this.elevation),this.target.z+Math.cos(this.orbit)*zoom):new T.Vector3(this.target.x,distance*.8,this.target.z+distance);
+  if(this.night&&this.camera.position.distanceTo(destination)>25)this.camera.position.copy(destination);else this.camera.position.lerp(destination,1-Math.exp(-(this.night?22:3)*dt));this.shake=Math.max(0,this.shake-dt);if(this.shake>0){this.camera.position.x+=Math.sin(time*110)*this.shake;this.camera.position.y+=Math.cos(time*90)*this.shake;}
+  this.camera.lookAt(this.target.x,this.night?1.65:.6,this.target.z);this.boundary.material=this.cyan;this.cyan.emissiveIntensity=.65+Math.sin(time*2)*.12;
   const active=new Set(s.projectiles.map(p=>p.id));for(const [id,g]of this.projectileMeshes)if(!active.has(id)){g.removeFromParent();this.projectileMeshes.delete(id);}
   for(const p of s.projectiles){let g=this.projectileMeshes.get(p.id);if(!g){g=this.pivot(this.scene);this.ball(g,this.cyan,0,1,0,p.charged?.32:.18);const ring=this.ring(g,this.gold,p.charged?.4:.25,.025,0,1);ring.rotation.x=Math.PI/2;this.projectileMeshes.set(p.id,g);}g.position.set(p.x,0,p.z);g.rotation.y=time*10;}
-  const retiredMaterials=new Set<T.Material>();const retire=(e:typeof this.effects[number])=>{e.mesh.removeFromParent();if(e.mesh instanceof T.Mesh){if(e.kind==='ring'){e.mesh.geometry.dispose();const i=this.geometries.indexOf(e.mesh.geometry);if(i>=0)this.geometries.splice(i,1);}retiredMaterials.add(e.mesh.material as T.Material);}};this.effects=this.effects.filter(e=>{e.age+=dt;const t=e.age/e.life;if(t>=1){retire(e);return false;}if(e.kind==='ring'){e.mesh.scale.setScalar(1+t*7);(e.mesh as T.Mesh).material instanceof T.MeshBasicMaterial&&((e.mesh as T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>).material.opacity=(1-t)*.6);}else{e.mesh.position.addScaledVector(e.velocity,dt);e.velocity.y-=dt*12;e.mesh.scale.setScalar(.07*(1-t));}return true;});
+  const retiredMaterials=new Set<T.Material>();const retire=(e:typeof this.effects[number])=>{e.mesh.removeFromParent();if(e.mesh instanceof T.Mesh){if(e.kind==='ring'||e.kind==='beam'){e.mesh.geometry.dispose();const i=this.geometries.indexOf(e.mesh.geometry);if(i>=0)this.geometries.splice(i,1);}retiredMaterials.add(e.mesh.material as T.Material);}};this.effects=this.effects.filter(e=>{e.age+=dt;const t=e.age/e.life;if(t>=1){retire(e);return false;}if(e.kind==='ring'){e.mesh.scale.setScalar(1+t*7);(e.mesh as T.Mesh).material instanceof T.MeshBasicMaterial&&((e.mesh as T.Mesh<T.BufferGeometry,T.MeshBasicMaterial>).material.opacity=(1-t)*.6);}else if(e.kind==='beam'){((e.mesh as T.Mesh).material as T.MeshBasicMaterial).opacity=(1-t)*.8;}else{e.mesh.position.addScaledVector(e.velocity,dt);e.velocity.y-=dt*12;e.mesh.scale.setScalar(.07*(1-t));}return true;});
   if(this.effects.length>220){for(const e of this.effects.splice(0,this.effects.length-220))retire(e);}
   const liveMaterials=new Set(this.effects.map(e=>(e.mesh as T.Mesh).material));for(const m of retiredMaterials)if(!liveMaterials.has(m)){m.dispose();const i=this.materials.indexOf(m);if(i>=0)this.materials.splice(i,1);}
   for(const label of this.labels){label.age+=dt;const p=new T.Vector3(label.x,3+label.age*2,label.z).project(this.camera);label.element.style.transform=`translate(${(p.x*.5+.5)*this.canvas.clientWidth}px,${(-p.y*.5+.5)*this.canvas.clientHeight}px)`;label.element.style.opacity=String(1-label.age/label.life);}this.labels=this.labels.filter(l=>{if(l.age>=l.life){l.element.remove();return false;}return true;});
   this.renderer.render(this.scene,this.camera);
  }
- dispose(){this.labels.forEach(l=>l.element.remove());new Set(this.geometries).forEach(g=>g.dispose());new Set(this.materials).forEach(m=>m.dispose());this.textures.forEach(t=>t.dispose());this.renderer.dispose();}
+ dispose(){this.sizeObserver?.disconnect();this.nightEffects?.dispose();this.world?.dispose();this.labels.forEach(l=>l.element.remove());new Set(this.geometries).forEach(g=>g.dispose());new Set(this.materials).forEach(m=>m.dispose());this.textures.forEach(t=>t.dispose());this.renderer.dispose();}
 }

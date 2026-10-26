@@ -97,3 +97,75 @@ Menu principal compacto com três modos; Quinta com cenário 3D, carrossel no ce
 Voz ao vivo por WebRTC, mistura estéreo por convidado sem eco próprio, proximidade 3D/direção/paredes e megafone recolhível por 20s. Animal recebe chamada de microfone aos 27s por até 8s; fala sustentada detetada no host adia peidos, replay não conta. Não compara palavras. Caçador com microfone aberto e controlo de fechar; segurar para falar disponível. Foco perdido/saída termina captação. Chromium exige elemento de receção silenciado para ativar o PCM remoto; correção validada.
 
 81 testes de lógica passaram. Teste real de dois navegadores confirmou código, áudio RTP com PCM recebido não nulo, voz host→convidado, gravação partilhada, partida com bots, chamada automática (pressão voltou a 0,65s) e encerramento ao sair host. Interface testada em 390×844, 360×640, 667×375, 844×390. Não houve teste físico em iPhone nem dez participantes com voz simultânea. Host migration continua ausente; sem TURN pago.
+
+## Caçador por toque e IA — 25/10/2026
+Seleção generosa de animais no ecrã, indicador sobre o alvo e botão Capturar. Arrastar continua a rodar a câmara; altura do caçador estabilizada e posição acompanha o modelo interpolado. Sem disparo involuntário ao tocar no cenário. A assistência usa apenas posição, alcance e obstáculos, com o mesmo tratamento para NPC e jogadores. A IA investiga sons e movimentos, persegue com corrida limitada por vigor, evita repetir tiros em NPC recentemente verificados e navega para reabastecer. 84 testes passaram, incluindo captura real pela IA e recuperação de munição; build aprovado. Validação visual nova indisponível porque a navegação local está desativada nas definições Work. Teste físico em telemóvel continua pendente.
+
+Câmara e movimento: rotação horizontal contínua de 360°, sensibilidade proporcional à largura do ecrã, amortecimento angular curto e câmara orbital coerente. O analógico é recalculado a cada frame na orientação atual, incluindo durante rotação simultânea com o outro dedo. Renderização até 60 Hz, simulação mantida a 20 Hz. Testes de controlos, assistência e IA: 23 aprovados. Verificação visual nova bloqueada pela definição Work de navegação local desativada.
+
+Captura à distância: o comando identifica o animal público selecionado e admite deslocação lateral moderada entre o toque e o processamento no host. Cone de tolerância de 0,44 rad apenas para esse alvo; assistência livre mantém 0,24 rad. Alcance mantém 26 unidades, paredes e moitas preservam as regras de visibilidade. A identidade escolhida não dá informação sobre ser jogador ou NPC. Novos testes verificam corrida lateral com comando atrasado, alcance, direção e parede. 25 testes específicos passaram.
+
+## Quinta do Caos — marcação, rede e caça em equipa (25/10/2026)
+
+Substitui as regras antigas de tiro/captura: alcance de marcação 24 unidades, alcance da rede 12, cinco redes por caçador. O jogador escolhe o alvo; o botão Capturar só fica disponível com seleção válida e no alcance. A captura não depende de precisão ou sorte. O host verifica alcance e obstáculos; conserva até oito poses recentes para tolerar até 350 ms de trânsito do comando, com margem máxima de duas unidades e sem atravessar paredes/moitas. Uma seleção que deixou de ser válida não gasta rede.
+
+As duas primeiras capturas da ronda, sejam NPC ou jogadores, convertem o animal em caçador. NPC convertidos recebem IA própria; máximo de três caçadores. Humanos convertidos mantêm o seu lugar e passam aos controlos de caçador, com breve proteção de transição. Não precisam gravar frase nem manter microfone aberto. A marcação gera aviso visual/sonoro apenas no jogador animal marcado; o caçador acompanha o alvo com a câmara, conservando controlo manual. Moitas e obstáculos quebram a marcação conforme visibilidade.
+
+Recarga: segurar 1,6 s na zona do armazém, com progresso, animação de recolha e reposição até cinco redes. Soltar, mover ou afastar cancela. Recolhas no mapa dão redes individuais. O armazém e os objetos do mapa mostram redes. Capturas, NPC e novos caçadores têm avisos para toda a sala e sons distintos. O caçador tem membros animados separadamente, marcha/corrida, lançamento de rede em arco e recolha; remove o antigo visual de arma/confetes. Animais têm nove ações, escolhidas num painel de toque: alimentação, alongamento, coçar, sacudir, passinho, ré, rebolado, drama e reverência. NPC usam o mesmo repertório. Mover cancela a ação.
+
+Movimento visual local responde ao comando antes do próximo passo do host, com correção suave e colisões. Os outros atores têm extrapolação curta e interpolação. Comandos a 20 Hz e vistas até 12,5 Hz em salas pequenas, mantendo simulação a 20 Hz e apresentação até 60 Hz. Comandos de movimento não podem substituir alvo/direção de captura pendente. Botão de captura tratado no início do toque, sem aguardar desbloqueio do áudio; HUD preserva os botões estáveis. Câmara com seguimento de alvo, respeito por arrasto manual e orientação relativa do analógico. Novo terreno texturado com caminhos, zonas, cascalho e sombras de contacto desenhadas numa textura, iluminação ajustada e antialiasing; sem novas dependências/serviços.
+
+98 testes em 14 ficheiros aprovados; build de produção aprovado. Inclui teste de captura com comando atrasado, rejeição de seleção expirada, conversões limitadas a duas, marcação privada, recarga interrompível e buffers sonoros não silenciosos. O navegador de testes está desativado nas definições Work: não foi feita nova validação visual/browser nem teste em iPhone físico. O utilizador fará o teste interativo. Protocolo Quinta atualizado para farm-3: fechar/reabrir o jogo e criar sala nova com todos na mesma versão.
+
+O Nightreign não foi alterado nesta atualização; os requisitos estão em PROXIMAS-ETAPAS.md para depois da Quinta. Não há transferência de anfitrião: a sala termina se ele sair; lugares de convidados continuam com substituição por bot e reconexão conforme o sistema existente.
+
+
+## 26/10/2026 — Cat Nightreign: Expedição da Coroa Partida
+
+Implementação isolada em night.ts, night-simulation.ts, night-data.ts, night-world.ts e night-network.ts. O botão principal passa a abrir a nova expedição; o combate legado continua preservado. Reutiliza o renderizador/rigs de HuntScene e o transporte WebRTC existente numa namespace night-1 separada.
+
+- 1–5 lugares, vagas preenchidas com bots, código de sala de seis caracteres e três dificuldades; host autoritativo. Convidados confirmam preparação e escolhem classe. Reconexão com identidade persistente; bots assumem quando deixam de chegar comandos. Host que sai termina a sessão.
+- Exploração de 150 s em cada etapa; confronto com limite de 300 s; santuário de até 70 s (ou todos preparados). Três formas progressivas do Devorador, padrões diferentes e aparência alterada; vitória apenas após a terceira.
+- Mapa 104 × 104: bosque, vila arruinada, criptas, coroa e santuário. Arquitetura agrupada por material, folhagem instanciada, textura de terreno gerada uma vez, neblina, lua e partículas limitadas. Dez acampamentos com três inimigos, XP/moedas e reaparecimento fora da proximidade dos jogadores após 30 s.
+- Cinco classes: duelista, curandeiro, guardião, duelista vampírico e mago drenador. Loja de dano/vida/vampirismo/cura/recarga, três poderes alternativos equipáveis e poções. Vampirismo usa dano efetivo, com redução em área e limite por acerto. Cura máxima respeitada. Fontes com cargas e reanimação por proximidade.
+- Botões seguir, atacar, defender, ajudar e reagrupar. Bots recebem ordens e priorizam reanimação; amigos recebem pedido e marcador, sem controlo forçado.
+- Postura do boss com recuperação, janela de vulnerabilidade curta e imunidade temporária após quebra; evita bloqueio infinito. Ataques com avisos, esquiva e vigor, combos e especial.
+- UI móvel em sobreposições, mapa, portal contextual, câmara orbitável e previsão visual do jogador remoto. Classes têm acessórios próprios (escudo, garras, halo), animações de golpes/esquiva/conjuração, raios mágicos, impactos e cura. História original em quatro passagens de texto.
+
+Verificações: 113 testes distintos passaram (suite geral de 111 e depois os 15 testes da expedição, incluindo dois novos de dificuldade normal/limite de snapshots). Build final TypeScript + Vite passou, 102 módulos e 71 recursos offline. A equipa IA de três classes completou as três formas nas dificuldades Aventura e Caçada, sem modificar vida/moedas nos testes. Sem teste visual automatizado nem validação física iPhone/Android nesta sessão: browser local estava indisponível nas definições do Work. Não apresentar como desempenho/ligação comprovados em todos os aparelhos.
+
+Sem serviços novos, cartão, cobrança ou TURN. Mesmos utilizadores e Supabase. Sem áudio protegido; sons sintéticos de combate existentes. O novo registo de vitórias é local por conta; a run não é retomável após fechar o host. Outros bosses do Tower Defense anotados para futura adaptação 3D, não incluídos agora.
+
+
+## 26/10/2026 — Revisão da câmara, combate e santuário
+
+- Câmara mais baixa e próxima, seguimento automático da direção de deslocação, estabilidade ao conjurar/parar, correção para obstáculos. O movimento conserva a direção de referência durante cada gesto, evitando rodar em círculos devido ao seguimento automático.
+- Arrastar verticalmente no cenário, pinça de dois dedos e roda do rato ajustam zoom limitado; já não rodam a câmara. Atualizada ajuda.
+- Ataque básico + quatro habilidades por classe: poder, defesa/suporte, controlo/debuff e especial. Recargas independentes. Lentidão, redução de dano, provocação do guardião e fúria/vampirismo do Rubro têm efeitos na simulação autoritativa.
+- Magias meteor/jardim/manto compradas são habilidades adicionais no botão Extras, com recarga própria; não substituem a classe. Meteorito tem preparação e acerto em área de 4 unidades. Dano/cura/recarga beneficiam das melhorias existentes.
+- Sexta classe jogável: Íris, arqueira de longo alcance, arco próprio e animação de puxar/soltar. Magos e arqueira disparam projéteis teleguiados simulados pelo host, com tempo de viagem; desaparecem se o alvo morrer. Ataque corpo a corpo mantém alcance curto.
+- Novas animações de antecipação/golpe/recuperação, finalizador vertical, garras alternadas, conjuração, áreas visíveis de cura/proteção/controlo, meteorito, projéteis e reação de inimigos. Efeitos limitados com geometria partilhada.
+- Santuário dividido em Melhorias, Magias extras e Curas; até quatro cartões por página, recomendações de classe, custo/falta de moedas, limite, confirmação de compra e botão separado Terminei as compras. Estado da compra sincronizado para convidados.
+- Protocolo Nightreign alterado para night-2: fechar/reabrir e criar sala nova para todos usarem a mesma versão.
+- Sem alteração das regras da Quinta ou Tower Defense. Continua pendente teste visual e de gestos em dispositivos físicos.
+
+- Proteção contra zoom nativo por duplo toque/double click e gestos Safari nas superfícies dos três modos. Não bloqueia páginas de conta/login. O zoom de câmara Nightreign continua via pointer events. Requer confirmação prática no iPhone, sem automatização de navegador disponível.
+
+Verificacao final desta revisao: 119 testes em 16 ficheiros passaram; build TypeScript/Vite concluido, 106 modulos e 71 recursos offline. Sem validacao visual em aparelho real nesta sessao.
+
+
+## 26/10/2026 — Acampamentos, autonomia e confirmação de compras
+
+- Inimigos com separação local, aproximação pelos flancos, desvio de obstáculos, visão bloqueada pela arquitetura e perseguição limitada ao território do acampamento.
+- Atiradores mantêm distância e lançam projéteis não teleguiados, que podem ser esquivados e bloqueados por obstáculos. Magos anunciam o local da magia e deixam uma zona perigosa por 2,4 s. Corpo a corpo tem arco de ataque; elites têm mais vida, impacto amplo e recompensa dupla. Dano aumenta por lua e tamanho do grupo.
+- Modelos de inimigos distinguem arco, cajado, arma e armadura de elite; animações dependem de deslocação real, preparação e recuperação do golpe. Avisos no chão correspondem à direção/posição do ataque; corrigida orientação do aviso de investida do boss.
+- Companheiros têm autonomia por defeito para acampamentos próximos (até 30 unidades do líder); Explorar por perto amplia para 38, Seguir-me/Reagrupar mantêm a equipa junta. Feridos regressam para perto da equipa e aliados evitam áreas anunciadas. Não existe promessa de companheiros incapazes de vencer sem participação humana.
+- Câmara com limite de velocidade angular, zona morta e sem rotação de 180 graus ao recuar; acompanhamento suave de alvos frontais ao combater.
+- Santuário: três escolhas por página, detalhe ao selecionar, confirmação explícita antes de gastar e cancelamento sem compra. A transação só ocorre em Confirmar compra.
+- Protocolo night-3: todos devem reabrir e criar sala nova. Sem mudanças nas regras da Quinta ou Tower Defense. Validação visual e de desempenho em aparelho físico continua pendente.
+
+Verificacao final: 127 testes passaram em 17 ficheiros com dois workers. A primeira execucao em paralelo com o build excedeu 5 s num teste de simulacao longa; a mesma suite passou sem alterar as assercoes ao limitar concorrencia.
+
+- Movimento: NippleJS 1.0.4 (MIT), joystick analógico com zona morta de 10%, integrado sem React/Rapier. Referências consultadas: https://github.com/yoannmoinet/nipplejs e https://github.com/pmndrs/ecctrl/blob/main/docs/api-reference.md . Ecctrl não instalado por exigir outra arquitetura.
+- Correr por botão/Shift, consumo de vigor e recuperação; salto separado (Espaço, esquiva Z), gravidade no host, sem saltos infinitos nem passagem através de edifícios. Ícones SVG originais em botões circulares, ataque destacado, recarga em anel. Inspirado no padrão de controlos móvel MOBA, sem copiar recursos de Wild Rift/Mobile Legends.
+- Protocolo final desta revisão: night-4. O pedido de publicar com economia de limite permanece prioritário; sem novas expansões nesta entrega.

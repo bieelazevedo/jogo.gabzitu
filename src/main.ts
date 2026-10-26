@@ -1,3 +1,5 @@
+import {installGameTouchGuard} from './game-touch';
+import './game-touch.css';
 import {movementRadius} from './mobility';
 import {TEAM_LIMIT,rememberedTeam,suggestTeam} from './formation';
 import {decorateMenu,gameIcon} from './ui/icons';
@@ -20,6 +22,7 @@ import { drawCat,portrait, Renderer, thumbnail } from './render';
 import { AudioManager } from './audio';
 import { PeerSession, validCommandPacket, validName } from './network';
 import type { Ability, CatKind, Command, Point, State } from './types';
+installGameTouchGuard();
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const receivedInvite=new URLSearchParams(location.hash.slice(1)).get('convite');if(receivedInvite&&/^[a-f0-9]{48}$/.test(receivedInvite)){sessionStorage.setItem('mb-invite',receivedInvite);accountView.tab='register';history.replaceState({},'',location.pathname+location.search);}
 let save = load(), screen = 'account', state: State | null = null, renderer: Renderer | null = null, selected: number | null = null, preview: CatKind | null = null, aim: Point | null = null, aiming = false;
@@ -770,7 +773,7 @@ async function action(a: string) {
         toast('O caderno está pronto para uma nova aventura.');
     }
     if(key==='farm-menu'){await beginFarm();return;}
-    if(key==='night-menu'){showDialog(`<h2>Gato Nightreign</h2><p>Caçada 3D experimental. Dois gatos, um chefe gigante e três ataques para aprender. O anfitrião controla Garra Lunar; o convidado, Astral. Ataque manual com combo de três golpes, esquiva com vigor, poderes e especial. Segura Atacar para encadear. Reanima o parceiro ao ficar perto durante 3 segundos.</p>${button('Criar ou entrar numa caçada','night-coop','primary wide')}${button('Treinar com aliado IA','night-train','secondary wide')}${button('Voltar','dialog-close','text-button')}`);return;}
+    if(key==='night-menu'){hideDialog();const {launchNight}=await import('./night');screen='hunt';state=null;menuState=null;app.style.visibility='hidden';huntStop=launchNight({name:account.user?.email?.split('@')[0]||'Bigodes',identity:account.user?.id,sound:kind=>audio.hunt(kind),onExit:()=>{huntStop=null;app.style.visibility='';setScreen('home');}});return;}
     if(key==='night-train'){await beginHunt(true);return;}
     if(key==='night-coop'){nightMode=true;screens.navigation.coop='invite';setScreen('coop');return;}
     if (key === 'coop') {nightMode=false;chosenLevel=4;screens.navigation.catPage=0;
@@ -1020,9 +1023,9 @@ if (location.hash.startsWith('#sala=')&&account.user) {
     setScreen('coop');
 }
 if('serviceWorker' in navigator&&import.meta.env.PROD){
- const hadController=!!navigator.serviceWorker.controller;let reloading=false;
- navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController&&!reloading&&screen!=='game'){reloading=true;location.reload();}});
- window.addEventListener('load',()=>{void navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).then(reg=>{const activate=()=>{if(reg.waiting&&screen!=='game')reg.waiting.postMessage('ACTIVATE');};activate();reg.addEventListener('updatefound',()=>reg.installing?.addEventListener('statechange',activate));void reg.update().catch(()=>{});}).catch(()=>{});});
+ // Keep the repair worker URL available to replace legacy offline workers.
+ // No navigation interception, cache wipe of account data, or forced reload.
+ void navigator.serviceWorker.register('/sw.js',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});
 }
 
 window.addEventListener('hashchange',()=>{if(location.hash.startsWith('#quinta=')){if(account.user&&!farmStop)void beginFarm(location.href);else if(!account.user)setScreen('account');return;}if(!location.hash.startsWith('#sala='))return;if(peer){toast('Sai da sala atual antes de entrar noutra.');return;}screens.navigation.coop='join';setScreen(account.user?'coop':'account');});
