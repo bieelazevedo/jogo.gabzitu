@@ -1,0 +1,3 @@
+import {NodeIO,getBounds} from '@gltf-transform/core';import {ALL_EXTENSIONS} from '@gltf-transform/extensions';import {MeshoptDecoder} from 'meshoptimizer';
+const io=new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({'meshopt.decoder':MeshoptDecoder});
+const want=process.argv.slice(3);const d=await io.read(process.argv[2]);for(const n of d.getRoot().getDefaultScene().listChildren()){if(want.length&&!want.includes(n.getName()))continue;const b=getBounds(n);console.log(n.getName().padEnd(28),'min',b.min.map(v=>v.toFixed(2)).join(','),'max',b.max.map(v=>v.toFixed(2)).join(','));}

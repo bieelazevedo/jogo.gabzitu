@@ -1,4 +1,7 @@
 import {NightEffects} from './night-effects';
+import {loadNightAssets,nightAssets,nightAssetsFailed} from './night-assets';
+import {HeroActor,BossActor} from './night-actors';
+import {dressNightArena} from './night-layout';
 import {nightBoom} from './night-camera';
 import {NIGHT_OBSTACLES} from './night-data';
 import {NightWorld} from './night-world';
@@ -17,6 +20,7 @@ export class HuntScene {
  readonly scene=new T.Scene();readonly camera=new T.PerspectiveCamera(43,1,.1,160);
  private materials:T.Material[]=[];private geometries:T.BufferGeometry[]=[];private textures:T.Texture[]=[];
  private nightEffects?:NightEffects;private nightBeacon?:T.Group;private night?:NightState;private world?:NightWorld;private arenaObjects:T.Object3D[]=[];private classKey="";private orbit=0;private zoomLevel=1;private elevation=.42;private nightStage=0;
+ private heroModels:HeroActor[]=[];private bossModel?:BossActor;private bossForm=0;private assetWait=0;private arenaFloor:T.Material[]=[];private hemi!:T.HemisphereLight;private key!:T.DirectionalLight;private rim!:T.DirectionalLight;private loading?:HTMLElement;
  private heroes:Rig[]=[];private boss!:Rig;private warning!:T.Mesh;private boundary!:T.Mesh;
  private projectileMeshes=new Map<number,T.Group>();private effects:{mesh:T.Object3D;age:number;life:number;kind:string;velocity:T.Vector3}[]=[];
  private labels:{element:HTMLElement;x:number;z:number;age:number;life:number}[]=[];
@@ -28,7 +32,7 @@ export class HuntScene {
   this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
   this.renderer.setClearColor(huntArena(arenaId).sky);this.scene.fog=new T.FogExp2(huntArena(arenaId).sky,.018);
   this.geometries.push(this.sphere,this.box,this.capsule);
-  this.scene.add(new T.HemisphereLight(0xb9ddff,0x28263a,2.6));const key=new T.DirectionalLight(0xffddb2,3.5);key.position.set(-6,12,9);this.scene.add(key);const rim=new T.DirectionalLight(0x5cb6db,2);rim.position.set(4,6,-12);this.scene.add(rim);
+  this.hemi=new T.HemisphereLight(0xb9ddff,0x28263a,2.6);this.scene.add(this.hemi);const key=this.key=new T.DirectionalLight(0xffddb2,3.5);key.position.set(-6,12,9);this.scene.add(key);const rim=this.rim=new T.DirectionalLight(0x5cb6db,2);rim.position.set(4,6,-12);this.scene.add(rim);
   this.gold=this.material(0xe7bc70,.55);this.cyan=this.material(0x8aefff,.2,0x3cb3e7,.7);this.ember=this.material(0xff9871,.1,0xff4e38,.65);
   this.environment();this.arenaObjects=this.scene.children.filter(o=>!(o instanceof T.Light));this.heroes=[this.cat(false),this.cat(true)];this.boss=this.monster();
   this.warning=this.add(new T.RingGeometry(.01,5.6,64),new T.MeshBasicMaterial({color:0xff7658,transparent:true,opacity:.25,side:T.DoubleSide,depthWrite:false}),this.scene,0,.04,0);this.warning.rotation.x=-Math.PI/2;
@@ -51,7 +55,7 @@ export class HuntScene {
   c.strokeStyle='#c3aa74';c.lineWidth=6;c.beginPath();c.arc(512,512,395,0,Math.PI*2);c.stroke();c.lineWidth=2;c.beginPath();c.arc(512,512,362,0,Math.PI*2);c.stroke();
   for(let i=0;i<12;i++){const a=i*Math.PI/6;c.save();c.translate(512+Math.cos(a)*375,512+Math.sin(a)*375);c.rotate(a);c.fillStyle='#d0b980';c.fillRect(-7,-7,14,14);c.restore();}
   c.globalAlpha=.25;c.fillStyle='#0a2639';c.beginPath();c.arc(512,512,150,0,Math.PI*2);c.fill();c.globalAlpha=1;c.strokeStyle='#c0b994';c.lineWidth=5;c.beginPath();c.moveTo(440,550);c.lineTo(420,420);c.lineTo(485,464);c.quadraticCurveTo(512,445,539,464);c.lineTo(604,420);c.lineTo(584,550);c.quadraticCurveTo(512,610,440,550);c.stroke();
-  const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;texture.anisotropy=Math.min(4,this.renderer.capabilities.getMaxAnisotropy());this.textures.push(texture);const floor=this.material(huntArena(this.arenaId).floor);floor.map=texture;
+  const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;texture.anisotropy=Math.min(4,this.renderer.capabilities.getMaxAnisotropy());this.textures.push(texture);const floor=this.material(huntArena(this.arenaId).floor);floor.map=texture;this.arenaFloor=[floor,edge,this.gold];
   this.add(new T.CylinderGeometry(12.8,13.5,.8,64),edge,staticGroup,0,-.48);const ground=this.add(new T.CircleGeometry(12.8,64),floor,staticGroup,0,-.065);ground.rotation.x=-Math.PI/2;
   for(const r of [12.3,12.65]){const ring=this.ring(staticGroup,this.gold,r,.07,0,-.015);ring.rotation.x=-Math.PI/2;}
   this.boundary=this.ring(this.scene,this.cyan,12.85,.035,0,.12);this.boundary.rotation.x=-Math.PI/2;
@@ -134,18 +138,29 @@ export class HuntScene {
  }
  movementHeading(){const e=this.camera.matrixWorld.elements;return Math.atan2(e[8],e[10]);}
  updateNight(s:NightState,dt:number,local:number,yaw=0,zoom=1,pitch=.42){
-  this.local=local;this.night=s;this.orbit=yaw;this.zoomLevel=zoom;this.elevation=pitch;if(!this.world){this.nightEffects=new NightEffects();this.scene.add(this.nightEffects.root);this.world=new NightWorld();this.scene.add(this.world.root);this.nightBeacon=this.pivot(this.scene);const beaconRing=this.ring(this.nightBeacon,this.gold,1.3,.05,0,.15);beaconRing.rotation.x=Math.PI/2;const tip=this.add(new T.ConeGeometry(.3,.6,4),this.cyan,this.nightBeacon,0,3,0);tip.rotation.z=Math.PI;this.arenaObjects.forEach(o=>o.scale.multiplyScalar(1.12));}
-  const key=s.players.map(p=>p.classId).join(',');if(key!==this.classKey){this.classKey=key;this.heroes.forEach(r=>{r.root.removeFromParent();r.shadow.removeFromParent();});this.heroes=s.players.map(p=>this.cat(classFor(p.classId).magic));this.heroes.forEach((r,i)=>{r.materials[2].color.setHex(classFor(s.players[i].classId).color);const role=s.players[i].classId;
+  this.local=local;this.night=s;this.orbit=yaw;this.zoomLevel=zoom;this.elevation=pitch;
+  if(!this.world&&!nightAssets()&&!nightAssetsFailed()&&this.assetWait<10){void loadNightAssets();this.assetWait+=dt;if(!this.loading){this.loading=document.createElement('div');this.loading.className='night-loading';this.loading.textContent='A preparar o mundo…';this.labelRoot.append(this.loading);}this.renderer.render(this.scene,this.camera);return;}
+  this.loading?.remove();this.loading=undefined;
+  if(!this.world){this.nightEffects=new NightEffects();this.scene.add(this.nightEffects.root);this.world=new NightWorld(nightAssets());this.scene.add(this.world.root);this.nightBeacon=this.pivot(this.scene);const beaconRing=this.ring(this.nightBeacon,this.gold,1.3,.05,0,.15);beaconRing.rotation.x=Math.PI/2;const tip=this.add(new T.ConeGeometry(.3,.6,4),this.cyan,this.nightBeacon,0,3,0);tip.rotation.z=Math.PI;this.arenaObjects.forEach(o=>o.scale.multiplyScalar(1.12));
+   // With models, the primitive pillars and backdrop give way to KayKit architecture; the engraved floor stays.
+   const assets=nightAssets();if(assets){
+    // Textured models read better under a cooler moon key and a softer sky fill than flat-shaded primitives.
+    this.hemi.intensity=1.5;this.hemi.color.setHex(0x9fc4ff);this.hemi.groundColor.setHex(0x2a2238);this.key.color.setHex(0xc9dcff);this.key.intensity=2.6;this.key.position.set(-10,16,6);this.rim.color.setHex(0xffa56b);this.rim.intensity=1.6;this.renderer.toneMappingExposure=1.1;
+this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)||this.arenaFloor.includes(o.material as T.Material)||o.material instanceof T.MeshBasicMaterial;if(!keep)o.removeFromParent();return keep;});this.arenaObjects.push(dressNightArena(assets,this.scene));}}
+  const assets=nightAssets();const key=s.players.map(p=>p.classId).join(',')+(assets?':models':'');if(key!==this.classKey){this.classKey=key;this.heroModels.forEach(h=>h.dispose());this.heroModels=[];this.heroes.forEach(r=>{r.root.removeFromParent();r.shadow.removeFromParent();});this.heroes=s.players.map(p=>this.cat(classFor(p.classId).magic));this.heroes.forEach((r,i)=>{r.materials[2].color.setHex(classFor(s.players[i].classId).color);const role=s.players[i].classId;
    r.materials[0].flatShading=false;r.materials[1].flatShading=false;
    if(role==='ranger'){r.weapon.visible=false;const bow=this.pivot(r.arms[0],0,-.4,.15);const arc=this.add(new T.TorusGeometry(.62,.045,5,24,Math.PI),this.gold,bow);arc.rotation.z=-Math.PI/2;this.block(bow,this.cyan,0,0,0,.025,1.2,.025);this.compact(bow);r.materials[0].color.setHex(0xab9781);}
    if(role==='guardian'){const shield=this.pivot(r.arms[0],0,-.35,.2);this.add(new T.CylinderGeometry(.58,.58,.16,6),this.gold,shield).rotation.x=Math.PI/2;this.add(new T.CylinderGeometry(.47,.47,.18,6),r.materials[2],shield).rotation.x=Math.PI/2;this.add(new T.OctahedronGeometry(.18),this.cyan,shield,0,0,.16);this.compact(shield);}
    if(role==='reaver'){r.weapon.visible=false;for(const arm of r.arms){const claws=this.pivot(arm,0,-.5,.12);for(let j=-1;j<=1;j++){const claw=this.add(new T.ConeGeometry(.055,.7,5),this.gold,claws,j*.12,-.28,.2);claw.rotation.x=.5;claw.rotation.z=Math.PI;}this.compact(claws);}r.materials[0].color.setHex(0x8c6674);}
    if(role==='witch'){const halo=this.ring(r.head,this.gold,.72,.025,0,.25);halo.rotation.x=.5;this.add(new T.OctahedronGeometry(.17),this.cyan,r.head,-.65,.3,0);r.materials[0].color.setHex(0x8e8bb0);}
-   r.root.position.set(s.players[i].x,0,s.players[i].z);});}
-  const arena=s.phase==='boss'||s.phase==='won';this.arenaObjects.forEach(o=>o.visible=arena);this.boss.root.visible=this.boss.shadow.visible=arena;this.marker.visible=this.boundary.visible=arena;
+   r.root.position.set(s.players[i].x,0,s.players[i].z);
+   if(assets){const model=new HeroActor(assets,role,this.scene);model.root.position.copy(r.root.position);model.root.add(r.aura,r.slash);r.root.visible=false;this.heroModels[i]=model;}});}
+  const arena=s.phase==='boss'||s.phase==='won';this.arenaObjects.forEach(o=>o.visible=arena);this.boss.root.visible=this.boss.shadow.visible=arena;
+  if(assets&&arena&&this.bossForm!==s.stage){this.bossModel?.dispose();this.bossModel=new BossActor(assets,s.stage,this.scene);this.bossModel.root.position.set(s.boss.x,0,s.boss.z);this.bossForm=s.stage;}
+  if(this.bossModel){this.bossModel.root.visible=arena;this.boss.root.visible=false;}this.marker.visible=this.boundary.visible=arena;
   if(this.nightStage!==s.stage){this.nightStage=s.stage;this.boss.root.scale.setScalar(1+(s.stage-1)*.09);this.boss.materials[2].color.setHex([0x8f3b55,0x9b4e27,0x503b8c][s.stage-1]);this.boss.materials[0].color.setHex([0x65506d,0x5a3d38,0x36385c][s.stage-1]);this.renderer.setClearColor([0x101c2b,0x241a28,0x141329][s.stage-1]);}
   if(this.nightBeacon){this.nightBeacon.visible=!!s.order;if(s.order){const leader=s.players[s.order.owner],fixed=s.order.kind==='defend';this.nightBeacon.position.set(fixed?s.order.x:leader.x,.15+Math.sin(s.time*3)*.12,fixed?s.order.z:leader.z);}}
-  this.nightEffects?.update(s,dt);this.world.update(s,dt);this.update(nightVisual(s),dt);
+  this.nightEffects?.update(s,dt);this.world.update(s,dt,this.target);this.update(nightVisual(s),dt);
  }
  private spawn(e:HuntEvent){
   if(e.kind==='hit'||e.kind==='hurt'||e.kind==='heal'&&e.value>0){const el=document.createElement('span');el.className='hunt-number '+e.kind;el.textContent=(e.kind==='heal'?'+':'')+Math.round(e.value);this.labelRoot.append(el);this.labels.push({element:el,x:e.x+(e.owner===0?-.9:.9)+(e.id%3-1)*.25,z:e.z,age:0,life:.85});if(this.labels.length>24)this.labels.shift()!.element.remove();}
@@ -159,7 +174,7 @@ export class HuntScene {
   this.sound(e.kind==='slash'?'slash':e.kind==='cast'?'cast':e.kind==='hit'?'hit':e.kind==='hurt'?'hurt':e.kind==='dodge'?'dodge':e.kind==='heal'?'heal':e.kind==='phase'?'roar':e.kind==='impact'?'slam':e.kind==='ultimate'?'ultimate':e.kind==='stagger'?'break':'');
  }
  update(s:HuntState,dt:number){
-  this.clock+=dt;const time=this.clock;if(this.clock-this.hudTime>2){this.hudTime=this.clock;this.sound('ambience');}for(const e of s.events)if(e.id>this.eventId){this.eventId=e.id;this.spawn(e);}this.heroes.forEach((r,i)=>this.animateHero(r,s.players[i],dt,time));this.animateBoss(s.boss,dt,time,s.status);this.telegraph(s.boss,time);if(this.night&&this.night.phase!=='boss')this.warning.visible=false;
+  this.clock+=dt;const time=this.clock;if(this.clock-this.hudTime>2){this.hudTime=this.clock;this.sound('ambience');}for(const e of s.events)if(e.id>this.eventId){this.eventId=e.id;this.spawn(e);}this.heroes.forEach((r,i)=>this.animateHero(r,s.players[i],dt,time));this.animateBoss(s.boss,dt,time,s.status);if(this.night){this.heroModels.forEach((h,i)=>h.update(this.night!.players[i],dt,time,this.night!.players[i].y));if(this.bossModel?.root.visible)this.bossModel.update(s.boss,dt,time,s.status);}this.telegraph(s.boss,time);if(this.night&&this.night.phase!=='boss')this.warning.visible=false;
   const local=s.players[this.local],b=s.boss;const centre=new T.Vector3((local.x+b.x)*.3,0,(local.z+b.z)*.3);if(!this.night)this.target.lerp(centre,Math.min(1,dt*3));const portrait=this.aspect<1;const spread=Math.hypot(local.x-b.x,local.z-b.z);const distance=portrait?32:19+Math.max(0,spread-7)*.4;
   if(this.night){const rig=this.heroes[this.local],focus=new T.Vector3(rig?.root.position.x??local.x,0,rig?.root.position.z??local.z);if(this.target.distanceTo(focus)>20)this.target.copy(focus);else this.target.lerp(focus,1-Math.exp(-18*dt));}
   let zoom=this.night?(portrait?8.5:6.8)*this.zoomLevel:distance;if(this.night&&this.night.phase!=='boss')zoom=nightBoom(this.target.x,this.target.z,this.orbit,zoom,NIGHT_OBSTACLES);
@@ -174,5 +189,5 @@ export class HuntScene {
   for(const label of this.labels){label.age+=dt;const p=new T.Vector3(label.x,3+label.age*2,label.z).project(this.camera);label.element.style.transform=`translate(${(p.x*.5+.5)*this.canvas.clientWidth}px,${(-p.y*.5+.5)*this.canvas.clientHeight}px)`;label.element.style.opacity=String(1-label.age/label.life);}this.labels=this.labels.filter(l=>{if(l.age>=l.life){l.element.remove();return false;}return true;});
   this.renderer.render(this.scene,this.camera);
  }
- dispose(){this.sizeObserver?.disconnect();this.nightEffects?.dispose();this.world?.dispose();this.labels.forEach(l=>l.element.remove());new Set(this.geometries).forEach(g=>g.dispose());new Set(this.materials).forEach(m=>m.dispose());this.textures.forEach(t=>t.dispose());this.renderer.dispose();}
+ dispose(){this.heroModels.forEach(h=>h.dispose());this.bossModel?.dispose();this.loading?.remove();this.sizeObserver?.disconnect();this.nightEffects?.dispose();this.world?.dispose();this.labels.forEach(l=>l.element.remove());new Set(this.geometries).forEach(g=>g.dispose());new Set(this.materials).forEach(m=>m.dispose());this.textures.forEach(t=>t.dispose());this.renderer.dispose();}
 }
