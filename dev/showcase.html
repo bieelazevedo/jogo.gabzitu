@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-PT"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vitrine</title>
+<style>body{margin:0;background:#0b1622;color:#eee;font:14px system-ui}canvas{display:block;width:100vw;height:100vh}#ui{position:fixed;left:8px;top:8px;display:flex;gap:6px;flex-wrap:wrap}#ui button{padding:6px 10px}</style></head>
+<body><div id="ui"></div><canvas></canvas><script type="module">
+// Dev-only showcase: every hero, enemy and boss form with the same actors the game uses.
+import * as T from 'three';
+import {loadNightAssets} from '/src/night-assets.ts';
+import {HeroActor,EnemyActor,BossActor} from '/src/night-actors.ts';
+import {NIGHT_CLASSES} from '/src/night-data.ts';
+const canvas=document.querySelector('canvas'),renderer=new T.WebGLRenderer({canvas,antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
+const scene=new T.Scene();scene.background=new T.Color(0x16202e);scene.add(new T.HemisphereLight(0x9fc4ff,0x2a2238,1.5));const key=new T.DirectionalLight(0xc9dcff,2.6);key.position.set(-6,10,8);scene.add(key);const rim=new T.DirectionalLight(0xffa56b,1.6);rim.position.set(5,6,-8);scene.add(rim);
+const floor=new T.Mesh(new T.CircleGeometry(30,48),new T.MeshStandardMaterial({color:0x2d3a3f}));floor.rotation.x=-Math.PI/2;scene.add(floor);
+const camera=new T.PerspectiveCamera(35,1,.1,200);
+const assets=await loadNightAssets();const params=new URLSearchParams(location.search),mode=params.get('mode')||'heroes',action=Number(params.get('action')||0);
+const heroes=[],enemies=[],bosses=[];
+if(mode==='heroes')NIGHT_CLASSES.forEach((c,i)=>{const h=new HeroActor(assets,c.id,scene);h.root.position.set((i-(NIGHT_CLASSES.length-1)/2)*2.6,0,0);heroes.push(h);});
+if(mode==='enemies')[0,1,2,3].forEach(k=>{const e={id:k+1,x:(k-1.5)*3,z:0,kind:k,facing:0,hp:10,max:10,hit:0,wind:0,recovery:0,evade:0,moving:0,aggro:0,slow:0,dead:0};enemies.push({e,a:new EnemyActor(assets,e,scene)});});
+if(mode==='bosses')[1,2,3].forEach(st=>{const b=new BossActor(assets,st,scene);b.root.position.set((st-2)*7,0,0);bosses.push(b);});
+const span=mode==='bosses'?22:mode==='enemies'?13:NIGHT_CLASSES.length*2.6+1;
+const resize=()=>{renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();const d=span/2/Math.tan(T.MathUtils.degToRad(camera.fov/2))/camera.aspect+3;camera.position.set(0,mode==='bosses'?6:2.6,d);camera.lookAt(0,mode==='bosses'?3.5:1.2,0);};resize();addEventListener('resize',resize);
+let t=0,last=performance.now();
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;t+=dt;
+ heroes.forEach((h,i)=>{const p={x:h.root.position.x,z:0,y:0,facing:0,hp:100,action:action&&(t%2)<1.2?action:0,combo:1+Math.floor(t/2)%3,actionTime:(t%2),duration:1.2,moving:0,running:0,hit:0,shield:0};h.update(p,dt,t,0);});
+ enemies.forEach(({e,a})=>{e.wind=action&&(t%2)<.7?.7-(t%2):0;a.update(e,dt,t);});
+ bosses.forEach((b,i)=>b.update({x:b.root.position.x,z:0,angle:0,stage:action&&(t%3)<1.4?1:0,attack:1+((Math.floor(t/3)+i)%5),total:1.4,timer:1.4-(t%3),hit:0,phase:1},dt,t,'playing'));
+ renderer.render(scene,camera);requestAnimationFrame(frame);}
+requestAnimationFrame(frame);
+const ui=document.getElementById('ui');for(const [m,a,label] of [['heroes',0,'Heróis'],['heroes',1,'Ataque'],['heroes',3,'Especial'],['enemies',0,'Inimigos'],['enemies',1,'Inimigos a atacar'],['bosses',0,'Chefes'],['bosses',1,'Chefes a atacar']]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>location.search=`?mode=${m}&action=${a}`;ui.append(b);}
+window.__ready=true;
+</script></body></html>

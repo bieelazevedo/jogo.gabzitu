@@ -17,7 +17,7 @@ const HEROES:Record<NightClass,HeroLook>={
  guardian:{model:'Barbarian',items:['1H_Axe','Barbarian_Round_Shield'],fur:0x9aa3ad,attack:['1H_Melee_Attack_Chop','1H_Melee_Attack_Slice_Horizontal','2H_Melee_Attack_Chop'],power:'1H_Melee_Attack_Jump_Chop',ultimate:'2H_Melee_Attack_Spin',utility:'Blocking',hex:'Taunt'},
  reaver:{model:'Rogue',items:['Knife','Knife_Offhand'],tint:0xffc9cf,fur:0x8c5f6c,attack:['Dualwield_Melee_Attack_Slice','Dualwield_Melee_Attack_Chop','Dualwield_Melee_Attack_Stab'],power:'Dualwield_Melee_Attack_Chop',ultimate:'2H_Melee_Attack_Spin',utility:'Taunt',hex:'Dualwield_Melee_Attack_Stab'},
  witch:{model:'Mage',items:['1H_Wand','Spellbook_open'],tint:0xbca8ff,fur:0x4b4560,attack:['Spellcast_Shoot'],power:'Spellcast_Long',ultimate:'Spellcast_Summon',utility:'Spellcast_Raise',hex:'Spellcast_Shoot'},
- chaos:{model:'Mage',items:[],hide:['Mage_Hat'],tint:0xff9a9a,fur:0x8a2a35,attack:['Spellcast_Shoot'],power:'Spellcast_Long',ultimate:'Spellcast_Summon',utility:'Spellcast_Raise',hex:'Spellcast_Summon'},
+ chaos:{model:'Rogue_Crimson',items:[],fur:0x6b1a24,attack:['Spellcast_Shoot'],power:'Spellcast_Long',ultimate:'Spellcast_Summon',utility:'Spellcast_Raise',hex:'Spellcast_Summon'},
  ranger:{model:'Rogue_Hooded',items:['2H_Crossbow'],tint:0xdaf2c8,fur:0xc49a6c,attack:['2H_Ranged_Shoot'],power:'2H_Ranged_Shoot',ultimate:'Spellcast_Raise',utility:'Dodge_Backward',hex:'Throw'},
 };
 
@@ -39,16 +39,12 @@ export class HeroActor{
  readonly actor:Actor;readonly look:HeroLook;private tail:T.Object3D[];private geometries:T.BufferGeometry[];
  private lastAction=0;private lastCombo=0;private lastTime=0;private hitUntil=0;private lastHit=0;
  constructor(assets:NightAssets,classId:NightClass,parent:T.Object3D){
-  this.look=HEROES[classId];this.actor=new Actor(assets,this.look.model,{items:this.look.items,hide:this.look.hide,tint:this.look.tint});if(classId==='chaos')this.chaosLook();
-  ({tail:this.tail,geometries:this.geometries}=catFeatures(this.actor,this.look.fur));parent.add(this.actor.root);this.actor.play('Idle');
+  this.look=HEROES[classId];this.actor=new Actor(assets,this.look.model,{items:this.look.items,hide:this.look.hide,tint:this.look.tint});
+  ({tail:this.tail,geometries:this.geometries}=catFeatures(this.actor,this.look.fur));if(classId==='chaos')this.chaosLook();parent.add(this.actor.root);this.actor.play('Idle');
  }
  get root(){return this.actor.root;}
- /** Carmesim: a pointed crimson tiara and hands that burn with chaos light. */
+ /** Carmesim: hands that burn with chaos light (Kenney CC0 glow texture). */
  private chaosLook(){
-  const gold=new T.MeshStandardMaterial({color:0xb01c32,metalness:.6,roughness:.35,emissive:0x5a0010,emissiveIntensity:.6});this.actor.materials.push(gold);
-  const crown=new T.Group();crown.position.set(0,.98,.12);const band=new T.TorusGeometry(.42,.035,5,20,Math.PI);const spike=new T.ConeGeometry(.07,.42,4);this.geometries.push(band,spike);
-  const b=new T.Mesh(band,gold);b.rotation.set(-.25,0,0);crown.add(b);for(const [x,h,r] of [[0,.5,0],[-.24,.36,.35],[.24,.36,-.35]] as const){const c=new T.Mesh(spike,gold);c.position.set(x,.12+h*.35,.32);c.scale.y=h/.42;c.rotation.set(-.35,0,r);crown.add(c);}
-  this.actor.bone('head')?.add(crown);
   for(const slot of ['handslot.l','handslot.r']){const glow=new T.Sprite(new T.SpriteMaterial({map:fxTexture('glow'),color:0xff2a4a,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));glow.scale.setScalar(.7);this.actor.bone(slot)?.add(glow);this.hands.push(glow);}
  }
  private hands:T.Sprite[]=[];

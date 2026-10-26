@@ -5,9 +5,9 @@ import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 /** CC0 KayKit models (Kay Lousberg), baked by scripts/build-models.mjs. */
-export const CHARACTER_NAMES=['Knight','Barbarian','Mage','Rogue','Rogue_Hooded','Skeleton_Warrior','Skeleton_Minion','Skeleton_Rogue','Skeleton_Mage'] as const;
+export const CHARACTER_NAMES=['Knight','Barbarian','Mage','Rogue','Rogue_Hooded','Rogue_Crimson','Skeleton_Warrior','Skeleton_Minion','Skeleton_Rogue','Skeleton_Mage'] as const;
 export type CharacterName=typeof CHARACTER_NAMES[number];
-const PACKS=['halloween','village','dungeon','items','skeleton_items'] as const;
+const PACKS=['halloween','village','dungeon','items','skeleton_items','nature'] as const;
 export type PropPart={geometry:T.BufferGeometry;material:T.Material;matrix:T.Matrix4};
 export type NightAssets={characters:Record<CharacterName,T.Object3D>;clips:Map<string,T.AnimationClip>;props:Map<string,T.Object3D>;parts:(name:string)=>PropPart[]};
 
@@ -19,7 +19,9 @@ export const nightAssetsFailed=()=>failed;
 function mergeSkinned(template:T.Object3D){
  const groups=new Map<string,T.SkinnedMesh[]>();
  template.traverse(o=>{if(o instanceof T.SkinnedMesh&&!Array.isArray(o.material)){// GLTFLoader gives every part its own Skeleton object over the same bones, so group by bones.
-  const key=o.skeleton.bones.map(b=>b.uuid).join()+':'+o.material.uuid;groups.set(key,[...(groups.get(key)||[]),o]);}});
+  // Parts can only share a draw call when they also share the bind pose (inverse bind matrices).
+  const pose=o.skeleton.boneInverses.map(m=>m.elements.map(v=>v.toFixed(4)).join(',')).join(';');
+  const key=o.skeleton.bones.map(b=>b.uuid).join()+'|'+pose+':'+o.material.uuid;groups.set(key,[...(groups.get(key)||[]),o]);}});
  for(const meshes of groups.values()){
   if(meshes.length<2)continue;const first=meshes[0];
   if(meshes.some(m=>!m.bindMatrix.equals(first.bindMatrix)||m.parent!==first.parent||!m.matrix.equals(first.matrix)))continue;

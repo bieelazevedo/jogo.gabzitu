@@ -63,10 +63,20 @@ export const CLASS_SKILLS:Record<NightClass,{defense:string;control:string;descr
 export const EXTRA_SPELLS=['meteor','garden','ward','chain','nova','blink'] as const;
 export type ExtraSpell=typeof EXTRA_SPELLS[number];
 export const EXTRA_INFO:Record<ExtraSpell,{label:string;icon:string;cooldown:number;color:number}>={
- meteor:{label:'Meteoro',icon:'meteor',cooldown:20,color:0xffb669},
- garden:{label:'Jardim',icon:'garden',cooldown:20,color:0x86edc1},
- ward:{label:'Manto',icon:'ward',cooldown:20,color:0x99c7ff},
- chain:{label:'Relâmpago',icon:'chain',cooldown:14,color:0x9fd8ff},
- nova:{label:'Nova',icon:'nova',cooldown:16,color:0xaee8ff},
- blink:{label:'Passo',icon:'blink',cooldown:9,color:0xc9a0ff},
+ meteor:{label:'Meteoro',icon:'meteor-impact',cooldown:20,color:0xffb669},
+ garden:{label:'Jardim',icon:'healing',cooldown:20,color:0x86edc1},
+ ward:{label:'Manto',icon:'shield-reflect',cooldown:20,color:0x99c7ff},
+ chain:{label:'Relâmpago',icon:'chain-lightning',cooldown:14,color:0x9fd8ff},
+ nova:{label:'Nova',icon:'ice-spell-cast',cooldown:16,color:0xaee8ff},
+ blink:{label:'Passo',icon:'teleport',cooldown:9,color:0xc9a0ff},
+};
+/** game-icons.net names (see night-skill-icons.ts) for each class's buttons. */
+export const CLASS_ICONS:Record<NightClass,{attack:string;power:string;defense:string;control:string;ultimate:string}>={
+ blade:{attack:'sword-slice',power:'crossed-swords',defense:'moon',control:'bloody-sword',ultimate:'night-sky'},
+ astral:{attack:'bolt-spell-cast',power:'sprout',defense:'heart-plus',control:'growth',ultimate:'sun'},
+ guardian:{attack:'axe-swing',power:'magic-shield',defense:'round-shield',control:'shield-bash',ultimate:'trident-shield'},
+ reaver:{attack:'claws',power:'bloody-sword',defense:'vampire-dracula',control:'dread-skull',ultimate:'wolf-howl'},
+ witch:{attack:'magic-swirl',power:'death-zone',defense:'vibrating-shield',control:'snowflake-1',ultimate:'ghost'},
+ ranger:{attack:'crossbow',power:'arrow-flights',defense:'tornado',control:'cobweb',ultimate:'heavy-arrow'},
+ chaos:{attack:'ringed-beam',power:'beams-aura',defense:'magic-palm',control:'pentacle',ultimate:'magic-portal'},
 };

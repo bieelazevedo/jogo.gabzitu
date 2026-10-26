@@ -5,6 +5,7 @@ import {ALL_EXTENSIONS} from '@gltf-transform/extensions';
 import {dedup,prune,meshopt,resample,textureCompress,unpartition,mergeDocuments,weld} from '@gltf-transform/functions';
 import {MeshoptEncoder,MeshoptDecoder} from 'meshoptimizer';
 import sharp from 'sharp';
+import AdmZip from 'adm-zip';
 import {mkdir,writeFile,readFile,access} from 'node:fs/promises';
 import {dirname,join} from 'node:path';
 
@@ -47,6 +48,18 @@ async function finish(doc,file,texture=512){
 }
 
 await mkdir(CACHE,{recursive:true});
+await fetchTo(CHARACTERS.Rogue,join(CACHE,'Rogue.glb'));
+/** Recolours the green/teal cloth swatches of a KayKit palette texture, leaving skin, hair and leather untouched. */
+async function recolor(doc,hue){
+ for(const t of doc.getRoot().listTextures()){const {data,info}=await sharp(Buffer.from(t.getImage())).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+  for(let i=0;i<data.length;i+=4){const r=data[i]/255,g=data[i+1]/255,b=data[i+2]/255,max=Math.max(r,g,b),min=Math.min(r,g,b),l=(max+min)/2,d=max-min;if(d<.08)continue;
+   let h=max===r?((g-b)/d)%6:max===g?(b-r)/d+2:(r-g)/d+4;h*=60;if(h<0)h+=360;if(h<120||h>200)continue;
+   const sat=Math.min(1,d/(1-Math.abs(2*l-1))*1.15),light=Math.max(.12,l*.9),c=(1-Math.abs(2*light-1))*sat,x=c*(1-Math.abs((hue/60)%2-1)),m=light-c/2;
+   const [rr,gg,bb]=hue<60?[c,x,0]:hue<120?[x,c,0]:hue<180?[0,c,x]:hue<240?[0,x,c]:hue<300?[x,0,c]:[c,0,x];data[i]=(rr+m)*255;data[i+1]=(gg+m)*255;data[i+2]=(bb+m)*255;}
+  t.setImage(await sharp(data,{raw:info}).png().toBuffer()).setMimeType('image/png');}
+}
+// Carmesim: the female Rogue adventurer with her cloth recoloured to crimson.
+{const doc=await io.read(join(CACHE,'Rogue.glb'));doc.getRoot().listAnimations().forEach(dropAnimation);await recolor(doc,350);await finish(doc,join(OUT,'characters','Rogue_Crimson.glb'));}
 for(const [name,path] of Object.entries(CHARACTERS)){
  const src=join(CACHE,name+'.glb');await fetchTo(path,src);const doc=await io.read(src);
  doc.getRoot().listAnimations().forEach(dropAnimation);
@@ -66,4 +79,16 @@ for(const [pack,{base,ext,items}] of Object.entries(PACKS)){
  }
  await target.transform(unpartition(),weld());await finish(target,join(OUT,'env',pack+'.glb'));
 }
+// Kenney Nature Kit (CC0): detailed trees, bushes, mushrooms, flowers and rocks for the forest.
+const KENNEY_NATURE='https://kenney.nl/media/pages/assets/nature-kit/37ac38a37b-1677698939/kenney_nature-kit.zip';
+const NATURE='tree_pineTallA_detailed tree_pineTallC_detailed tree_detailed_dark tree_oak_dark tree_fat_darkh tree_pineRoundE tree_pineDefaultA tree_default_fall tree_detailed_fall plant_bushDetailed plant_bushLarge plant_bushTriangle mushroom_redGroup mushroom_red mushroom_tanTall flower_purpleA flower_redA flower_yellowA grass_leafsLarge grass rock_largeA rock_tallB stone_tallA stone_largeB stump_oldTall stump_roundDetailed log_large log_stackLarge campfire_stones hanging_moss statue_ring statue_head'.split(' ');
+{const zipPath=join(CACHE,'kenney_nature-kit.zip');if(!await exists(zipPath)){const r=await fetch(KENNEY_NATURE);if(!r.ok)throw Error(r.status+' nature kit');await writeFile(zipPath,Buffer.from(await r.arrayBuffer()));}
+ const zip=new AdmZip(zipPath),target=new (await import('@gltf-transform/core')).Document(),scene=target.createScene('nature');target.getRoot().setDefaultScene(scene);
+ for(const item of NATURE){const entry=zip.getEntry(`Models/GLTF format/${item}.glb`);if(!entry)throw Error('Em falta: '+item);const src=await io.readBinary(new Uint8Array(entry.getData()));
+  // Unlit flat colours look pasted-on under the moon; lit materials blend with the rest of the world.
+  for(const m of src.getRoot().listMaterials()){for(const ext of m.listExtensions())ext.dispose?.();m.setExtension('KHR_materials_unlit',null);m.setRoughnessFactor(.85).setMetallicFactor(0);}
+  const map=mergeDocuments(target,src),copy=map.get(src.getRoot().getDefaultScene()||src.getRoot().listScenes()[0]);const holder=target.createNode(item);for(const child of copy.listChildren())holder.addChild(child);scene.addChild(holder);copy.dispose();}
+ target.getRoot().listExtensionsUsed().filter(e=>e.extensionName==='KHR_materials_unlit').forEach(e=>e.dispose());
+ await target.transform(unpartition(),weld());await finish(target,join(OUT,'env','nature.glb'));
+ await writeFile(join(OUT,'LICENSE-kenney-nature-kit.txt'),zip.getEntry('License.txt').getData());}
 for(const [name,path] of Object.entries(LICENSES))await fetchTo(path,join(OUT,`LICENSE-kaykit-${name}.txt`));
