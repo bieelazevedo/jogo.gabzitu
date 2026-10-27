@@ -66,3 +66,13 @@ Não confundir a vitrine com uma campanha publicada. Os painéis de demonstraç�
 
 - Poses individuais adicionadas às sete classes, com transição e remoção dos offsets antes da animação seguinte. Testes verificam ausência de acumulação e saída no combate.
 - Joystick Nightreign: eventos pointer de toque aceites, lostpointercapture liberta, blur repõe o identificador do dedo. Quinta: prevenção de pan da página durante movimento. Verificação física no telemóvel pendente; controlo do browser indisponível.
+
+## Publicação e novos pedidos
+
+- Cloudflare Pages acompanha visual-overhaul, não main.
+- Commit bba9d63 publicado com sucesso em https://muralhasebigodes.pages.dev; preservados os três commits anteriores de visual-overhaul.
+- Commit b346dcc: modo convidado sem persistência, também publicado com sucesso.
+- Supabase: registo sem convite e fila privada de avisos aplicados; teste transacional passou e foi revertido, sem conta de teste persistida.
+- notify-signup publicada; emails para azevedo-biel@live.com ainda dependem de serviço de envio configurado e agendamento. Utilizador não confirmou se o SMTP antigo funciona.
+- Nova correção Safari: transferência explícita pointer→touch, multitouch isolado, eventos acompanhados fora da área, libertação no blur; comando fixo maior. Teste real continua pendente.
+- Registo reduzido a email, palavra-passe, nome opcional e declaração de maioridade/privacidade.

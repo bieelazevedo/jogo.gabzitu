@@ -129,3 +129,9 @@
  .night .night-menu main.lobby .night-class-picker{grid-template-columns:40px auto minmax(0,1fr) 40px;gap:6px}
 }
 .night,.hunt{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+/* Fixed thumb pad: one stable origin, broad hit area, independent of the right thumb. */
+.night .night-move-zone{width:min(42vw,220px);height:min(64vh,200px);left:max(8px,env(safe-area-inset-left));bottom:max(8px,env(safe-area-inset-bottom));z-index:8;user-select:none;-webkit-user-select:none;touch-action:none}
+.night .night-move-zone .hunt-stick{left:50%;top:50%;bottom:auto;width:128px;height:128px;opacity:.8;transform:translate(-50%,-50%)}
+.night .night-move-zone .hunt-stick.active{opacity:1;box-shadow:0 0 18px #83c6cf44,inset 0 0 20px #72a5b733}
+.night .night-move-zone .hunt-stick i{left:calc(50% - 23px);top:calc(50% - 23px)}

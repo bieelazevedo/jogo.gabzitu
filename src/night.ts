@@ -1,3 +1,4 @@
+import {bindThumbstick} from './thumbstick-input';
 import {activateTrial,nearbyMonument} from './night-trials';
 import {trialBrief,trialBanner} from './night-trials-ui';
 import {saveNightCampaign,readNightCampaign,clearNightCampaign} from './night-campaign-save';
@@ -53,29 +54,21 @@ export function launchNight(options:Options){
   try{scene=new HuntScene(root.querySelector('canvas')!,root.querySelector('.hunt-labels')!,me(),options.sound);}catch(e){notice='Este dispositivo não conseguiu iniciar o modo 3D.';state=null;screen='home';renderMenu();return;}
   const resize=()=>scene?.resize();window.addEventListener('resize',resize);stopHandlers.push(()=>window.removeEventListener('resize',resize));
   const keydown=(e:KeyboardEvent)=>{if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();if(e.repeat&&['e','q','r',' '].includes(e.key.toLowerCase()))return;keys.add(e.key.toLowerCase());if(e.key===' ')input.jump=true;if(e.key.toLowerCase()==='z')input.dodge=true;if(e.key.toLowerCase()==='e')input.power=true;if(e.key.toLowerCase()==='q')input.ultimate=true;if(e.key.toLowerCase()==='r')input.potion=true;if(e.key.toLowerCase()==='c')input.utility=true;if(e.key.toLowerCase()==='v')input.hex=true;if(e.key.toLowerCase()==='f'){input.interact=true;void action('interact');}},keyup=(e:KeyboardEvent)=>keys.delete(e.key.toLowerCase());window.addEventListener('keydown',keydown);window.addEventListener('keyup',keyup);stopHandlers.push(()=>{window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);});
-  // Floating joystick: it appears wherever the left thumb lands in the movement zone.
+  // Fixed thumb pad: the centre stays visible; touch and pointer events share one owner.
   // Two quick taps dodge (towards the drag if the thumb moves at once); pushing to the rim for a moment starts running.
   const stick=root.querySelector<HTMLElement>('.hunt-stick')!,knob=stick.querySelector<HTMLElement>('i')!,zone=root.querySelector<HTMLElement>('.night-move-zone')!;
   let lastStickStart=-1e9,dodgeArmed=0,stickOrigin={x:0,y:0},fullSince=0;const RADIUS=52;
   const fireDodge=()=>{if(!dodgeArmed)return;dodgeArmed=0;input.dodge=true;stick.classList.remove('dodge-tap');void stick.offsetWidth;stick.classList.add('dodge-tap');};
   const release=()=>{stickPointer=-1;stickX=stickZ=0;autoRun=false;fullSince=0;knob.style.transform='';stick.classList.remove('active','running');stick.style.left=stick.style.top='';};
   // Pointer events drive all devices; legacy touch events remain a fallback for older Safari.
-  // mouse/pen pointer. Touch ids are offset so they never collide with pointer ids.
+  // Touch identifiers are tracked independently of browser pointer identifiers.
   const stickStart=(id:number,x:number,y:number)=>{if(stickPointer>=0)return false;const now=performance.now();if(now-lastStickStart<350){dodgeArmed=now;window.setTimeout(fireDodge,140);lastStickStart=-1e9;}else lastStickStart=now;
-   stickPointer=id;const r=zone.getBoundingClientRect();stickOrigin={x,y};stick.style.left=x-r.left+'px';stick.style.top=y-r.top+'px';stick.classList.add('active');return true;};
+   stickPointer=id;const r=stick.getBoundingClientRect();stickOrigin={x:r.left+r.width/2,y:r.top+r.height/2};stick.classList.add('active');return true;};
   const stickMove=(id:number,x:number,y:number)=>{if(id!==stickPointer)return;const dx=(x-stickOrigin.x)/RADIUS,dy=(y-stickOrigin.y)/RADIUS,length=Math.hypot(dx,dy);
    if(length<.12){stickX=stickZ=0;}else{const strength=Math.min(1,(length-.12)/.88);stickX=dx/length*strength;stickZ=dy/length*strength;if(dodgeArmed&&strength>.3)fireDodge();}
    const now=performance.now();if(length>=.95){fullSince||=now;if(now-fullSince>350)autoRun=true;}else{fullSince=0;if(length<.6)autoRun=false;}stick.classList.toggle('running',autoRun);
    const k=Math.min(1,length);knob.style.transform=`translate(${dx/(length||1)*k*RADIUS*.62}px,${dy/(length||1)*k*RADIUS*.62}px)`;};
-  const TOUCH=1e6;
-  zone.onpointerdown=e=>{e.preventDefault();if(stickStart(e.pointerId,e.clientX,e.clientY))zone.setPointerCapture(e.pointerId);};
-  zone.onpointermove=e=>stickMove(e.pointerId,e.clientX,e.clientY);
-  zone.onpointerup=zone.onpointercancel=zone.onlostpointercapture=e=>{if(e.pointerId===stickPointer)release();};
-  const touchStart=(e:TouchEvent)=>{if(e.cancelable)e.preventDefault();for(const t of Array.from(e.changedTouches))if(stickStart(TOUCH+t.identifier,t.clientX,t.clientY))break;};
-  const touchMove=(e:TouchEvent)=>{if(e.cancelable)e.preventDefault();for(const t of Array.from(e.changedTouches))stickMove(TOUCH+t.identifier,t.clientX,t.clientY);};
-  const touchEnd=(e:TouchEvent)=>{for(const t of Array.from(e.changedTouches))if(TOUCH+t.identifier===stickPointer)release();};
-  zone.addEventListener('touchstart',touchStart,{passive:false});zone.addEventListener('touchmove',touchMove,{passive:false});zone.addEventListener('touchend',touchEnd);zone.addEventListener('touchcancel',touchEnd);
-  stopHandlers.push(()=>{zone.onpointerdown=zone.onpointermove=zone.onpointerup=zone.onpointercancel=zone.onlostpointercapture=null;zone.removeEventListener('touchstart',touchStart);zone.removeEventListener('touchmove',touchMove);zone.removeEventListener('touchend',touchEnd);zone.removeEventListener('touchcancel',touchEnd);release();});
+  stopHandlers.push(bindThumbstick(zone,document,window,{start:(x,y)=>{stickStart(1,x,y);},move:(x,y)=>stickMove(1,x,y),end:release}));
   // iOS Safari ignores touch-action:none: a drag on the joystick or the camera starts a page pan, which fires
   // pointercancel and drops the stick at once. Non-passive touch listeners stop the pan (scrollable panels excepted).
   const holdTouch=(e:TouchEvent)=>{if(e.cancelable)e.preventDefault();};
