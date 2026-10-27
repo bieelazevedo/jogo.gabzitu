@@ -1,5 +1,6 @@
 import {NEW_CATS,NEW_ENEMIES,RECRUITS,BOSS_AT} from './expansion';
 import type { CatDef, CatKind, EnemyDef, EnemyKind, Group, Level, Point, Wave } from './types';
+import {applyHexLayout} from './td-hex';
 export const W = 1000, H = 600, STEP = 1 / 30;
 export const CATS: Record<CatKind, CatDef> = {
     ...NEW_CATS,...RECRUITS,
@@ -158,6 +159,8 @@ for(const l of LEVELS)l.chapter=WORLD_ENDS.findIndex(end=>l.id<=end)+1;
 
 // Append close-range bases without changing indices used by saved games.
 for(const level of LEVELS){const target=Math.min(24,level.spots.length+4);const candidates:Point[]=[];for(let y=75;y<=525;y+=60)for(let x=65;x<=935;x+=60){const point={x,y},d=distanceToPaths(point,level.paths);if(d>=44&&d<=72)candidates.push(point);}for(const point of candidates.sort((a,b)=>distanceToPaths(a,level.paths)-distanceToPaths(b,level.paths))){if(level.spots.length>=target)break;if(level.spots.every(p=>Math.hypot(p.x-point.x,p.y-point.y)>=74))level.spots.push(point);}}
+// Levels are laid on the KayKit hex grid: roads follow tile centres and spots sit on whole tiles (see td-hex.ts).
+for(const level of LEVELS)applyHexLayout(level);
 CATS.knight.range=132;CATS.monk.range=138;CATS.samurai.range=132;CATS.boxer.range=120;
 CATS.commander.range=190;CATS.bard.range=185;CATS.guardian.range=165;
 CATS.allyRatazao.range=138;CATS.allyVacuum.range=155;CATS.allyKraken.range=175;

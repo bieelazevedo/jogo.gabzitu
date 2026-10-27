@@ -61,6 +61,7 @@ export interface Level {
     coins: number;
     bridgeAt?: number;
     dual?: boolean;
+    high?: number[];
 }
 export interface Tower {
     offset?:Point;

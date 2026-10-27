@@ -61,6 +61,12 @@ export function stats(t: Tower, s?: State) {
       if(t.kind==='allyLegollas')area=65;if(['allyKraken','allyMagistrate','allyArchivist'].includes(t.kind))damage*=1.35;
     }
     if(s&&t.kind!=='guardian'){const level=LEVELS[s.levelId-1],here=level.spots[t.spot];if(s.towers.some(g=>g.kind==='guardian'&&g.id!==t.id&&dist(here,level.spots[g.spot])<=CATS.guardian.range+(g.level>1?10:0)+(g.branch==='a'?40:0)))range*=1.1;}
+    // Raised ground (hex tiles two steps from the road) gives ranged cats a longer view.
+    if (s && LEVELS[s.levelId - 1]?.high?.includes(t.spot) && d.range > 140)
+        range *= 1.12;
+    // Raised ground (hex tiles two steps from the road) gives ranged cats a longer view.
+    if (s && LEVELS[s.levelId - 1]?.high?.includes(t.spot) && d.range > 140)
+        range *= 1.12;
     return { damage, range, interval, area, magic: !!d.magic };
 }
 export const upgradeCost = (t: Tower) => Math.floor(CATS[t.kind].cost * (t.level === 1 ? .8 : 1.3));
