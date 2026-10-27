@@ -52,22 +52,32 @@ export function launchNight(options:Options){
   let lastStickStart=-1e9,dodgeArmed=0,stickOrigin={x:0,y:0},fullSince=0;const RADIUS=52;
   const fireDodge=()=>{if(!dodgeArmed)return;dodgeArmed=0;input.dodge=true;stick.classList.remove('dodge-tap');void stick.offsetWidth;stick.classList.add('dodge-tap');};
   const release=()=>{stickPointer=-1;stickX=stickZ=0;autoRun=false;fullSince=0;knob.style.transform='';stick.classList.remove('active','running');stick.style.left=stick.style.top='';};
-  zone.onpointerdown=e=>{if(stickPointer>=0)return;e.preventDefault();const now=performance.now();if(now-lastStickStart<350){dodgeArmed=now;window.setTimeout(fireDodge,140);lastStickStart=-1e9;}else lastStickStart=now;
-   stickPointer=e.pointerId;zone.setPointerCapture(e.pointerId);const r=zone.getBoundingClientRect();stickOrigin={x:e.clientX,y:e.clientY};stick.style.left=e.clientX-r.left+'px';stick.style.top=e.clientY-r.top+'px';stick.classList.add('active');};
-  zone.onpointermove=e=>{if(e.pointerId!==stickPointer)return;const dx=(e.clientX-stickOrigin.x)/RADIUS,dy=(e.clientY-stickOrigin.y)/RADIUS,length=Math.hypot(dx,dy);
+  // One joystick driven by either touch events (always used on phones: iOS Safari is reliable with them) or a
+  // mouse/pen pointer. Touch ids are offset so they never collide with pointer ids.
+  const stickStart=(id:number,x:number,y:number)=>{if(stickPointer>=0)return false;const now=performance.now();if(now-lastStickStart<350){dodgeArmed=now;window.setTimeout(fireDodge,140);lastStickStart=-1e9;}else lastStickStart=now;
+   stickPointer=id;const r=zone.getBoundingClientRect();stickOrigin={x,y};stick.style.left=x-r.left+'px';stick.style.top=y-r.top+'px';stick.classList.add('active');return true;};
+  const stickMove=(id:number,x:number,y:number)=>{if(id!==stickPointer)return;const dx=(x-stickOrigin.x)/RADIUS,dy=(y-stickOrigin.y)/RADIUS,length=Math.hypot(dx,dy);
    if(length<.12){stickX=stickZ=0;}else{const strength=Math.min(1,(length-.12)/.88);stickX=dx/length*strength;stickZ=dy/length*strength;if(dodgeArmed&&strength>.3)fireDodge();}
    const now=performance.now();if(length>=.95){fullSince||=now;if(now-fullSince>350)autoRun=true;}else{fullSince=0;if(length<.6)autoRun=false;}stick.classList.toggle('running',autoRun);
    const k=Math.min(1,length);knob.style.transform=`translate(${dx/(length||1)*k*RADIUS*.62}px,${dy/(length||1)*k*RADIUS*.62}px)`;};
-  zone.onpointerup=zone.onpointercancel=e=>{if(e.pointerId===stickPointer)release();};stopHandlers.push(()=>{zone.onpointerdown=zone.onpointermove=zone.onpointerup=zone.onpointercancel=null;});
+  const TOUCH=1e6;
+  zone.onpointerdown=e=>{if(e.pointerType==='touch')return;e.preventDefault();if(stickStart(e.pointerId,e.clientX,e.clientY))zone.setPointerCapture(e.pointerId);};
+  zone.onpointermove=e=>{if(e.pointerType!=='touch')stickMove(e.pointerId,e.clientX,e.clientY);};
+  zone.onpointerup=zone.onpointercancel=e=>{if(e.pointerType!=='touch'&&e.pointerId===stickPointer)release();};
+  const touchStart=(e:TouchEvent)=>{if(e.cancelable)e.preventDefault();for(const t of Array.from(e.changedTouches))if(stickStart(TOUCH+t.identifier,t.clientX,t.clientY))break;};
+  const touchMove=(e:TouchEvent)=>{if(e.cancelable)e.preventDefault();for(const t of Array.from(e.changedTouches))stickMove(TOUCH+t.identifier,t.clientX,t.clientY);};
+  const touchEnd=(e:TouchEvent)=>{for(const t of Array.from(e.changedTouches))if(TOUCH+t.identifier===stickPointer)release();};
+  zone.addEventListener('touchstart',touchStart,{passive:false});zone.addEventListener('touchmove',touchMove,{passive:false});zone.addEventListener('touchend',touchEnd);zone.addEventListener('touchcancel',touchEnd);
+  stopHandlers.push(()=>{zone.onpointerdown=zone.onpointermove=zone.onpointerup=zone.onpointercancel=null;zone.removeEventListener('touchstart',touchStart);zone.removeEventListener('touchmove',touchMove);zone.removeEventListener('touchend',touchEnd);zone.removeEventListener('touchcancel',touchEnd);});
   // iOS Safari ignores touch-action:none: a drag on the joystick or the camera starts a page pan, which fires
   // pointercancel and drops the stick at once. Non-passive touch listeners stop the pan (scrollable panels excepted).
   const holdTouch=(e:TouchEvent)=>{if(e.cancelable)e.preventDefault();};
   const noPan=(e:TouchEvent)=>{if((e.target as Element|null)?.closest?.('.night-panel-card,.night-panel,.night-shop'))return;if(e.cancelable)e.preventDefault();};
   const noZoom=(e:Event)=>e.preventDefault();
   const view=root.querySelector<HTMLCanvasElement>('canvas')!;
-  for(const el of [zone,view])el.addEventListener('touchstart',holdTouch,{passive:false});
+  view.addEventListener('touchstart',holdTouch,{passive:false});
   root.addEventListener('touchmove',noPan,{passive:false});document.addEventListener('gesturestart',noZoom);
-  stopHandlers.push(()=>{for(const el of [zone,view])el.removeEventListener('touchstart',holdTouch);root.removeEventListener('touchmove',noPan);document.removeEventListener('gesturestart',noZoom);});
+  stopHandlers.push(()=>{view.removeEventListener('touchstart',holdTouch);root.removeEventListener('touchmove',noPan);document.removeEventListener('gesturestart',noZoom);});
 
   // Hold a skill for 0.4 s to read what it does (base and current numbers); releasing then does not cast it.
   const card=root.querySelector<HTMLElement>('.night-skill-card')!;let holdTimer=0,suppressClick=false;
