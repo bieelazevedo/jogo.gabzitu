@@ -78,6 +78,7 @@ export class NightEffects{
  private implode(x:number,z:number,color:number,count:number,r:number){for(let i=0;i<count;i++){const a=i/count*Math.PI*2;this.create('spark',x+Math.sin(a)*r,.6,z+Math.cos(a)*r,color,.24,.6,new T.Vector3(x,1,z));}}
  /** One visual recipe per gameplay event: every class skill, enemy blow and boss attack reads differently. */
  private event(s:NightState,e:NightState['events'][number]){
+  if(e.kind==='cast'&&e.value>=300)return;// quest completions are announced by the HUD
   const caster=s.players[e.owner],cls=caster?.classId||'blade',tint=CLASS_COLOR[cls]||0xffc88c,v=e.value,x=e.x,z=e.z;
   if(e.kind==='slash'&&caster){if(cls==='ranger')return;const f=caster.facing,fx=x+Math.sin(f)*1.1,fz=z+Math.cos(f)*1.1;this.create('slashfx',fx,1.2,fz,tint,v===3?2.4:1.6,.22);if(v===3)this.burst('spark',fx,fz,tint,5,1.6,1,.6,.18,.35);return;}
   if(e.kind==='hit'){this.create('flare',x,1.1,z,0xffe3a0,.9,.22);this.burst('spark',x,z,0xffd98c,4,1,1,.6,.14,.3);return;}

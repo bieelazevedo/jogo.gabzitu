@@ -11,6 +11,9 @@
 ## Efeitos de partículas (CC0)
 - **Particle Pack** — Kenney (www.kenney.nl). Licença em `/fx/LICENSE-kenney-particle-pack.txt`.
 
+## Interface (CC0)
+- **Fantasy UI Borders** e **UI Pack – RPG Expansion** — Kenney (www.kenney.nl). Licenças em `/ui/LICENSE-kenney-*.txt`.
+
 ## Ícones de habilidades (CC BY 3.0)
 - **game-icons.net** — ícones de Lorc, Delapouite, Skoll e restantes autores (https://game-icons.net), licença Creative Commons Attribution 3.0 (https://creativecommons.org/licenses/by/3.0/). Ícones usados sem alterações de forma; cor aplicada no jogo.
 

@@ -65,3 +65,25 @@
  .night .night-rotate svg.gi{width:64px;height:64px;transform:rotate(90deg);animation:night-rotate 1.6s ease-in-out infinite}
  .night .night-rotate strong{font:700 22px Georgia,serif}.night .night-rotate span{font-size:14px;color:#c9d2cc;max-width:260px}}
 @keyframes night-rotate{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(90deg)}}
+/* Quest tracker under the title and completion toast. */
+.night .night-quests{position:absolute;top:max(86px,calc(env(safe-area-inset-top) + 80px));left:50%;transform:translateX(-50%);margin:0;padding:0;list-style:none;display:flex;gap:6px;z-index:4;pointer-events:none}
+.night .night-quests[hidden]{display:none}
+.night .night-quests li{display:flex;align-items:center;gap:5px;padding:3px 9px 3px 5px;border-radius:999px;background:#0b141ccc;border:1px solid #e2c98a55;color:#e8e3d2;font-size:10.5px;white-space:nowrap}
+.night .night-quests li svg.gi{width:16px;height:16px;color:#f3d79a}
+.night .night-quests li b{color:#f3d79a;font-variant-numeric:tabular-nums}
+.night .night-quests li.done{opacity:.55}.night .night-quests li.done b{color:#8ff0b5}
+.night .night-quest-toast{position:absolute;top:34%;left:50%;transform:translateX(-50%);z-index:12;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 26px;border:12px solid transparent;border-image:url('/ui/frame-panel.png') 16 / 12px stretch;background:#0b141cf0 padding-box;color:#f3e2b8;text-align:center;animation:night-toast .45s ease-out}
+.night .night-quest-toast[hidden]{display:none}
+.night .night-quest-toast small{letter-spacing:2px;font-size:10px;color:#8ff0b5}.night .night-quest-toast strong{font:700 20px Georgia,serif}.night .night-quest-toast span{font-size:12px;color:#d9dccf}
+@keyframes night-toast{from{opacity:0;transform:translate(-50%,10px) scale(.95)}to{opacity:1;transform:translate(-50%,0)}}
+@media(max-width:700px) and (orientation:landscape){.night .night-quests li span{display:none}}
+/* Skill card shown while a skill is held (left of the right-thumb arc). */
+.night .night-skill-card{position:absolute;z-index:20;left:max(150px,calc(50% - 250px));bottom:max(92px,calc(env(safe-area-inset-bottom) + 84px));width:min(300px,40vw);padding:10px 14px;border:12px solid transparent;border-image:url('/ui/frame-panel.png') 16 / 12px stretch;background:#0b141cf2 padding-box;color:#e8e3d2;pointer-events:none;animation:night-toast .18s ease-out}
+.night .night-skill-card[hidden]{display:none}
+.night .night-skill-card strong{display:block;font:700 18px Georgia,serif;color:#f3e2b8;margin-bottom:4px}
+.night .night-skill-card p{margin:0 0 8px;font-size:12.5px;line-height:1.35}
+.night .night-skill-card table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.night .night-skill-card th{font-weight:600;color:#aab6b1;text-align:left;padding:2px 4px;font-size:10px;letter-spacing:.5px}
+.night .night-skill-card td{padding:3px 4px;border-top:1px solid #e2c98a22}
+.night .night-skill-card td.up{color:#8ff0b5;font-weight:700}
+.night .night-skill-card small{display:block;margin-top:6px;color:#9fc4ff;font-size:11px}

@@ -81,3 +81,12 @@ export const CLASS_ICONS:Record<NightClass,{attack:string;power:string;defense:s
  ranger:{attack:'crossbow',power:'arrow-flights',defense:'tornado',control:'cobweb',ultimate:'heavy-arrow'},
  chaos:{attack:'ringed-beam',power:'beams-aura',defense:'magic-palm',control:'pentacle',ultimate:'magic-portal'},
 };
+/** Optional objectives for each moon's exploration. Rewards go to the whole team when a quest completes. */
+export type QuestKind='camps'|'portals'|'relic'|'elite'|'perfect';
+export const NIGHT_QUESTS:{kind:QuestKind;goal:number;gold:number;points:number;title:string}[][]=[
+ [{kind:'camps',goal:2,gold:40,points:0,title:'Limpa 2 acampamentos'},{kind:'portals',goal:3,gold:35,points:0,title:'Ativa 3 portais'},{kind:'relic',goal:1,gold:30,points:1,title:'Recupera a relíquia do Bosque'}],
+ [{kind:'camps',goal:3,gold:55,points:0,title:'Limpa 3 acampamentos'},{kind:'elite',goal:1,gold:45,points:1,title:'Derrota um elite'},{kind:'perfect',goal:4,gold:40,points:1,title:'Faz 4 esquivas perfeitas'}],
+ [{kind:'camps',goal:4,gold:70,points:0,title:'Limpa 4 acampamentos'},{kind:'elite',goal:2,gold:60,points:1,title:'Derrota 2 elites'},{kind:'relic',goal:1,gold:50,points:2,title:'Recupera a relíquia da Coroa'}],
+];
+/** Where each moon's relic rests (only moons with a relic quest use it). */
+export const NIGHT_RELICS=[{x:-38,z:29},{x:-38,z:29},{x:40,z:-41}];
