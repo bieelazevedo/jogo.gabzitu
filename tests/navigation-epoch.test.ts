@@ -1,0 +1,4 @@
+import {it,expect} from 'vitest';
+import {NavigationEpoch} from '../src/navigation-epoch';
+it('uma sincronização tardia não substitui o modo que o jogador acabou de iniciar',async()=>{const navigation=new NavigationEpoch();let screen='home',finish!:()=>void;const ticket=navigation.capture();const sync=(async()=>{await new Promise<void>(r=>finish=r);if(navigation.current(ticket))screen='home';})();navigation.advance();screen='night';finish();await sync;expect(screen).toBe('night');});
+it('ignora um carregamento de modo ultrapassado por outra escolha e permite a escolha atual',()=>{const navigation=new NavigationEpoch(),first=navigation.advance(),second=navigation.advance();expect(navigation.current(first)).toBe(false);expect(navigation.current(second)).toBe(true);navigation.advance();expect(navigation.current(second)).toBe(false);});

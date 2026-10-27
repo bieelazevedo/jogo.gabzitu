@@ -14,3 +14,5 @@ it('recusa dados inválidos antes de contactar a autenticação',async()=>{
 });
 
 it('reenvia a confirmação para o endereço do jogo sem recriar o utilizador',async()=>{const resend=vi.fn().mockResolvedValue({error:null});const account={client:{auth:{resend}}} as unknown as GameAccount;await GameAccount.prototype.resendConfirmation.call(account,' pessoa@example.com ');expect(resend).toHaveBeenCalledWith({type:'signup',email:'pessoa@example.com',options:{emailRedirectTo:'https://muralhasebigodes.pages.dev/?conta=confirmar'}});});
+
+it('descarta a sincronização de uma sessão que já foi substituída',async()=>{vi.stubGlobal('navigator',{onLine:true});let finish!:(x:unknown)=>void;const from=vi.fn();const account={user:{id:'primeira'},generation:1,client:{rpc:()=>new Promise(r=>finish=r),from}};const pending=GameAccount.prototype.pull.call(account as unknown as GameAccount);account.user={id:'segunda'};account.generation++;finish({data:true,error:null});await expect(pending).rejects.toThrow('sessão mudou');expect(from).not.toHaveBeenCalled();});

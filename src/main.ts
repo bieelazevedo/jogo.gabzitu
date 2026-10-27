@@ -1,3 +1,4 @@
+import {NavigationEpoch} from './navigation-epoch';
 import {installGameTouchGuard} from './game-touch';
 import './game-touch.css';
 import {movementRadius} from './mobility';
@@ -28,6 +29,7 @@ import type { Ability, CatKind, Command, Point, State } from './types';
 installGameTouchGuard();
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const receivedInvite=new URLSearchParams(location.hash.slice(1)).get('convite');if(receivedInvite&&/^[a-f0-9]{48}$/.test(receivedInvite)){sessionStorage.setItem('mb-invite',receivedInvite);accountView.tab='register';history.replaceState({},'',location.pathname+location.search);}
+const navigation=new NavigationEpoch();let accountTransition=0;
 let save = load(), screen = 'account', state: State | null = null, renderer: BattleRenderer | null = null, selected: number | null = null, preview: CatKind | null = null, aim: Point | null = null, aiming = false;
 let chosenLevel = 1, chosenMode: State['mode'] = 'campaign', team: CatKind[] = ['archer', 'ice'], resultShown = false, lastTime = 0, acc = 0, lastHud = 0, lastSnapshot = 0, lastAudioKills = 0;
 let peer: PeerSession | null = null, localPlayer = 0, remoteName = 'À espera de companhia', remoteTeam: CatKind[] = ['archer', 'ice', 'bomber'], remoteReady = false, localReady = false, networkStatus = '', manualOutput = '', manualStep = '', oldRemoteTick = -1;
@@ -60,12 +62,22 @@ function applyCloud(data:CloudData){save=mergeProgress(save,data.progress);persi
 function queueCloud(){account.queue(cloudData,applyCloud);}
 function saveSafePoint(){if(!state||guestAccess)return;lastCheckpointCompleted=state.completed;if(peer||state.players.length!==1||!['campaign','chaos','endless'].includes(state.mode))return;const cp=writeCheckpoint(state);if(cp)queueCloud();else toast('Não foi possível guardar a recuperação neste dispositivo.');}
 account.onStatus=()=>{const el=document.getElementById('sync-status');if(el)el.textContent=account.status;};
-account.onUser=(user,recovery)=>{void (async()=>{if(farmStop){farmStop();farmStop=null;}if(huntStop){huntStop();huntStop=null;}if(peer){peer.close();peer=null;}state=null;if(user)guestAccess=false;setSaveScope(user?.id||null,guestAccess);save=load();account.admin=false;adminPrefs.money=false;adminPrefs.life=false;if(recovery){accountView.tab='password';setScreen('account');return;}if(user){account.status='A recuperar o progresso da conta…';if(screen==='account')render();try{const remote=await account.pull();await account.checkAdmin();const cp=readCheckpoint();applyCloud({...remote,checkpoint:cp&&(!remote.checkpoint||cp.savedAt>remote.checkpoint.savedAt)?cp:remote.checkpoint});account.status='Progresso da conta recuperado';queueCloud();}catch(error){toast(error instanceof Error?error.message:'A cópia local continua disponível.');}}if(screen!=='privacy'){if(account.user&&location.hash.startsWith('#quinta='))await beginFarm(location.href);else setScreen(account.user||guestAccess?(location.hash.startsWith('#sala=')?'coop':'home'):'account');}})();};
+account.onUser=(user,recovery)=>{const transition=++accountTransition;void (async()=>{
+ const current=()=>transition===accountTransition&&account.user?.id===user?.id;
+ if(!current())return;
+ if(farmStop){farmStop();farmStop=null;}if(huntStop){huntStop();huntStop=null;}if(peer){peer.close();peer=null;}app.style.visibility='';state=null;
+ if(user)guestAccess=false;setSaveScope(user?.id||null,guestAccess);save=load();account.admin=false;adminPrefs.money=false;adminPrefs.life=false;
+ if(recovery){accountView.tab='password';setScreen('account');return;}
+ const ticket=navigation.capture();
+ if(user){account.status='A recuperar o progresso da conta…';if(screen==='account')render();try{const remote=await account.pull();if(!current())return;await account.checkAdmin();if(!current())return;const cp=readCheckpoint();applyCloud({...remote,checkpoint:cp&&(!remote.checkpoint||cp.savedAt>remote.checkpoint.savedAt)?cp:remote.checkpoint});account.status='Progresso da conta recuperado';queueCloud();}catch(error){if(!current())return;toast(error instanceof Error?error.message:'A cópia local continua disponível.');}}
+ if(!current()||!navigation.current(ticket)||screen==='privacy')return;
+ if(account.user&&location.hash.startsWith('#quinta='))await beginFarm(location.href);else setScreen(account.user||guestAccess?(location.hash.startsWith('#sala=')?'coop':'home'):'account');
+})();};
 function header() { return `<header class="site-header app-header">${button('← Menu', 'home', 'secondary')}<div class="brand"><img class="brand-emblem" src="/icon.svg" alt=""><span>Muralhas <em>&</em> Bigodes<small>A ORDEM DO NOVELO</small></span></div><span class="star-total">✦ ${totalStars(save)} <small>/ ${LEVELS.length*3}</small></span>${button('⛶', 'fullscreen', 'icon-button')}</header>`; }
 function footer() { return ''; }
 // Dev server only: ?devgame=N opens level N without an account, for layout checks on phone sizes.
 const DEV_GUEST = import.meta.env.DEV && ['devgame','devscreen','devfarm'].some(k=>new URLSearchParams(location.search).has(k));
-function setScreen(next: string) {if(!['account','privacy'].includes(next))registrationDraft=null;screen = next; dialog = ''; renderer?.dispose(); renderer = null; render(); }
+function setScreen(next: string) {navigation.advance();if(!['account','privacy'].includes(next))registrationDraft=null;screen = next; dialog = ''; renderer?.dispose(); renderer = null; render(); }
 function render() {
     if(!account.user&&!guestAccess&&!DEV_GUEST&&!['account','privacy'].includes(screen)){screen='account';}
     if (screen === 'game') {
@@ -122,9 +134,9 @@ function coopScreen() { const markup=screens.coop(getConfig(), location.hash.sta
 function lobby() { const markup=screens.lobby({ host: localPlayer === 0, connected: !!peer?.connected, name: peerName, remoteName, ready: localReady, remoteReady, team, status: networkStatus, step: manualStep, output: manualOutput },save,chosenLevel);return nightMode?markup.replace('Sala da Ordem','Dungeon Nightreign').replace('A tua equipa está guardada.','Garra Lunar e Astral estão preparados.').replace('Começar partida ▶','Iniciar caçada ▶')+'<style>.room-selection,.room-team,.room-cat-pages,.room-rule{display:none!important}</style>':markup; }
 let peerName = 'Bigodes';
 let farmStop:(()=>void)|null=null;
-async function beginFarm(invite?:string){if(farmStop)return;hideDialog();const {launchFarm}=await import('./farm');screen='farm';state=null;menuState=null;app.style.visibility='hidden';farmStop=launchFarm({identity:account.user?.id,name:account.user?.email?.split('@')[0]||'Bigodes',invite,progress:save.farm,onProgress:p=>{save.farm=p;store();},onExit:()=>{farmStop=null;app.style.visibility='';setScreen('home');}});}
+async function beginFarm(invite?:string){if(farmStop)return;const ticket=navigation.advance();hideDialog();const {launchFarm}=await import('./farm');if(!navigation.current(ticket)||farmStop)return;screen='farm';state=null;menuState=null;app.style.visibility='hidden';farmStop=launchFarm({identity:account.user?.id,name:account.user?.email?.split('@')[0]||'Bigodes',invite,progress:save.farm,onProgress:p=>{save.farm=p;store();},onExit:()=>{farmStop=null;app.style.visibility='';setScreen('home');}});}
 let nightMode=false, huntStop:(()=>void)|null=null;
-async function beginHunt(training=false){if(huntStop)return;hideDialog();const session=training?null:peer;const {launchHunt}=await import('./hunt');if(!training&&(!session||session!==peer||!session.connected))return;screen='hunt';state=null;menuState=null;app.style.visibility='hidden';try{huntStop=launchHunt(session,()=>{huntStop=null;app.style.visibility='';peer?.close();peer=null;nightMode=false;if(location.hash.startsWith('#sala='))history.replaceState({},'',location.pathname+location.search);setScreen('home');},kind=>audio.hunt(kind));}catch(error){app.style.visibility='';setScreen('home');toast(error instanceof Error?error.message:'Não foi possível iniciar o 3D.');}}
+async function beginHunt(training=false){if(huntStop)return;const ticket=navigation.advance();hideDialog();const session=training?null:peer;const {launchHunt}=await import('./hunt');if(!navigation.current(ticket)||huntStop)return;if(!training&&(!session||session!==peer||!session.connected))return;screen='hunt';state=null;menuState=null;app.style.visibility='hidden';try{huntStop=launchHunt(session,()=>{huntStop=null;app.style.visibility='';peer?.close();peer=null;nightMode=false;if(location.hash.startsWith('#sala='))history.replaceState({},'',location.pathname+location.search);setScreen('home');},kind=>audio.hunt(kind));}catch(error){app.style.visibility='';setScreen('home');toast(error instanceof Error?error.message:'Não foi possível iniciar o 3D.');}}
 function dockMarkup(){if(!state)return '';const all=state.players[localPlayer].team,pages=Math.ceil(all.length/5);dockPage=Math.min(dockPage,pages-1);return all.slice(dockPage*5,dockPage*5+5).map(k=>`<button class="dock-cat" data-cat="${k}" data-action="dock:${k}" title="${CATS[k].name} · ${CATS[k].cost} moedas"><img src="${portrait(k)}" alt="${CATS[k].short}"><small class="dock-name">${CATS[k].short}</small><span>${CATS[k].cost} ◉</span></button>`).join('')+(pages>1?button('⇄<small>'+ (dockPage+1)+'/'+pages+'</small>','dock-page','dock-pager'):'');}
 function renderGame() {
     if (!state)
@@ -400,7 +412,7 @@ function startGame(coop = false) {
     acc = 0;
     lastAudioKills = 0;
     lastTime = performance.now();
-    screen = 'game';
+    navigation.advance();screen = 'game';
     lastCheckpointCompleted=state!.completed;renderGame();if(!coop)saveSafePoint();
 }
 function finish() {
@@ -812,7 +824,7 @@ async function action(a: string) {
         toast('O caderno está pronto para uma nova aventura.');
     }
     if(key==='farm-menu'){await beginFarm();return;}
-    if(key==='night-menu'){hideDialog();const {launchNight}=await import('./night');screen='hunt';state=null;menuState=null;app.style.visibility='hidden';huntStop=launchNight({name:account.user?.email?.split('@')[0]||'Bigodes',identity:account.user?.id,sound:kind=>audio.hunt(kind),onExit:()=>{huntStop=null;app.style.visibility='';setScreen('home');}});return;}
+    if(key==='night-menu'){if(huntStop)return;const ticket=navigation.advance();hideDialog();const {launchNight}=await import('./night');if(!navigation.current(ticket)||huntStop)return;screen='hunt';state=null;menuState=null;app.style.visibility='hidden';huntStop=launchNight({name:account.user?.email?.split('@')[0]||'Bigodes',identity:account.user?.id,sound:kind=>audio.hunt(kind),onExit:()=>{huntStop=null;app.style.visibility='';setScreen('home');}});return;}
     if(key==='night-train'){await beginHunt(true);return;}
     if(key==='night-coop'){nightMode=true;screens.navigation.coop='invite';setScreen('coop');return;}
     if (key === 'coop') {nightMode=false;chosenLevel=4;screens.navigation.catPage=0;

@@ -34,3 +34,8 @@ Novas mensagens acrescentam requisitos; não substituem os pedidos anteriores. O
 ## Validação
 - Testes direcionados de contas, convidado, joystick e carregamento por modo. Repetir build no estado final.
 - Suite completa anterior: 161 passaram e um teste longo antigo excedeu 120 s; não declarar suite integral aprovada.
+
+## Retorno involuntário ao menu
+- Identificada sincronização inicial que, ao terminar, navegava para home mesmo após o início de um modo.
+- Época de navegação protege a escolha atual; carregamentos dinâmicos antigos são descartados e callbacks de sessões anteriores não se aplicam à nova sessão.
+- Acrescentados testes de resposta tardia e troca de conta durante a sincronização.
