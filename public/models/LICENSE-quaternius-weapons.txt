@@ -1,0 +1,4 @@
+Quaternius — Fantasy Props MegaKit, Standard
+https://quaternius.com/packs/fantasypropsmegakit.html
+CC0 1.0. Mirror agentkaerf/FreeModels revision db3df04d1e4714298a09510b26fb6de6645138a2.
+Changes: texture and geometry compression.

@@ -1,0 +1,4 @@
+Scarlet Witch — 3D Share
+https://sketchfab.com/3d-models/863cca848e2448e6b504a862cce80ae2
+CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
+Mirror: allenai/objaverse. Changes: compression, normalized scale, retargeted CC0 Quaternius animations.

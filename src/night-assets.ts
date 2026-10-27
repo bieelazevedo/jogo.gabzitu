@@ -7,9 +7,9 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 /** CC0 KayKit models (Kay Lousberg), baked by scripts/build-models.mjs. */
 export const CHARACTER_NAMES=['Knight','Barbarian','Mage','Rogue','Rogue_Hooded','Rogue_Crimson','Skeleton_Warrior','Skeleton_Minion','Skeleton_Rogue','Skeleton_Mage'] as const;
 export type CharacterName=typeof CHARACTER_NAMES[number];
-const PACKS=['halloween','village','dungeon','items','skeleton_items','nature','meadow'] as const;
+const PACKS=['halloween','village','dungeon','items','skeleton_items','nature','meadow','medieval','weapons','authored-weapons'] as const;
 export type PropPart={geometry:T.BufferGeometry;material:T.Material;matrix:T.Matrix4};
-export type NightAssets={characters:Record<CharacterName,T.Object3D>;clips:Map<string,T.AnimationClip>;props:Map<string,T.Object3D>;parts:(name:string)=>PropPart[]};
+export type NightAssets={characters:Record<CharacterName,T.Object3D>;clips:Map<string,T.AnimationClip>;modern?:{models:Map<string,T.Object3D>;heads:Map<string,T.Object3D>;clips:Map<string,T.AnimationClip>;variants:Map<string,Map<string,T.AnimationClip>>};props:Map<string,T.Object3D>;parts:(name:string)=>PropPart[]};
 
 let pending:Promise<NightAssets>|null=null,ready:NightAssets|null=null,failed=false;
 export const nightAssets=()=>ready;
@@ -37,10 +37,14 @@ export function loadNightAssets():Promise<NightAssets>{
  const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);
  const base=import.meta.env.BASE_URL+'models/';
  pending=(async()=>{
-  const [characters,anims,packs]=await Promise.all([
+  const headNames=['Superhero_Male_FullBody','Superhero_Female_FullBody','Hair_SimpleParted','Hair_Long','Hair_Buzzed','Hair_Beard'];
+  const [characters,anims,packs,modernModels,modernAnims,modernHeads]=await Promise.all([
    Promise.all(CHARACTER_NAMES.map(n=>loader.loadAsync(base+'characters/'+n+'.glb'))),
    loader.loadAsync(base+'characters/anims.glb'),
    Promise.all(PACKS.map(n=>loader.loadAsync(base+'env/'+n+'.glb'))),
+   Promise.all(['Male_Ranger','Female_Ranger','Male_Peasant','Female_Peasant','ForgottenKnight','ScarletSorceress'].map(n=>loader.loadAsync(base+'characters/modern/'+n+'.glb'))),
+   Promise.all(['gaits','animations'].map(n=>loader.loadAsync(base+'characters/modern/'+n+'.glb'))),
+   Promise.all(headNames.map(n=>loader.loadAsync(base+'characters/modern/'+n+'.glb'))),
   ]);
   const record={} as Record<CharacterName,T.Object3D>;
   CHARACTER_NAMES.forEach((n,i)=>{const scene=characters[i].scene;mergeSkinned(scene);scene.traverse(o=>{if(o instanceof T.Mesh)o.frustumCulled=false;});record[n]=scene;});
@@ -48,7 +52,10 @@ export function loadNightAssets():Promise<NightAssets>{
   const props=new Map<string,T.Object3D>();packs.forEach((g,i)=>{if(PACKS[i]==='meadow')brightenFoliage(g.scene);for(const child of g.scene.children)props.set(child.name,child);});
   const partCache=new Map<string,PropPart[]>();
   const parts=(name:string)=>{let list=partCache.get(name);if(list)return list;const node=props.get(name);list=[];if(node){const root=new T.Group();const copy=node.clone();copy.position.set(0,0,0);copy.rotation.set(0,0,0);copy.scale.set(1,1,1);root.add(copy);root.updateMatrixWorld(true);copy.traverse(o=>{if(o instanceof T.Mesh&&!Array.isArray(o.material))list!.push({geometry:o.geometry,material:o.material,matrix:o.matrixWorld.clone()});});}partCache.set(name,list);return list;};
-  ready={characters:record,clips,props,parts};return ready;
+  const knight=modernModels[4].scene;knight.updateMatrixWorld(true);const box=new T.Box3().setFromObject(knight),size=box.getSize(new T.Vector3()),scale=1.95/size.y,wrapper=new T.Group();wrapper.add(knight);knight.scale.multiplyScalar(scale);knight.position.set(-(box.min.x+box.max.x)*.5*scale,-box.min.y*scale,-(box.min.z+box.max.z)*.5*scale);
+  const scarlet=modernModels[5].scene;scarlet.updateMatrixWorld(true);const sb=new T.Box3().setFromObject(scarlet),ss=1.95/sb.getSize(new T.Vector3()).y,sw=new T.Group();sw.add(scarlet);scarlet.scale.multiplyScalar(ss);scarlet.position.set(-(sb.min.x+sb.max.x)*.5*ss,-sb.min.y*ss,-(sb.min.z+sb.max.z)*.5*ss);
+  const modern={models:new Map<string,T.Object3D>([...['Male_Ranger','Female_Ranger','Male_Peasant','Female_Peasant'].map((n,i)=>[n,modernModels[i].scene] as [string,T.Object3D]),['ForgottenKnight',wrapper],['ScarletSorceress',sw]]),heads:new Map(headNames.map((n,i)=>[n,modernHeads[i].scene])),clips:new Map(modernAnims.flatMap(g=>g.animations.map(c=>[c.name,c] as const))),variants:new Map([['ForgottenKnight',new Map(modernModels[4].animations.map(c=>[c.name,c]))],['ScarletSorceress',new Map(modernModels[5].animations.map(c=>[c.name,c]))]])};
+  ready={characters:record,clips,modern,props,parts};return ready;
  })();
  pending.catch(e=>{failed=true;console.warn('Modelos 3D indisponíveis; a usar geometria simples.',e);});
  return pending;
@@ -77,7 +84,7 @@ const extraPacks=new Map<string,Promise<void>>();
 /** Loads another environment pack (e.g. the hex battlefield tiles) into the shared prop library. */
 export function loadExtraPack(name:string){
  let p=extraPacks.get(name);if(p)return p;
- p=loadNightAssets().then(async assets=>{const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const g=await loader.loadAsync(import.meta.env.BASE_URL+'models/env/'+name+'.glb');if(name==='meadow'&&assets.props.has('meadow-Pine_1'))return;if(name==='meadow')brightenFoliage(g.scene);for(const child of [...g.scene.children])assets.props.set(child.name,child);});
+ p=loadNightAssets().then(async assets=>{const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const g=await loader.loadAsync(import.meta.env.BASE_URL+'models/env/'+name+'.glb');for(const child of [...g.scene.children])assets.props.set(child.name,child);});
  extraPacks.set(name,p);p.catch(()=>extraPacks.delete(name));return p;
 }
 const models=new Map<string,Promise<{scene:T.Object3D;animations:T.AnimationClip[]}>>();
@@ -92,12 +99,15 @@ export function fxTexture(name:string){let t=fxCache.get(name);if(!t){t=new T.Te
 export function prop(assets:NightAssets,name:string){const node=assets.props.get(name);const copy=node?node.clone():new T.Group();copy.position.set(0,0,0);copy.rotation.set(0,0,0);copy.scale.set(1,1,1);return copy;}
 
 type PlayOptions={loop?:boolean;fade?:number;speed?:number;restart?:boolean};
+const MODERN_CLIPS:Record<string,string>={Idle:'Idle_Loop',Idle_Combat:'Sword_Idle',Walking_A:'Walk_Loop',Running_A:'Jog_Fwd_Loop',Death_A:'Death01',Hit_A:'Hit_Chest',Jump_Idle:'Jump_Loop',Block:'Sword_Block',Blocking:'Idle_Shield_Loop',Taunt:'Idle_FoldArms_Loop',Throw:'OverhandThrow','2H_Ranged_Shoot':'Pistol_Shoot','1H_Melee_Attack_Slice_Diagonal':'Sword_Regular_A','1H_Melee_Attack_Slice_Horizontal':'Sword_Regular_B','1H_Melee_Attack_Chop':'Sword_Regular_C','2H_Melee_Attack_Spin':'Sword_Heavy_Combo','1H_Melee_Attack_Jump_Chop':'Sword_Dash',Spellcast_Long:'Spell_Simple_Enter',Spellcast_Summon:'Spell_Simple_Idle_Loop',Spellcast_Raise:'Spell_Simple_Enter'};
 /** Animated KayKit character: shared clips, per-actor materials for hit flashes and tints. */
 export class Actor{
  readonly root=new T.Group();readonly model:T.Object3D;readonly mixer:T.AnimationMixer;readonly materials:T.MeshStandardMaterial[]=[];
  private actions=new Map<string,T.AnimationAction>();private current?:T.AnimationAction;active='';
- constructor(private assets:NightAssets,name:CharacterName,options:{items?:string[];hide?:string[];tint?:number;scale?:number}={}){
-  this.model=cloneSkinned(assets.characters[name]);this.root.add(this.model);this.model.scale.setScalar(options.scale??1);
+ readonly modern:boolean;private clips:Map<string,T.AnimationClip>;
+ constructor(private assets:NightAssets,name:CharacterName,options:{items?:string[];hide?:string[];tint?:number;scale?:number;modern?:string}={}){
+  const modern=options.modern&&assets.modern?.models.get(options.modern);this.modern=!!modern;this.clips=modern?(assets.modern!.variants.get(options.modern!)||assets.modern!.clips):assets.clips;
+  this.model=cloneSkinned(modern||assets.characters[name]);this.root.add(this.model);this.model.scale.setScalar(options.scale??1);
   const materials=new Map<T.Material,T.MeshStandardMaterial>();
   this.model.traverse(o=>{
    if(!(o instanceof T.Mesh))return;
@@ -107,13 +117,14 @@ export class Actor{
   this.mixer=new T.AnimationMixer(this.model);
  }
  /** GLTFLoader sanitises node names ("handslot.r" becomes "handslotr"), so look up both spellings. */
- bone(name:string){return this.model.getObjectByName(name)??this.model.getObjectByName(T.PropertyBinding.sanitizeNodeName(name))!;}
+ bone(name:string){if(this.modern){const scarlet=!!this.model.getObjectByName('mixamorigHead_05'),knight=!!this.model.getObjectByName('headx_5');name=(scarlet?{'head':'mixamorigHead_05','handslot.r':'mixamorigRightHand_034','handslot.l':'mixamorigLeftHand_010'}:knight?{'head':'headx_5','handslot.r':'handr_53','handslot.l':'handl_28'}:{'head':'Head','handslot.r':'hand_r','handslot.l':'hand_l'} as Record<string,string>)[name]||name;}return this.model.getObjectByName(name)??this.model.getObjectByName(T.PropertyBinding.sanitizeNodeName(name))!;}
  /** Attaches a prop from the item packs to a bone (e.g. 'handslot.r'). */
  hold(item:string,bone:string,transform?:(o:T.Object3D)=>void){const o=prop(this.assets,item);o.traverse(c=>{if(c instanceof T.Mesh){const m=(c.material as T.MeshStandardMaterial).clone();this.materials.push(m);c.material=m;}});transform?.(o);this.bone(bone)?.add(o);return o;}
- has(clip:string){return this.assets.clips.has(clip);}
- duration(clip:string){return this.assets.clips.get(clip)?.duration||1;}
+ private mapped(clip:string){if(!this.modern)return clip;return MODERN_CLIPS[clip]||(/Spellcast/.test(clip)?'Spell_Simple_Shoot':/Attack/.test(clip)?'Sword_Regular_A':/Dodge/.test(clip)?'Roll':/Running/.test(clip)?'Jog_Fwd_Loop':'Idle_Loop');}
+ has(clip:string){return this.clips.has(this.mapped(clip));}
+ duration(clip:string){return this.clips.get(this.mapped(clip))?.duration||1;}
  play(clip:string,{loop=true,fade=.15,speed=1,restart=false}:PlayOptions={}){
-  const c=this.assets.clips.get(clip);if(!c)return;let action=this.actions.get(clip);if(!action){action=this.mixer.clipAction(c);this.actions.set(clip,action);}
+  const c=this.clips.get(this.mapped(clip));if(!c)return;let action=this.actions.get(clip);if(!action){action=this.mixer.clipAction(c);this.actions.set(clip,action);}
   action.timeScale=speed;
   if(this.current===action&&!restart)return;
   action.reset();action.setLoop(loop?T.LoopRepeat:T.LoopOnce,Infinity);action.clampWhenFinished=!loop;action.enabled=true;action.setEffectiveWeight(1);

@@ -1,3 +1,4 @@
+import {NIGHT_MAP_EXTENT} from './night-expedition';
 import {NightEffects} from './night-effects';
 import {loadNightAssets,nightAssets,nightAssetsFailed,fxTexture} from './night-assets';
 import {HeroActor,BossActor} from './night-actors';
@@ -107,7 +108,7 @@ export class HuntScene {
   if(p.action===1||p.action===2||p.action===3)r.arms[1].rotation.x=-1.4*swing;
   r.arms[0].rotation.z=p.action===3?.9*swing:0;r.cape.rotation.x=-.15-p.moving*.2+Math.sin(time*6)*.08;r.tail.forEach((t,i)=>{t.rotation.y=Math.sin(time*4-i*.6)*.24;t.rotation.x=-.08;});
   r.aura.material=this.materials.includes(r.aura.material as T.Material)?r.aura.material:this.cyan;r.aura.visible=p.hp>0;r.aura.scale.setScalar(p.shield>0?1.3:1);r.aura.rotation.z=time*.4;
-  r.slash.visible=p.action===1&&p.actionTime>.08&&progress<.85&&(this.night?!rangedClass(this.night.players[this.heroes.indexOf(r)].classId):this.heroes.indexOf(r)===0);r.slash.rotation.z=-progress*Math.PI*2;r.slash.scale.setScalar(p.combo===3?1.4:1);
+  r.slash.visible=!this.night&&p.action===1&&p.actionTime>.08&&progress<.85&&this.heroes.indexOf(r)===0;r.slash.rotation.z=-progress*Math.PI*2;r.slash.scale.setScalar(p.combo===3?1.4:1);
   if(this.night&&p.hp>0){r.head.rotation.y=0;r.body.position.z=0;r.weapon.rotation.z=0;r.root.position.y=ease(previousY,r.root.position.y+this.night.players[this.heroes.indexOf(r)].y,dt*18);const hero=this.night.players[this.heroes.indexOf(r)],mage=classFor(hero.classId).magic,u=Math.min(1,p.actionTime/(p.duration||1)),strike=Math.min(.7,Math.max(.15,hero.impactAt/(p.duration||1))),wind=Math.min(1,u/strike),release=Math.max(0,Math.min(1,(u-strike)/.24)),recover=Math.max(0,(u-strike-.24)/(1-strike-.24)),swing=wind*(1-release)+release*(1-recover);
    if(p.action===1){if(hero.classId==='ranger'){r.arms[0].rotation.x=-1.2;r.arms[0].rotation.z=-.15;r.arms[1].rotation.x=-.8;r.arms[1].rotation.z=.9*wind-.6*release*(1-recover);r.body.rotation.y=-.35;r.head.rotation.y=.2;}else if(mage){r.arms[1].rotation.x=-.6-wind*.7+release*.9;r.arms[0].rotation.x=-.55*swing;r.body.rotation.x=.12*swing;r.weapon.rotation.z=Math.sin(u*Math.PI)*.18;}
     else if(hero.classId==='reaver'){r.arms[p.combo%2].rotation.x=-1.3*wind+2.2*release*(1-recover);r.arms[1-p.combo%2].rotation.x=-.45;r.body.rotation.y=(p.combo%2?1:-1)*(.5*wind-1.1*release*(1-recover));}
@@ -139,12 +140,12 @@ export class HuntScene {
  }
  /**
   * Top-down photograph of the rendered world (models, paths, districts) used as the map and minimap background.
-  * Rendered once with an orthographic camera; covers x,z in [-54, 54], north (−z) at the top.
+  * Rendered once with an orthographic camera; covers the shared expedition extent, north (−z) at the top.
   */
  worldMap(){
   if(this.mapImage||!this.world||!nightAssets())return this.mapImage;
   const size=512,rt=new T.WebGLRenderTarget(size,size);rt.texture.colorSpace=T.SRGBColorSpace;
-  const camera=new T.OrthographicCamera(-54,54,54,-54,1,300);camera.position.set(0,150,0);camera.up.set(0,0,-1);camera.lookAt(0,0,0);
+  const camera=new T.OrthographicCamera(-NIGHT_MAP_EXTENT,NIGHT_MAP_EXTENT,NIGHT_MAP_EXTENT,-NIGHT_MAP_EXTENT,1,300);camera.position.set(0,150,0);camera.up.set(0,0,-1);camera.lookAt(0,0,0);
   const hidden=[...this.scene.children.filter(o=>o.visible&&o!==this.world!.root&&!(o instanceof T.Light)),...this.world.transient()];hidden.forEach(o=>o.visible=false);const fog=this.scene.fog;this.scene.fog=null;const exposure=this.renderer.toneMappingExposure;this.renderer.toneMappingExposure=1.3;
   // Neutral daylight for the map photo: the blue night fill turns foliage cyan from above.
   const hemi=[this.hemi.color.getHex(),this.hemi.intensity],key=[this.key.color.getHex(),this.key.intensity];this.hemi.color.setHex(0xffffff);this.hemi.intensity=2.2;this.key.color.setHex(0xfff4e0);this.key.intensity=2.4;
@@ -159,9 +160,10 @@ export class HuntScene {
   this.local=local;this.lock=lock;this.night=s;this.orbit=yaw;this.zoomLevel=zoom;this.elevation=pitch;
   if(!this.world&&!nightAssets()&&!nightAssetsFailed()&&this.assetWait<10){void loadNightAssets();this.assetWait+=dt;if(!this.loading){this.loading=document.createElement('div');this.loading.className='night-loading';this.loading.textContent='A preparar o mundo…';this.labelRoot.append(this.loading);}this.renderer.render(this.scene,this.camera);return;}
   this.loading?.remove();this.loading=undefined;
-  if(!this.world){this.nightEffects=new NightEffects();this.scene.add(this.nightEffects.root);this.world=new NightWorld(nightAssets());this.scene.add(this.world.root);this.nightBeacon=this.pivot(this.scene);const beaconRing=this.ring(this.nightBeacon,this.gold,1.3,.05,0,.15);beaconRing.rotation.x=Math.PI/2;const tip=this.add(new T.ConeGeometry(.3,.6,4),this.cyan,this.nightBeacon,0,3,0);tip.rotation.z=Math.PI;this.arenaObjects.forEach(o=>o.scale.multiplyScalar(1.12));
+  if(!this.world){this.nightEffects=new NightEffects();this.nightEffects.handOrigin=(i,side)=>this.heroModels[i]?.handPosition(side);this.scene.add(this.nightEffects.root);this.world=new NightWorld(nightAssets());this.scene.add(this.world.root);this.nightBeacon=this.pivot(this.scene);const beaconRing=this.ring(this.nightBeacon,this.gold,1.3,.05,0,.15);beaconRing.rotation.x=Math.PI/2;const tip=this.add(new T.ConeGeometry(.3,.6,4),this.cyan,this.nightBeacon,0,3,0);tip.rotation.z=Math.PI;this.arenaObjects.forEach(o=>o.scale.multiplyScalar(1.12));
    // With models, the primitive pillars and backdrop give way to KayKit architecture; the engraved floor stays.
    const assets=nightAssets();if(assets){
+    this.renderer.shadowMap.enabled=!matchMedia('(pointer:coarse)').matches;this.renderer.shadowMap.type=T.PCFSoftShadowMap;this.key.castShadow=true;this.key.shadow.mapSize.set(1024,1024);Object.assign(this.key.shadow.camera,{left:-22,right:22,top:22,bottom:-22,near:1,far:80});this.key.shadow.camera.updateProjectionMatrix();this.key.shadow.bias=-.00015;this.key.shadow.normalBias=.035;this.scene.add(this.key.target);
     // Arena moon: NASA LRO colour map (public domain).
     for(const o of this.arenaObjects)if(o instanceof T.Mesh&&o.material instanceof T.MeshBasicMaterial&&o.material.color.getHex()===0xb6e4eb){o.material.map=fxTexture('moon');o.material.color.setHex(0xdde8ff);o.material.needsUpdate=true;}
     // Textured models read better under a cooler moon key and a softer sky fill than flat-shaded primitives.
@@ -180,6 +182,7 @@ this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)
   if(this.bossModel){this.bossModel.root.visible=arena;this.boss.root.visible=false;}this.marker.visible=arena;this.boundary.visible=arena&&!this.arena;
   if(this.nightStage!==s.stage){this.nightStage=s.stage;if(assets){this.arena?.dispose();this.arena=dressNightArena(assets,this.scene,s.stage);this.scene.fog=new T.FogExp2(this.arena.fog,.016);}this.boss.root.scale.setScalar(1+(s.stage-1)*.09);this.boss.materials[2].color.setHex([0x8f3b55,0x9b4e27,0x503b8c][s.stage-1]);this.boss.materials[0].color.setHex([0x65506d,0x5a3d38,0x36385c][s.stage-1]);this.renderer.setClearColor([0x101c2b,0x241a28,0x141329][s.stage-1]);}
   if(this.nightBeacon){this.nightBeacon.visible=!!s.order;if(s.order){const leader=s.players[s.order.owner],fixed=s.order.kind==='defend';this.nightBeacon.position.set(fixed?s.order.x:leader.x,.15+Math.sin(s.time*3)*.12,fixed?s.order.z:leader.z);}}
+  const focus=s.players[local];if(focus){this.key.position.set(focus.x-18,28,focus.z+16);this.key.target.position.set(focus.x,0,focus.z);}
   this.nightEffects?.update(s,dt);this.world.update(s,dt,this.target);this.update(nightVisual(s),dt);
  }
  private spawn(e:HuntEvent){

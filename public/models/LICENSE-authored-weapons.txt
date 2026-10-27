@@ -1,0 +1,14 @@
+PriestessStaff — K-Li
+https://sketchfab.com/3d-models/9f1978976eda42b09f78becc7ee5cafe
+CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
+Mirror: allenai/objaverse. Changes: normalization, compressed geometry and textures.
+
+SkullStaff — Devin Eggleston
+https://sketchfab.com/3d-models/0dfda2514e4849cdb60b153808b5f65c
+CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
+Mirror: allenai/objaverse. Changes: normalization, compressed geometry and textures.
+
+RecurveBow — Átila Becker
+https://sketchfab.com/3d-models/e8c4201ef4c9473aa89a1d0b48cc6963
+CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
+Mirror: allenai/objaverse. Changes: normalization, compressed geometry and textures.

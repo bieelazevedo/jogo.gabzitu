@@ -1,8 +1,12 @@
 import * as T from 'three';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {Actor,fxTexture,type CharacterName,type NightAssets} from './night-assets';
 import type {NightClass} from './night-data';
 import type {HuntBoss} from './hunt-simulation';
 import type {NightEnemy,NightPlayer} from './night-simulation';
+import {adventurerRegalia} from './night-regalia';
+import {vfxTexture} from './night-vfx-textures';
+import {HeroPose} from './night-poses';
 
 const ease=(a:number,b:number,t:number)=>a+(b-a)*Math.min(1,t);
 const turn=(a:number,b:number,t:number)=>a+Math.atan2(Math.sin(b-a),Math.cos(b-a))*Math.min(1,t);
@@ -27,29 +31,50 @@ export function catFeatures(actor:Actor,fur:number){
  const ear=new T.ConeGeometry(.2,.42,4),earInner=new T.ConeGeometry(.11,.26,4);
  const head=actor.bone('head');
  for(const side of [-1,1]){const e=new T.Mesh(ear,furMat);e.position.set(side*.33,1.12,-.02);e.rotation.set(-.1,0,-side*.32);const i=new T.Mesh(earInner,inner);i.position.set(0,-.04,.07);e.add(i);head?.add(e);}
+ // A compact muzzle and whiskers give the rig a feline profile, including through helmets and hoods.
+ const muzzle=new T.MeshStandardMaterial({color:new T.Color(fur).lerp(new T.Color(0xffead1),.68),roughness:.95});
+ const ink=new T.MeshStandardMaterial({color:0x25252f,roughness:.7});actor.materials.push(muzzle,ink);
+ const detail=new T.Group(),round=new T.SphereGeometry(1,8,6),whisker=new T.CylinderGeometry(.009,.009,.23,4);
+ const shapes:T.BufferGeometry[]=[ear,earInner];
+ const face=(mat:T.Material,x:number,y:number,z:number,sx:number,sy:number,sz:number)=>{const o=new T.Mesh(round,mat);o.position.set(x,y,z);o.scale.set(sx,sy,sz);detail.add(o);return o;};
+ for(const side of [-1,1]){face(furMat,side*.24,.58,.33,.19,.19,.14);face(muzzle,side*.09,.52,.48,.13,.09,.08);
+  for(const angle of [-.2,.16]){const w=new T.Mesh(whisker,muzzle);w.position.set(side*.27,.54+angle*.18,.5);w.rotation.z=side*(Math.PI/2+angle);detail.add(w);}}
+ face(ink,0,.57,.56,.055,.036,.025);face(ink,0,.475,.535,.035,.012,.015);
+ // Merge rigid face details by material so whiskers do not add one draw call each.
+ for(const mat of [furMat,muzzle,ink]){const pieces:T.BufferGeometry[]=[];detail.traverse(o=>{if(o instanceof T.Mesh&&o.material===mat){o.updateMatrix();pieces.push(o.geometry.clone().applyMatrix4(o.matrix));}});const g=mergeGeometries(pieces,false);pieces.forEach(g=>g.dispose());if(g){head?.add(new T.Mesh(g,mat));shapes.push(g);}}
+ round.dispose();whisker.dispose();
  // A single curved tube reads as a tail; it hangs from the actor root because hip bone axes differ per rig.
  const curve=new T.CatmullRomCurve3([new T.Vector3(0,0,0),new T.Vector3(0,.08,-.3),new T.Vector3(0,.4,-.5),new T.Vector3(0,.75,-.42),new T.Vector3(0,.92,-.2)]);
  const tube=new T.TubeGeometry(curve,14,.085,6,false),tip=new T.SphereGeometry(.1,8,6);
  const base=new T.Group();base.position.set(0,.88,-.3);actor.root.add(base);const tailMesh=new T.Mesh(tube,furMat);const end=new T.Mesh(tip,furMat);end.position.set(0,.92,-.2);base.add(tailMesh,end);
  const tail=[base];
- return {tail,geometries:[ear,earInner,tube,tip]};
+ return {tail,geometries:[...shapes,tube,tip]};
 }
 
 export class HeroActor{
  readonly actor:Actor;readonly look:HeroLook;private tail:T.Object3D[];private geometries:T.BufferGeometry[];
  private lastAction=0;private lastCombo=0;private lastTime=0;private hitUntil=0;private lastHit=0;
+ private pose:HeroPose;
  constructor(assets:NightAssets,classId:NightClass,parent:T.Object3D){
-  this.look=HEROES[classId];this.actor=new Actor(assets,this.look.model,{items:this.look.items,hide:this.look.hide,tint:this.look.tint});
-  ({tail:this.tail,geometries:this.geometries}=catFeatures(this.actor,this.look.fur));if(classId==='chaos')this.chaosLook();parent.add(this.actor.root);this.actor.play('Idle');
+  this.look=HEROES[classId];const outfit=classId==='chaos'?'ScarletSorceress':classId==='guardian'?'ForgottenKnight':classId==='witch'?'Female_Peasant':classId==='astral'?'Male_Peasant':classId==='ranger'?'Female_Ranger':'Male_Ranger';
+  this.actor=new Actor(assets,this.look.model,{items:this.look.items,hide:this.look.hide,tint:this.look.tint,modern:outfit,scale:assets.modern?1.55:1});
+  this.pose=new HeroPose(this.actor,classId);
+  ({tail:this.tail,geometries:this.geometries}=this.actor.modern&&!['guardian','chaos'].includes(classId)?adventurerRegalia(this.actor,assets,classId):{tail:[],geometries:[]});
+  if(this.actor.modern&&classId!=='guardian')for(const item of this.look.items){const left=/Offhand|Shield|Spellbook/.test(item);const name=({'1H_Sword':'weapon-Sword_Bronze','1H_Axe':'weapon-Axe_Bronze','1H_Axe_Offhand':'weapon-Axe_Bronze','Barbarian_Round_Shield':'weapon-Shield_Wooden','2H_Staff':'weapon-PriestessStaff','1H_Wand':'weapon-SkullStaff','Spellbook_open':'spellbook_open','2H_Crossbow':'weapon-RecurveBow'} as Record<string,string>)[item]||item;this.actor.hold(name,left?'handslot.l':'handslot.r',o=>{const authored=/Priestess|Skull|Recurve/.test(name);o.scale.setScalar(authored?1:.65);o.rotation.set(authored?0:Math.PI/2,0,left?Math.PI:0);});}
+  if(classId==='chaos')this.chaosLook();parent.add(this.actor.root);this.actor.play('Idle');
  }
  get root(){return this.actor.root;}
  /** Carmesim: hands that burn with chaos light (Kenney CC0 glow texture). */
  private chaosLook(){
-  for(const slot of ['handslot.l','handslot.r']){const glow=new T.Sprite(new T.SpriteMaterial({map:fxTexture('glow'),color:0xff2a4a,transparent:true,depthWrite:false,blending:T.AdditiveBlending}));glow.scale.setScalar(.7);this.actor.bone(slot)?.add(glow);this.hands.push(glow);}
+  for(const slot of ['handslot.l','handslot.r']){const group=new T.Group();this.root.add(group);this.handAnchors.push({group,slot});
+   for(let i=0;i<10;i++){const smoke=i>=6,core=i===1;const glow=new T.Sprite(new T.SpriteMaterial({map:vfxTexture(smoke?'smoke':i>1?'spark':'glow'),color:smoke?0x851028:core?0xffb3aa:0xff1538,transparent:true,opacity:smoke?.35:.85,depthWrite:false,blending:smoke?T.NormalBlending:T.AdditiveBlending,toneMapped:false}));glow.userData.layer=i;group.add(glow);this.hands.push(glow);}}
  }
  private hands:T.Sprite[]=[];
+ private handAnchors:{group:T.Group;slot:string}[]=[];
+ handPosition(side:'l'|'r',out=new T.Vector3()){this.root.updateMatrixWorld(true);const bone=this.actor.bone('handslot.'+side);return bone?bone.getWorldPosition(out):out.copy(this.root.position).add(new T.Vector3(0,1.45,0));}
  private clipFor(p:NightPlayer){const l=this.look;switch(p.action){case 1:return l.attack[Math.max(0,p.combo-1)%l.attack.length];case 2:return l.power;case 3:return l.ultimate;case 4:return 'Dodge_Forward';case 5:return l.utility;case 6:return l.hex;case 7:return 'Spellcast_Long';default:return '';}}
  update(p:NightPlayer,dt:number,time:number,y:number){
+  this.pose.clear();
   const r=this.actor.root;r.position.x=ease(r.position.x,p.x,dt*20);r.position.z=ease(r.position.z,p.z,dt*20);r.position.y=ease(r.position.y,y,dt*18);r.rotation.y=turn(r.rotation.y,p.facing,dt*15);
   const restarted=p.action!==this.lastAction||p.combo!==this.lastCombo||p.actionTime<this.lastTime;
   if(p.hit>0&&this.lastHit<=0&&p.action===0)this.hitUntil=time+.35;this.lastHit=p.hit;
@@ -60,11 +85,13 @@ export class HeroActor{
   else if(p.moving>.1){const running=p.running>0||p.moving>.6;this.actor.play(running?'Running_A':'Walking_A',{fade:.18,speed:running?(p.running?1.25:1)*Math.max(.7,p.moving):.6+p.moving});}
   else this.actor.play('Idle',{fade:.25});
   this.lastAction=p.action;this.lastCombo=p.combo;this.lastTime=p.actionTime;
-  const tail=this.tail[0];tail.rotation.y=Math.sin(time*3.2)*.35*(1+p.moving*.6);tail.rotation.x=-.1+Math.sin(time*2.1)*.06-p.moving*.25;
+  const tail=this.tail[0];if(tail){tail.rotation.y=Math.sin(time*3.2)*.35*(1+p.moving*.6);tail.rotation.x=-.1+Math.sin(time*2.1)*.06-p.moving*.25;}
   // A brief red pulse on the first frames of a hit only; a lingering tint reads as a pink character.
   const flash=p.hit>.18;this.actor.flash(flash?0xff3b30:p.shield>0?0x1d6c70:0,flash?.18:p.shield>0?.18:0);
-  this.hands.forEach((h,i)=>{const channel=p.action>0?1.6:1;h.scale.setScalar((.55+Math.sin(time*9+i*2)*.12)*channel);});
   this.actor.update(dt);
+  this.pose.update(p.hp>0&&p.action===0&&p.moving<.1&&y<.2&&time>=this.hitUntil,dt,time);
+  if(this.handAnchors.length){this.root.updateMatrixWorld(true);for(const {group,slot} of this.handAnchors){const bone=this.actor.bone(slot);if(bone){const v=bone.getWorldPosition(new T.Vector3());group.position.copy(this.root.worldToLocal(v));}group.visible=p.hp>0;}
+   this.hands.forEach((h,i)=>{const layer=h.userData.layer as number,channel=p.action>0?1.5:.65,a=time*(layer>=6?.8:2.4)+i*2.4,r=layer<2?0:layer>=6?.18:.12;h.position.set(Math.sin(a)*r,Math.cos(a*1.3)*r+(layer>=6?.12:0),Math.cos(a)*r);h.scale.setScalar((layer===0?.65:layer===1?.15:layer>=6?.6:.075)*channel*(1+Math.sin(time*7+i)*.15));h.material.opacity=(layer>=6?.22:.8)*(p.action>0?1:.6);h.material.rotation=a*.3;});}
  }
  dispose(){this.hands.forEach(h=>h.material.dispose());this.actor.dispose();this.geometries.forEach(g=>g.dispose());}
 }

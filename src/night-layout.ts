@@ -1,6 +1,10 @@
 import * as T from 'three';
 import {NIGHT_CAMPS,NIGHT_OBSTACLES,NIGHT_PORTALS,NIGHT_SPRINGS} from './night-data';
 import {fxTexture,type NightAssets} from './night-assets';
+import {contactShadows,weatheredStone,forestGround} from './night-art-direction';
+import {sanctuaryArchitecture} from './night-sanctuary';
+import {medievalTown} from './night-town';
+import {NIGHT_TOWN_HOUSES,NIGHT_WOODLAND_TREES,NIGHT_HOMESTEADS,NIGHT_MONUMENTS} from './night-expedition';
 
 /** [x, z, rotationY, scale, y] */
 type Place=[number,number,number?,number?,number?];
@@ -13,15 +17,30 @@ const facing=(x:number,z:number,tx=0,tz=0)=>Math.atan2(tx-x,tz-z);
  * so the whole world costs a few dozen draw calls. Solid props sit on NIGHT_OBSTACLES so the
  * visuals match the host simulation's collisions; everything else stays clear of camps, paths and portals.
  */
-export const NIGHT_PATHS=[[0,27,-29,14],[-29,14,-24,-25],[-24,-25,25,-27],[25,-27,28,8],[28,8,0,27],[0,27,-24,-25]];
+export const NIGHT_PATHS=[[0,27,-29,14],[-29,14,-24,-25],[-24,-25,25,-27],[25,-27,28,8],[28,8,0,27],[0,27,-24,-25],[0,27,35,24],[28,8,35,24],[35,24,70,24],[56,24,56,54],[-29,14,-62,22],[-62,22,-60,-28],[-60,-28,-24,-25],[-62,22,-55,44],[-60,-28,-66,-42],[0,27,6,58]];
 export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.InstancedMesh[];update:(time:number)=>void;dispose:()=>void}{
- const meshes:T.InstancedMesh[]=[],m=new T.Matrix4(),q=new T.Quaternion(),up=new T.Vector3(0,1,0);
+ const meshes:T.InstancedMesh[]=[],m=new T.Matrix4(),q=new T.Quaternion(),up=new T.Vector3(0,1,0),shadows=contactShadows(root);
+ const stoneMaterials=new Map<T.Material,T.Material>();
  const moonlit=new Map<T.Material,T.Material>();
- // Quaternius foliage is self-lit for daylight scenes; under the moon it keeps only a faint glow.
  const nightMaterial=(m:T.Material)=>{let v=moonlit.get(m);if(!v){v=m.clone();const sm=v as T.MeshStandardMaterial;if(sm.emissive)sm.emissive.multiplyScalar(.3);moonlit.set(m,v);}return v;};
+ const disposeGround=forestGround(root,NIGHT_PATHS);
+ const sanctuary=sanctuaryArchitecture();
+ const town=medievalTown(assets);
+ // Use the detailed nature pack already shipped for the farm; preserve the original fallback.
+ const detailed=assets.props.has('meadow-CommonTree_3');
+ const treeModels:Record<string,string>={tree_detailed_dark:'CommonTree_3',tree_oak_dark:'CommonTree_4',tree_fat_darkh:'CommonTree_5',tree_pineTallA_detailed:'Pine_1',tree_pineTallC_detailed:'Birch_3',tree_pineRoundE:'CommonTree_4',tree_pineDefaultA:'Pine_1'};
  const scatter=(name:string,places:Place[],scale=1)=>{
-  const parts=assets.parts(name);if(!parts.length||!places.length)return;
-  for(const part of parts){const mesh=new T.InstancedMesh(part.geometry,name.startsWith('meadow-')?nightMaterial(part.material):part.material,places.length);
+  if(detailed&&treeModels[name]){name='meadow-'+treeModels[name];scale=scale/5.2*1.12;}
+  // Spatial batches let the renderer cull woodland sectors instead of drawing the entire forest.
+  if(/^meadow-(CommonTree|Pine|Birch)/.test(name)&&places.length>16){const sectors=new Map<string,Place[]>();for(const p of places){const key=Math.floor(p[0]/28)+':'+Math.floor(p[1]/28);const list=sectors.get(key)||[];list.push(p);sectors.set(key,list);}if(sectors.size>1){for(const list of sectors.values())scatter(name,list,scale);return;}}
+  const parts=town.get(name)??sanctuary.get(name)??assets.parts(name);if(!parts.length||!places.length)return;
+  if(/^(tree_|building_|pillar|column|crypt|grave|arch|bench|tent|rock_|stump)/.test(name)){
+   const bounds=new T.Box3();for(const part of parts){if(!part.geometry.boundingBox)part.geometry.computeBoundingBox();bounds.union(part.geometry.boundingBox!.clone().applyMatrix4(part.matrix));}
+   const size=bounds.getSize(new T.Vector3());for(const [x,z,,s=1,y=0] of places)if(y<.2){const radius=Math.max(size.x,size.z)*s*scale;shadows.add(x,z,Math.max(.7,radius*.95),Math.max(.6,radius*.7));}
+  }
+  for(const part of parts){let material=name.startsWith('meadow-')?nightMaterial(part.material):part.material;
+   if(/^(pillar|column|arch|crypt|grave|floor_tile|wall_|bench_decorated)/.test(name)&&(!(material instanceof T.MeshStandardMaterial)||material.metalness<.1)){let aged=stoneMaterials.get(material);if(!aged){aged=weatheredStone(material);stoneMaterials.set(material,aged);}material=aged;}
+   const mesh=new T.InstancedMesh(part.geometry,material,places.length);mesh.receiveShadow=true;mesh.castShadow=/^(town_|pillar|column|arch|building_|meadow-(CommonTree|Pine|Birch))/.test(name);
    places.forEach(([x,z,r=0,s=1,y=0],i)=>{q.setFromAxisAngle(up,r);m.compose(new T.Vector3(x,y,z),q,new T.Vector3().setScalar(s*scale));mesh.setMatrixAt(i,m.multiply(part.matrix));});
    mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();mesh.computeBoundingBox();root.add(mesh);meshes.push(mesh);}
  };
@@ -30,11 +49,6 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
  const glowSprite=(map:string,color:number,x:number,y:number,z:number,size:number,opacity=.9)=>{const m=new T.SpriteMaterial({map:fxTexture(map),color,transparent:true,opacity,depthWrite:false,blending:T.AdditiveBlending});owned.push(m);const sp=new T.Sprite(m);sp.position.set(x,y,z);sp.scale.setScalar(size);root.add(sp);return sp;};
  const decalPlane=(map:string,color:number,x:number,y:number,z:number,size:number,vertical=false)=>{const m=new T.MeshBasicMaterial({map:fxTexture(map),color,transparent:true,opacity:.85,depthWrite:false,side:T.DoubleSide,blending:T.AdditiveBlending});owned.push(m);const mesh=new T.Mesh(new T.PlaneGeometry(size,size),m);mesh.position.set(x,y,z);if(!vertical)mesh.rotation.x=-Math.PI/2;root.add(mesh);return mesh;};
 
- // Ground: KayKit hexagon grass tiles over the whole map, tinted per district through instance colours.
- {const parts=assets.parts('hex_grass'),S=3.2,W=2*S,R=1.15*S,places:{x:number;z:number;c:T.Color}[]=[];
-  const tint=(x:number,z:number)=>{if(Math.hypot(x,z-27)<11)return 0xb4bca8;if(Math.hypot(x+24,z+27)<20)return 0x8c8aa2;if(Math.hypot(x-25,z+29)<18)return 0xaaa486;if(Math.hypot(x-28,z-9)<19)return 0xa6a888;if(x<-8&&z>-6)return 0x6e8c62;return 0x8fa27c;};
-  for(let row=0;row*1.5*R<120;row++)for(let col=0;col*W<124;col++){const x=-62+col*W+(row%2)*S,z=-60+row*1.5*R;places.push({x,z,c:new T.Color(tint(x,z)).multiplyScalar(.92+hash(row*31+col)*.16)});}
-  for(const part of parts){const mesh=new T.InstancedMesh(part.geometry,part.material,places.length);places.forEach((p,i)=>{m.compose(new T.Vector3(p.x,0,p.z),q.identity(),new T.Vector3(S,S,S));mesh.setMatrixAt(i,m.multiply(part.matrix));mesh.setColorAt(i,p.c);});mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);}}
  // Velvet crypts stand on bare earth (Halloween Bits dirt tiles).
  {const dirt:Place[]=[];for(let x=-42;x<=-14;x+=4.6)for(let z=-43;z<=-17;z+=4.6)if(Math.hypot(x+27,z+30)<15)dirt.push([x,z,Math.floor(hash(x*z)*4)*Math.PI/2,1.15,.01]);scatter('floor_dirt',dirt);}
  // Stone paths (Halloween Bits) follow the routes between districts.
@@ -42,7 +56,7 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
   for(const [x,z,tx,tz] of NIGHT_PATHS){const len=Math.hypot(tx-x,tz-z),nx=-(tz-z)/len,nz=(tx-x)/len;for(let d=0;d<len;d+=1.9)for(const side of [-1,1]){const t=d/len;variants[keys[Math.floor(hash(n++)*4)]].push([x+(tx-x)*t+nx*side*.95,z+(tz-z)*t+nz*side*.95,Math.floor(hash(n*7)*4)*Math.PI/2,1.05,.005]);}}
   for(const [k,v] of Object.entries(variants))scatter(k,v);}
  // Sanctuary beacon: a pulsing light above the central column instead of a polygon crystal.
- const beacon=glowSprite('glow',0x7fe9ff,0,3.4,27,3.2),flare=glowSprite('flare',0xbff6ff,0,3.4,27,2.4),halo=glowSprite('light',0x5fd0e8,0,3.4,27,6,.35);
+ const beacon=glowSprite('glow',0x7fe9ff,0,3.4,27,3.2),flare=glowSprite('flare',0xbff6ff,0,3.4,27,2.4),halo=glowSprite('glow',0x5fd0e8,0,3.4,27,6,.35);
  sprites.push({sprite:beacon,update:t=>{beacon.scale.setScalar(3+Math.sin(t*2)*.3);(flare.material as T.SpriteMaterial).rotation=t*.6;halo.scale.setScalar(6+Math.sin(t*1.3)*.6);}});
  // Broken crown landmark: turning rune discs and a golden core above the colonnade.
  const crown=new T.Group();crown.position.set(25,6,-29);root.add(crown);const discs=[0,1,2].map(i=>{const d=decalPlane(i===1?'rune':'magic',i===1?0x7fe9ff:0xf3cd8a,0,0,0,6+i*1.2,true);d.removeFromParent();crown.add(d);d.rotation.set(.6+i*.65,i*.8,0);return d;});const core=glowSprite('glow',0xffd08a,25,6,-29,3);
@@ -62,16 +76,21 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
  scatter('lantern_standing',[[-2.6,21.3],[2.6,21.3]]);
  scatter('plaque_candles',[[0,33.2,Math.PI]]);
  scatter('banner_patternA_red',[[-6,25.8,0,.9,1.4],[6,25.8,0,.9,1.4]]);
+ // Pools of warm light ground the candle clusters without adding point-light shader cost.
+ {const places=[[-5.2,22.6],[5.2,22.6],[-1.8,32.6],[1.8,32.6],[-5.5,29],[5.5,29]];
+  const glow=decalPlane('glow',0xffb56b,0,.06,0,2.8),batch=new T.InstancedMesh(glow.geometry,glow.material,places.length),dummy=new T.Object3D();
+  glow.removeFromParent();places.forEach(([x,z],i)=>{dummy.position.set(x,.06,z);dummy.rotation.x=-Math.PI/2;dummy.updateMatrix();batch.setMatrixAt(i,dummy.matrix);});batch.computeBoundingSphere();root.add(batch);meshes.push(batch);
+ }
 
  // Forest of whispers: Kenney Nature Kit trees on the solid trunks, a dense canopy around the clearings,
  // and undergrowth (bushes, mushrooms, flowers, stumps) kept off the paths and fighting spots.
- const NATURE=5.2,MEADOW=1.25;
+ const NATURE=5.2;
  const forestTrunks=NIGHT_OBSTACLES.filter(o=>o.x<0&&o.z>0&&Math.abs(o.x)<40||(o.x===-40&&o.z===7));
- // Quaternius Stylized Nature trees on the trunks (moonlit: their self-light is dimmed below).
- for(const [k,name] of ['CommonTree_3','CommonTree_4','CommonTree_5'].entries())scatter('meadow-'+name,forestTrunks.filter((_,i)=>i%3===k).map((o,i)=>[o.x,o.z,i*1.7+k,1.05+hash(i+k)*.25] as Place),MEADOW);
+ scatter('tree_detailed_dark',forestTrunks.map((o,i)=>[o.x,o.z,i*1.7,1.15] as Place),NATURE);
+ if(detailed){const groves:Place[]=[];forestTrunks.forEach((o,i)=>{for(let j=0;j<2;j++){const a=j*Math.PI+i;groves.push([o.x+Math.sin(a)*.7,o.z+Math.cos(a)*.7,a,1.1+hash(i+j)*.4]);}});scatter('meadow-Birch_3',groves);}
  scatter('tree_pineTallA_detailed',[[-44,30,.4,1.1],[-27,33,2,1],[-12,22,1,.9],[-46,15,3,1.1],[-34,31,1,1],[-48,24,.3,1.2]],NATURE);
  scatter('tree_pineTallC_detailed',[[-19,30,2.5,1],[-41,-4,2.2,1.1],[-26,26,.8,.9]],NATURE);
- scatter('meadow-CommonTree_4',[[-36,26,0,1.1],[-23,11,2,1],[-45,0,4,1.2]],MEADOW);
+ scatter('tree_oak_dark',[[-36,26,0,1.1],[-23,11,2,1],[-45,0,4,1.2]],NATURE);
  scatter('tree_dead_large',[[-25,18,.5],[-44,-8,2]]);
  scatter('pumpkin_orange_jackolantern',[[-21,21,.6,.7],[-31,9,2.4,.6],[-42,12,1,.7],[-16,13,4,.55]]);
  scatter('stump_oldTall',[[-14,16,1],[-33,4,2],[-40,25,3]],3.4);
@@ -79,17 +98,63 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
  // Undergrowth everywhere outside paths, camps, portals and springs.
  const PATHS=NIGHT_PATHS;
  const segment=(x:number,z:number,[ax,az,bx,bz]:number[])=>{const dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));return Math.hypot(x-ax-t*dx,z-az-t*dz);};
- const open=(x:number,z:number)=>PATHS.every(p=>segment(x,z,p)>3)&&NIGHT_CAMPS.every(c=>Math.hypot(c.x-x,c.z-z)>5)&&[...NIGHT_PORTALS,...NIGHT_SPRINGS].every(p=>Math.hypot(p.x-x,p.z-z)>3.5)&&NIGHT_OBSTACLES.every(o=>Math.hypot(o.x-x,o.z-z)>o.r+1)&&Math.hypot(x,z-27)>9;
- const cover:Record<string,Place[]>={'meadow-Bush_Large':[],'meadow-Bush_Long_1':[],'meadow-Bush_Common_Flowers':[],'meadow-Flower_3_Group':[],'meadow-Fern_1':[],'meadow-Mushroom_RedCap':[],'meadow-Grass_Common_Tall':[]};
+ const open=(x:number,z:number)=>PATHS.every(p=>segment(x,z,p)>3)&&NIGHT_MONUMENTS.every(m=>Math.hypot(m.x-x,m.z-z)>m.r+.5)&&NIGHT_CAMPS.every(c=>Math.hypot(c.x-x,c.z-z)>5)&&[...NIGHT_PORTALS,...NIGHT_SPRINGS].every(p=>Math.hypot(p.x-x,p.z-z)>3.5)&&NIGHT_OBSTACLES.every(o=>Math.hypot(o.x-x,o.z-z)>o.r+1)&&Math.hypot(x,z-27)>9;
+ const cover:Record<string,Place[]>={plant_bushDetailed:[],plant_bushLarge:[],flower_purpleA:[],flower_redA:[],flower_yellowA:[],mushroom_redGroup:[],mushroom_tanTall:[]};
  const kinds=Object.keys(cover);for(let i=0;i<320;i++){const x=(hash(i*3.1)-.5)*92,z=(hash(i*7.7+1)-.5)*92;if(!open(x,z))continue;const forest=x<-8&&z>-6,kind=kinds[Math.floor(hash(i*13.3)*kinds.length)];if(!forest&&/mushroom/.test(kind))continue;cover[kind].push([x,z,hash(i)*6.3,.8+hash(i*5)*.6]);}
  // Ground cover reads at roughly knee height; bushes a little taller.
- const coverScale:Record<string,number>={'meadow-Bush_Large':.8,'meadow-Bush_Long_1':.85,'meadow-Bush_Common_Flowers':.85,'meadow-Flower_3_Group':1.2,'meadow-Fern_1':1.1,'meadow-Mushroom_RedCap':1.6,'meadow-Grass_Common_Tall':1.2,plant_bushDetailed:2.6,plant_bushLarge:2.8,grass:2.2,rock_largeA:2.2};
- for(const [kind,places] of Object.entries(cover))scatter(kind,places,coverScale[kind]);
+ const coverScale:Record<string,number>={plant_bushDetailed:2.6,plant_bushLarge:2.8,grass:2.2,flower_purpleA:2.4,flower_redA:2.4,flower_yellowA:2.4,mushroom_redGroup:3,mushroom_tanTall:3.2,rock_largeA:2.2};
+ if(!detailed)for(const [kind,places] of Object.entries(cover))scatter(kind,places,coverScale[kind]);
+ if(detailed){
+  // Tall grass grows in islands rather than a uniform carpet; the clear lanes remain readable.
+  const grass:Place[]=[],ferns:Place[]=[],bushes:Place[]=[];
+  for(let i=0;i<350;i++){const x=(hash(i*5.13)-.5)*94,z=(hash(i*9.71+2)-.5)*94;if(!open(x,z)||!NIGHT_WOODLAND_TREES.some(([a,b])=>Math.hypot(a-x,b-z)<9))continue;
+   const forest=x<-8&&z>-6,s=.65+hash(i+44)*.6;
+   if(i%7===0)bushes.push([x,z,i,forest?.7:.45]);else if(i%3===0)ferns.push([x,z,i,forest?1.2:.8]);else grass.push([x,z,i,s]);
+  }
+  scatter('meadow-Grass_Common_Tall',grass);scatter('meadow-Fern_1',ferns);scatter('meadow-Bush_Large_Flowers',bushes);
+  // A higher outer canopy and rocky shelves give real vertical parallax beyond the playable boundary.
+  const canopy:Place[]=[],birches:Place[]=[],ledges:Place[]=[];
+  for(let i=0;i<54;i++){const a=i/54*Math.PI*2,r=88+hash(i+80)*7;canopy.push([Math.sin(a)*r,Math.cos(a)*r,a,1.4+hash(i+90)*.65]);if(i%3===0)birches.push([Math.sin(a+.03)*(r+3),Math.cos(a+.03)*(r+3),a,1.4]);}
+  for(let i=0;i<28;i++){const a=i/28*Math.PI*2,r=87+hash(i)*5;ledges.push([Math.sin(a)*r,Math.cos(a)*r,a,2.2+hash(i+3)*2,-.6]);}
+  scatter('meadow-CommonTree_3',canopy);scatter('meadow-Birch_3',birches);scatter('meadow-Rock_Medium_1',ledges);
+  scatter('meadow-CommonTree_4',NIGHT_WOODLAND_TREES.filter((_,i)=>i%3===0).map(([x,z],i)=>[x,z,i,1.5+hash(i)*.5]));
+  scatter('meadow-Pine_1',NIGHT_WOODLAND_TREES.filter((_,i)=>i%3===1).map(([x,z],i)=>[x,z,i,2+hash(i)*.65]));
+  scatter('meadow-Birch_3',NIGHT_WOODLAND_TREES.filter((_,i)=>i%3===2).map(([x,z],i)=>[x,z,i,1.45+hash(i)*.35]));
+  // Undergrowth is authored around tree islands, not sprinkled uniformly across the fighting lanes.
+  const thickets:Place[]=[],tall:Place[]=[],fernBeds:Place[]=[];
+  NIGHT_WOODLAND_TREES.forEach(([cx,cz],i)=>{for(let j=0;j<14;j++){const a=j*2.4,r=1.8+hash(i*31+j)*6,x=cx+Math.sin(a)*r,z=cz+Math.cos(a)*r;if(!open(x,z))continue;(j%7===0?thickets:j%3===0?fernBeds:tall).push([x,z,a,.85+hash(i*41+j)*.5]);}});
+  scatter('meadow-Bush_Large',thickets);scatter('meadow-Grass_Common_Tall',tall);scatter('meadow-Fern_1',fernBeds);
+  // Interior ground layers connect places: clover, fern beds, fallen wood and low rocks.
+  const beds=[[-12,8],[-9,-7],[13,17],[9,-14],[-35,-5],[17,-40],[35,-14],[-4,42],[24,29],[39,30]];
+  const clover:Place[]=[],shortGrass:Place[]=[],leaves:Place[]=[],pebbles:Place[]=[],fallen:Place[]=[];
+  beds.forEach(([cx,cz],i)=>{for(let j=0;j<64;j++){const a=j*2.399,r=Math.sqrt(hash(j*7+i))*8,x=cx+Math.sin(a)*r,z=cz+Math.cos(a)*r;if(!open(x,z))continue;(j%5===0?leaves:j%3===0?clover:shortGrass).push([x,z,a,.7+hash(i*30+j)*.7]);if(j%13===0)pebbles.push([x,z,a,.25+hash(j)*.22]);}if(open(cx,cz))fallen.push([cx,cz,i,.7]);});
+  scatter('meadow-Clover_1',clover);scatter('meadow-Grass_Wide_Short',shortGrass);scatter('meadow-Fern_1',leaves);scatter('meadow-Pebble_Round_1',pebbles);scatter('log_large',fallen,2.5);
+ }
 
  // Village without tomorrow: houses on the three solid footprints, a well and work yards.
- scatter('building_tavern_red',[[21,4,facing(21,4,8,16)]],VILLAGE);
- scatter('building_home_B_red',[[34,13,facing(34,13,20,22)]],VILLAGE);
- scatter('building_blacksmith_red',[[30,-3,facing(30,-3,20,-20)]],VILLAGE*.95);
+ scatter('town_tavern',[[21,4,facing(21,4,8,16)]],.78);
+ scatter('town_home',[[34,13,facing(34,13,20,22)]],.78);
+ scatter('town_smith',[[30,-3,facing(30,-3,20,-20)]],.73);
+ for(const kind of ['town_home','town_tavern','town_smith'])scatter(kind,NIGHT_TOWN_HOUSES.filter(h=>h.kind===kind).map(h=>[h.x,h.z,h.rotation]),.9);
+ // A connected merchant street: front doors face the road, work yards and fences sit behind the houses.
+ scatter('building_well_red',[[62,24,0]],VILLAGE*.8);
+ scatter('barrel',[[48,18,0],[49,18,1],[57,18,0],[67,39,2],[64,53,1]],VILLAGE*.8);
+ scatter('crate_A_big',[[47,39,0],[49,39,.15],[67,12,.4],[63,44,1]],VILLAGE*.85);
+ scatter('wheelbarrow',[[43,37,1.4],[61,50,2.8]],VILLAGE);
+ scatter('sack',[[52,18,0],[53,18,1],[63,29,.4]],VILLAGE);
+ scatter('resource_lumber',[[43,41,0],[68,45,1]],VILLAGE*.65);
+ const yards:Place[]=[];for(const z of [9,41])for(let x=41;x<=72;x+=4)yards.push([x,z,Math.PI/2]);
+ scatter('fence_wood_straight',yards,VILLAGE*.7);
+ const streetPaving:Place[]=[];for(let x=34;x<=70;x+=2)for(const z of [22,24,26])streetPaving.push([x,z,0,.5,.03]);for(let z=28;z<=54;z+=2)for(const x of [54,56,58])streetPaving.push([x,z,0,.5,.03]);scatter('floor_tile_large',streetPaving);
+ // Woodland homesteads: one cottage, fenced crop rows and a working yard form each clearing.
+ scatter('town_farm',NIGHT_HOMESTEADS.map(h=>[h.x,h.z,h.rotation]),.85);
+ const wheat:Place[]=[],farmFences:Place[]=[],farmGoods:Place[]=[],dirtBeds:Place[]=[];
+ for(const h of NIGHT_HOMESTEADS){
+  for(let row=0;row<6;row++)for(let col=0;col<7;col++){const x=h.x-5+col*.8,z=h.z+5+row*.75;wheat.push([x,z,.1,.6+hash(row*19+col)*.25]);if(col%3===0&&row%2===0)dirtBeds.push([x,z,0,.45,-.015]);}
+  for(let j=0;j<4;j++){farmFences.push([h.x-7,h.z+3+j*2,0,.5],[h.x+2,h.z+3+j*2,0,.5]);}for(let j=0;j<5;j++)farmFences.push([h.x-6+j*2,h.z+10,Math.PI/2,.5]);
+  farmGoods.push([h.x+4,h.z+1,1]);scatter('barrel',[[h.x+3,h.z-1],[h.x+4,h.z-1]],VILLAGE*.7);scatter('wheelbarrow',[[h.x+4,h.z+3,1.2]],VILLAGE*.9);scatter('resource_lumber',[[h.x-4,h.z-3,0]],VILLAGE*.55);
+ }
+ scatter('meadow-Grass_Wheat',wheat);scatter('floor_dirt',dirtBeds);scatter('fence_wood_straight',farmFences,VILLAGE);scatter('crate_A_big',farmGoods,VILLAGE*.8);
  scatter('building_destroyed',[[15,-3,2.2]],VILLAGE*.9);
  scatter('building_tower_A_red',[[41,-9,.6]],VILLAGE);
  scatter('building_well_red',[[26.5,12.6,0]],VILLAGE*.9);
@@ -141,12 +206,13 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
  // The forest wall on the east/west borders matches the obstacle ring; a denser forest and mountains lie beyond.
  scatter('tree_pineDefaultA',NIGHT_OBSTACLES.filter(o=>Math.abs(o.x)>40&&!(o.x===-40&&o.z===7)).map((o,i)=>[o.x,o.z,i,1.1+hash(i)*.3] as Place),NATURE);
  const outer:Place[]=[],clumps:Place[]=[];
- for(let i=0;i<120;i+=2){const x=Math.sin(i*18.731)*55,z=Math.cos(i*7.347)*55;if(Math.abs(x)<48&&Math.abs(z)<47)continue;(i%3?outer:clumps).push([x,z,i,1+hash(i)*.5]);}
- for(let i=0;i<18;i++){const a=i/18*Math.PI*2,r=50+hash(i)*4;clumps.push([Math.sin(a)*r,Math.cos(a)*r,i,1.2]);}
+ for(let i=0;i<120;i+=2){const x=Math.sin(i*18.731)*88,z=Math.cos(i*7.347)*88;if(Math.abs(x)<82&&Math.abs(z)<82)continue;(i%3?outer:clumps).push([x,z,i,1+hash(i)*.5]);}
+ for(let i=0;i<18;i++){const a=i/18*Math.PI*2,r=88+hash(i)*6;clumps.push([Math.sin(a)*r,Math.cos(a)*r,i,1.2]);}
  scatter('tree_pineTallA_detailed',outer,NATURE*1.2);scatter('tree_pineRoundE',clumps.filter((_,i)=>i%2===0),NATURE*1.4);scatter('tree_fat_darkh',clumps.filter((_,i)=>i%2===1),NATURE*1.5);
- const mountains:Place[]=[];for(let i=0;i<14;i++){const a=i/14*Math.PI*2,r=68+hash(i)*8;mountains.push([Math.sin(a)*r,Math.cos(a)*r,a,1+hash(i+9)*.6,-1]);}
+ const mountains:Place[]=[];for(let i=0;i<14;i++){const a=i/14*Math.PI*2,r=100+hash(i)*10;mountains.push([Math.sin(a)*r,Math.cos(a)*r,a,1+hash(i+9)*.6,-1]);}
  scatter('mountain_A_grass_trees',mountains.filter((_,i)=>i%3===0),VILLAGE*2.2);scatter('mountain_B_grass_trees',mountains.filter((_,i)=>i%3===1),VILLAGE*2.2);scatter('mountain_C',mountains.filter((_,i)=>i%3===2),VILLAGE*2.4);
- return {meshes,update:t=>sprites.forEach(s=>s.update(t)),dispose:()=>{owned.forEach(m=>m.dispose());moonlit.forEach(m=>m.dispose());root.traverse(o=>{if(o instanceof T.Mesh&&(o.geometry.type==='PlaneGeometry'||o.geometry.type==='SphereGeometry'))o.geometry.dispose();});}};
+ shadows.bake();
+ return {meshes,update:t=>sprites.forEach(s=>s.update(t)),dispose:()=>{town.dispose();sanctuary.dispose();disposeGround();shadows.dispose();stoneMaterials.forEach(m=>m.dispose());moonlit.forEach(m=>m.dispose());owned.forEach(m=>m.dispose());root.traverse(o=>{if(o instanceof T.Mesh&&(o.geometry.type==='PlaneGeometry'||o.geometry.type==='SphereGeometry'))o.geometry.dispose();});}};
 }
 
 export type NightArena={group:T.Group;update:(time:number,dt:number)=>void;fog:number;sky:number;dispose:()=>void};

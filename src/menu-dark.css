@@ -1,4 +1,4 @@
-/* Tower defense menus in the same dark, gold-trimmed style as the battle HUD and Gato Nightreign.
+/* Tower defense menus in the same dark, gold-trimmed style as the battle HUD and Dungeon Nightreign.
    Panels and buttons use the Kenney Fantasy UI frames in public/ui (CC0). Loaded after the base sheets. */
 :root{--md-ink:#f3e7c4;--md-soft:#b9c9c3;--md-gold:#e2c98a;--md-deep:#0c1c22;--md-panel:#13282fee;--md-card:#183339}
 body:has(.app-screen),body:has(.app-header){background:radial-gradient(ellipse at 50% 0%,#24414a,#0b171d 70%)}
@@ -78,3 +78,5 @@ body:has(.app-screen),body:has(.app-header){background:radial-gradient(ellipse a
 .account-buttons .primary,.account-form button[type=submit]{background:linear-gradient(160deg,#c9a24f,#7a5a24)!important;color:#1b1206!important;border:1px solid #ffe7a8!important}
 .account-buttons button:not(.primary),.account-buttons a{color:var(--md-gold)!important}
 .privacy-card{background:var(--md-panel)!important;color:var(--md-ink)!important}
+
+.dungeon-wordmark{display:block;font-family:Georgia,serif;font-size:clamp(26px,5vw,58px);font-weight:500;letter-spacing:.09em;color:#e8d5a6;text-shadow:0 3px 25px #000}.dungeon-wordmark small{display:block;font:11px system-ui;letter-spacing:.55em;color:#a8bccb;margin-bottom:10px}

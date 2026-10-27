@@ -1,5 +1,5 @@
 import * as T from 'three';
-import {fxTexture} from './night-assets';
+import {vfxTexture} from './night-vfx-textures';
 import {nightBeamForks,type NightState} from './night-simulation';
 type Fx={mesh:T.Mesh|T.Sprite;age:number;life:number;kind:string;radius:number;from:T.Vector3;to:T.Vector3;spin:number};
 /** Ground-plane kinds lie flat; the rest are camera-facing sprites. Each kind maps to a CC0 Kenney particle texture. */
@@ -9,8 +9,9 @@ const SPRITE:Record<string,string>={spark:'spark',fall:'fire',flare:'flare',glow
 const CLASS_COLOR:Record<string,number>={blade:0xffd38a,astral:0x86edc1,guardian:0x99c7ff,reaver:0xff5a7a,witch:0xc89aff,ranger:0xb8e27a,chaos:0xff2a4a};
 /** Bounded, shared geometry effects; actual skill release events drive the impact. */
 export class NightEffects{
- readonly root=new T.Group();private hostile=new Map<number,T.Object3D>();private hazards=new Map<number,T.Mesh>();private shots=new Map<number,T.Object3D>();private arrow=new T.ConeGeometry(.13,.85,5);private effects:Fx[]=[];private seen=0;private trailTick=-1;
- private plane=new T.PlaneGeometry(2,2);private tube=new T.CylinderGeometry(1,1,1,8,1,true);private beams=new Map<number,{group:T.Group;parts:T.Mesh[];end:T.Sprite}>();
+ handOrigin?:(index:number,side:'l'|'r')=>T.Vector3|undefined;
+ readonly root=new T.Group();private hostile=new Map<number,T.Object3D>();private hazards=new Map<number,T.Mesh>();private shots=new Map<number,T.Object3D>();private arrow=new T.ConeGeometry(.055,.55,16);private effects:Fx[]=[];private seen=0;private trailTick=-1;
+ private plane=new T.PlaneGeometry(2,2);private tube=new T.CylinderGeometry(1,1,1,32,1,true);private beams=new Map<number,{group:T.Group;parts:T.Mesh[];end:T.Sprite}>();
  private realm?:{group:T.Group;floor:T.Mesh;runes:T.Mesh;dome:T.Mesh;orbit:T.Sprite[]};
  /** Carmesim's rewritten reality: rotating rune floors, a crimson dome and conjured runes orbiting inside. */
  private drawRealm(s:NightState,dt:number){
@@ -35,7 +36,7 @@ export class NightEffects{
   b.parts.forEach((m,i)=>{const k=Math.floor(i/2),end=targets[k];m.visible=!!end;if(!end)return;const origin=k===0?start:targets[0],dir=end.clone().sub(origin),len=dir.length();const r=(i%2?.05:.17)*(k?0.6:1)*(1+Math.sin(time*30+i)*.25);m.position.copy(origin).addScaledVector(dir,.5);m.scale.set(r,len,r);m.quaternion.setFromUnitVectors(up,dir.normalize());});
   b.end.position.copy(targets[0]);b.end.scale.setScalar(1.3+Math.sin(time*25)*.3);
  }
- private additive(map:string,color:number,opacity=.9){return {map:fxTexture(map),color,transparent:true,opacity,depthWrite:false,blending:T.AdditiveBlending};}
+ private additive(map:string,color:number,opacity=.9){return {map:vfxTexture(map),color,transparent:true,opacity,depthWrite:false,blending:T.AdditiveBlending,toneMapped:false};}
  private glow(color:number,size:number){const s=new T.Sprite(new T.SpriteMaterial(this.additive('glow',color)));s.scale.setScalar(size);return s;}
  private create(kind:string,x:number,y:number,z:number,color:number,radius:number,life:number,to?:T.Vector3){
   if(this.effects.length>=170){const old=this.effects.shift()!;old.mesh.removeFromParent();(old.mesh.material as T.Material).dispose();}
@@ -55,7 +56,7 @@ export class NightEffects{
   if(!mesh){mesh=new T.Group();if(p.magic){mesh.add(this.glow(0xa99cff,1.3));const core=this.glow(0xffffff,.45);mesh.add(core);}else{const head=new T.Mesh(this.arrow,new T.MeshBasicMaterial({color:0xf4d99f}));head.name='head';mesh.add(head,this.glow(0xffd889,.8));}mesh.position.set(p.x,1.4,p.z);this.root.add(mesh);this.shots.set(p.id,mesh);}
   const target=p.target===0?s.boss:s.enemies.find(e=>e.id===p.target);mesh.position.lerp(new T.Vector3(p.x,1.4,p.z),1-Math.exp(-25*dt));
   const head=mesh.getObjectByName('head');if(head&&target)head.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),new T.Vector3(target.x-p.x,0,target.z-p.z).normalize());if(p.magic)mesh.children[0].scale.setScalar(1.2+Math.sin(s.time*20)*.15);}
- const beaming=new Set<number>();s.players.forEach((p,i)=>{if(p.classId!=='chaos'||p.beam<0||p.hp<=0)return;const target=p.beam===0?(s.phase==='boss'?s.boss:undefined):s.enemies.find(e=>e.id===p.beam&&e.hp>0);if(!target)return;beaming.add(i);const hand=new T.Vector3(p.x+Math.sin(p.facing)*.55,1.45+p.y,p.z+Math.cos(p.facing)*.55);this.beam(i,hand,[new T.Vector3(target.x,target===s.boss?2.6:1.25,target.z),...nightBeamForks(s,p,target).map(f=>new T.Vector3(f.x,1.25,f.z))],s.time);});
+ const beaming=new Set<number>();s.players.forEach((p,i)=>{if(p.classId!=='chaos'||p.beam<0||p.hp<=0)return;const target=p.beam===0?(s.phase==='boss'?s.boss:undefined):s.enemies.find(e=>e.id===p.beam&&e.hp>0);if(!target)return;for(const side of ['l','r'] as const){const key=i*2+(side==='r'?1:0);beaming.add(key);const hand=this.handOrigin?.(i,side)||new T.Vector3(p.x+Math.sin(p.facing)*.55,1.45+p.y,p.z+Math.cos(p.facing)*.55);this.beam(key,hand,[new T.Vector3(target.x,target===s.boss?2.6:1.25,target.z),...nightBeamForks(s,p,target).map(f=>new T.Vector3(f.x,1.25,f.z))],s.time);}});
  for(const [i,b] of this.beams)if(!beaming.has(i))b.group.visible=false;
  this.drawRealm(s,dt);
  for(const e of s.events){if(e.id<=this.seen)continue;this.seen=e.id;this.event(s,e);}

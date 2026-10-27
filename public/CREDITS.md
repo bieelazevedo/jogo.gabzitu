@@ -1,4 +1,4 @@
-# Créditos — Gato Nightreign e campo 3D do tower defense
+# Créditos — Dungeon Nightreign e campo 3D do tower defense
 
 ## Modelos 3D (CC0, domínio público)
 - **KayKit Character Pack: Adventurers** e **Skeletons**, **Medieval Hexagon Pack**, **Halloween Bits**, **Dungeon Remastered** — Kay Lousberg (www.kaylousberg.com). Licenças em `/models/LICENSE-kaykit-*.txt`.
@@ -24,3 +24,13 @@
 
 ## Personagens
 Todas as personagens, nomes e habilidades são originais. O modo inspira-se na estrutura de jogos de ação cooperativa, sem usar nomes, modelos, mapas ou recursos protegidos de outros jogos.
+
+
+## Novos modelos e materiais
+
+- Quaternius: Medieval Village MegaKit, Modular Character Outfits, Universal Base Characters, Universal Animation Library e Fantasy Props MegaKit — CC0. Ver licenças em models/.
+- The Forgotten Knight — dark_igorek, CC BY 4.0. https://sketchfab.com/3d-models/d14eb14d83bd4e7ba7cbe443d76a10fd
+- Scarlet Witch — 3D Share, CC BY 4.0. https://sketchfab.com/3d-models/863cca848e2448e6b504a862cce80ae2
+- Priestess Staff — K-Li; Skull Staff — Devin Eggleston; Bow — Átila Becker. CC BY 4.0; ligações completas em models/LICENSE-authored-weapons.txt.
+- Poly Haven: forest_ground_04, stone_wall, leafy_grass — CC0, comprimidos para WebP.
+- Alterações: compressão, normalização, adaptação de animações e integração no jogo.
