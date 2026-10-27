@@ -71,7 +71,7 @@ function buildTower(assets:NightAssets,kind:CatKind,level:number,branch:string){
  const group=new T.Group(),S=1.4,hue=CAT_LOOKS[kind].model.startsWith('Skeleton')?0:hueOf(CATS[kind].color);let y=0,floor=0;
  const pieces=level===1?['tower-round-bottom-a','tower-round-top-a']:level===2?['tower-round-bottom-b','tower-round-middle-a','tower-round-top-c']:['tower-round-bottom-c','tower-round-middle-a',branch==='b'?'tower-round-middle-c':'tower-round-middle-b','tower-round-top-b'];
  pieces.forEach((name,i)=>{const o=prop(assets,name);o.scale.set(S*1.55,S*.95,S*1.55);o.traverse(c=>{if(c instanceof T.Mesh){c.material=recolored(c.material as T.Material,hue);c.castShadow=true;c.receiveShadow=true;}});
-  const box=new T.Box3().setFromObject(o);o.position.y=y-box.min.y;group.add(o);const h=box.max.y-box.min.y;if(i===pieces.length-1)floor=y+h*.3;y+=h*(i===pieces.length-1?1:.98);});
+  const box=new T.Box3().setFromObject(o);o.position.y=y-box.min.y;group.add(o);const h=box.max.y-box.min.y;if(i===pieces.length-1)floor=y+h*(name.endsWith('top-c')?.62:name.endsWith('top-b')?.5:.34);y+=h*(i===pieces.length-1?1:.98);});
  return {group,top:floor};
 }
 /** A cat standing guard on its tower. */
@@ -81,7 +81,7 @@ class CatUnit{
   const look=CAT_LOOKS[t.kind],skeleton=look.model.startsWith('Skeleton');
   ({group:this.base,top:this.top}=buildTower(assets,t.kind,t.level,t.branch));this.assets=assets;
   this.root.position.set(at.x,at.y,at.z);this.root.add(this.base);
-  this.actor=new Actor(assets,look.model,{items:look.items??[],tint:look.tint,scale:1.2*(look.scale||1)});
+  this.actor=new Actor(assets,look.model,{items:look.items??[],hide:look.hide,tint:look.tint,scale:1.2*(look.scale||1)});
   for(const [item,bone] of look.hold||[])this.actor.hold(item,bone);
   // Ears only: from this camera height the tail reads as a hook.
   if(!skeleton)catFeatures(this.actor,look.fur??0xc8a070).tail.forEach(t=>t.visible=false);
@@ -94,7 +94,8 @@ class CatUnit{
  update(t:Tower,s:State,dt:number,time:number,selected:boolean){
   this.t=t;const look=CAT_LOOKS[t.kind],a=this.actor;
   // Fighters leave the tower to meet enemies; their position is the simulation offset.
-  const off=t.offset||{x:0,y:0},away=Math.hypot(off.x,off.y)>3,target=away?{x:off.x/TD_SCALE,z:off.y/(TD_SCALE*Math.sin(TD_PITCH))}:{x:0,z:0};
+  // Mobile fighters stay on their tower and lean towards where the simulation sends them (at most a step).
+  const off=t.offset||{x:0,y:0},away=false,lean=Math.min(1,Math.hypot(off.x,off.y)/32)*.35,dir=Math.atan2(off.y,off.x),target=lean>0?{x:Math.cos(dir)*lean,z:Math.sin(dir)*lean}:{x:0,z:0};
   const r=a.root;const px=r.position.x,pz=r.position.z;r.position.x=ease(px,target.x,dt*10);r.position.z=ease(pz,target.z,dt*10);r.position.y=ease(r.position.y,away?-this.root.position.y:this.top,dt*12);
   const moving=Math.hypot(r.position.x-px,r.position.z-pz)/Math.max(dt,.001);
   r.rotation.y=turn(r.rotation.y,heading(Math.cos(t.angle),Math.sin(t.angle)),dt*8);

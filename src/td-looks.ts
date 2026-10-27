@@ -6,40 +6,46 @@ import type {CatKind, EnemyKind} from './types';
  * ears and a tail; reformed allies keep their skeleton bodies. `items` are the weapons already inside the
  * character file; `hold` attaches props from the item packs ([prop, bone]).
  */
-export type CatLook={model:CharacterName;items?:string[];hold?:[string,string][];tint?:number;fur?:number;attack:string;scale?:number;glow?:number};
+export type CatLook={model:CharacterName;items?:string[];hide?:string[];hold?:[string,string][];tint?:number;fur?:number;attack:string;scale?:number;glow?:number};
 const melee='1H_Melee_Attack_Slice_Diagonal',cast='Spellcast_Shoot',raise='Spellcast_Raise',shoot='2H_Ranged_Shoot';
+/**
+ * Every cat has its own silhouette: body, headgear (hat, helmet or bare head), weapons and colour never repeat
+ * as a whole. `hold` props come from the adventurer and dungeon item packs.
+ */
 export const CAT_LOOKS:Record<CatKind,CatLook>={
  archer:{model:'Rogue_Hooded',items:['2H_Crossbow'],fur:0xc38b43,attack:shoot},
  ice:{model:'Mage',items:['2H_Staff'],tint:0xbfe6ff,fur:0xe9eef4,attack:cast,glow:0x8fe3ff},
- bomber:{model:'Rogue',items:['Throwable'],tint:0xffd2b0,fur:0xda865c,attack:'Throw'},
- commander:{model:'Knight',items:['1H_Sword','Badge_Shield'],tint:0xf2f0d0,fur:0xb2b879,attack:'Cheer'},
- knight:{model:'Knight',items:['1H_Sword','Round_Shield'],fur:0xa5adb8,attack:melee},
+ bomber:{model:'Barbarian',items:[],hold:[['smokebomb','handslot.r']],tint:0xffd2b0,fur:0xda865c,attack:'Throw'},
+ commander:{model:'Knight',items:['1H_Sword','Badge_Shield'],hide:['Knight_Helmet'],tint:0xfff0c0,fur:0xb2b879,attack:'Cheer'},
+ knight:{model:'Knight',items:['1H_Sword','Rectangle_Shield'],fur:0xa5adb8,attack:melee},
  witch:{model:'Mage',items:['1H_Wand','Spellbook_open'],tint:0xd6b8ff,fur:0x4b4560,attack:cast,glow:0xc58cff},
- bard:{model:'Mage',items:['Spellbook_open'],tint:0xffe2a8,fur:0xaf9569,attack:raise,glow:0xffd77a},
- monk:{model:'Rogue_Hooded',items:[],tint:0xffd0a0,fur:0xcb9257,attack:'1H_Melee_Attack_Stab',glow:0xffa860},
+ bard:{model:'Rogue',items:[],hold:[['spellbook_open','handslot.l']],tint:0xffe2a8,fur:0xaf9569,attack:raise,glow:0xffd77a},
+ monk:{model:'Rogue_Crimson',items:[],fur:0xcb9257,attack:'1H_Melee_Attack_Stab',glow:0xffa860},
  engineer:{model:'Rogue',items:['1H_Crossbow'],tint:0xb8f0f0,fur:0x79adb1,attack:'1H_Ranged_Shoot',glow:0x7fe7ff},
  uia:{model:'Mage',items:['2H_Staff','Spellbook_open'],tint:0xffe7a0,fur:0xe1c58b,attack:'Spellcast_Summon',scale:1.18,glow:0xffe08a},
  pirate:{model:'Barbarian',items:['2H_Axe'],tint:0xffd8a8,fur:0xd89b55,attack:'2H_Melee_Attack_Chop'},
- samurai:{model:'Knight',items:['2H_Sword'],tint:0xbff2e6,fur:0x70c3b2,attack:'2H_Melee_Attack_Slice'},
- alchemist:{model:'Mage',items:['1H_Wand','Spellbook'],tint:0xd8ffb0,fur:0xb5d97c,attack:'Throw',glow:0xb6ff70},
- astronomer:{model:'Mage',items:['2H_Staff'],tint:0xc9c4ff,fur:0x6d6aa8,attack:'Spellcast_Long',glow:0xb3a8ff},
- gardener:{model:'Rogue',items:['Knife'],tint:0xc8f0b8,fur:0x80b678,attack:raise,glow:0x9ff07f},
- chef:{model:'Barbarian',items:['Mug'],tint:0xffe0c0,fur:0xefab74,attack:'1H_Melee_Attack_Chop'},
- boxer:{model:'Barbarian',items:[],tint:0xffc0c0,fur:0xe38989,attack:'1H_Melee_Attack_Stab'},
- guardian:{model:'Knight',items:['1H_Sword','Spike_Shield'],tint:0xc8f4ff,fur:0x79c8d4,attack:'Block',glow:0x8ff0ff},
- adminMage:{model:'Mage',items:['2H_Staff','Spellbook_open'],tint:0xb0fff6,fur:0x3e4f5c,attack:'Spellcast_Long',glow:0x7ce8e3},
+ samurai:{model:'Knight',items:['2H_Sword'],hide:['Knight_Helmet'],tint:0xbff2e6,fur:0x70c3b2,attack:'2H_Melee_Attack_Slice'},
+ alchemist:{model:'Mage',items:['Spellbook'],hide:['Mage_Hat'],hold:[['bottle_A_green','handslot.r']],tint:0xd8ffb0,fur:0xb5d97c,attack:'Throw',glow:0xb6ff70},
+ astronomer:{model:'Mage',items:['Spellbook_open'],hide:['Mage_Hat'],hold:[['staff','handslot.r']],tint:0xc9c4ff,fur:0x6d6aa8,attack:'Spellcast_Long',glow:0xb3a8ff},
+ gardener:{model:'Rogue_Hooded',items:['Knife'],tint:0xc8f0b8,fur:0x80b678,attack:raise,glow:0x9ff07f},
+ chef:{model:'Barbarian',items:['Mug'],hide:['Barbarian_Hat'],tint:0xffe0c0,fur:0xefab74,attack:'1H_Melee_Attack_Chop'},
+ boxer:{model:'Barbarian',items:[],hide:['Barbarian_Hat'],tint:0xffc0c0,fur:0xe38989,attack:'1H_Melee_Attack_Stab'},
+ guardian:{model:'Knight',items:['Spike_Shield','1H_Sword_Offhand'],tint:0xc8f4ff,fur:0x79c8d4,attack:'Block',glow:0x8ff0ff},
+ adminMage:{model:'Knight',items:[],hide:['Knight_Helmet'],hold:[['staff','handslot.r'],['spellbook_open','handslot.l']],tint:0xb0fff6,fur:0x3e4f5c,attack:'Spellcast_Long',glow:0x7ce8e3},
  allyLegollas:{model:'Skeleton_Mage',hold:[['Skeleton_Staff','handslot.r']],tint:0xffb8c8,attack:cast,glow:0xff5a86},
  allyRatazao:{model:'Skeleton_Warrior',hold:[['Skeleton_Axe','handslot.r']],tint:0xe8c8a8,attack:'2H_Melee_Attack_Chop'},
  allyVacuum:{model:'Skeleton_Minion',hold:[['Skeleton_Blade','handslot.r'],['Skeleton_Blade','handslot.l']],tint:0xc8eef0,attack:'2H_Melee_Attack_Spin',glow:0x9ddbd4},
  allyKing:{model:'Skeleton_Warrior',hold:[['Skeleton_Axe','handslot.r'],['Skeleton_Shield_Large_A','handslot.l']],tint:0xffe08a,attack:'2H_Melee_Attack_Chop'},
  allyAdmiral:{model:'Skeleton_Rogue',hold:[['Skeleton_Crossbow','handslot.r']],tint:0xb8e2f0,attack:shoot},
- allyDuchess:{model:'Skeleton_Mage',hold:[['Skeleton_Staff','handslot.r']],tint:0xe2c4ff,attack:cast,glow:0xc69ee8},
- allyHydra:{model:'Skeleton_Minion',hold:[['Skeleton_Blade','handslot.r']],tint:0xc8f0b0,attack:cast,glow:0xa3d69b},
- allyKraken:{model:'Skeleton_Warrior',hold:[['Skeleton_Blade','handslot.r']],tint:0xffc8cc,attack:'2H_Melee_Attack_Spin',glow:0xd69297},
- allyMagistrate:{model:'Skeleton_Mage',hold:[['Skeleton_Staff','handslot.r']],tint:0xf0e4c8,attack:'1H_Melee_Attack_Chop'},
- allyPhoenix:{model:'Skeleton_Mage',hold:[['Skeleton_Staff','handslot.r']],tint:0xffc898,attack:cast,glow:0xffa050},
- allyArchivist:{model:'Skeleton_Mage',hold:[['Skeleton_Staff','handslot.r']],tint:0xc0f0ee,attack:cast,glow:0x9bd6d2},
+ allyDuchess:{model:'Skeleton_Mage',hold:[['Skeleton_Staff','handslot.r'],['Skeleton_Shield_Small_A','handslot.l']],tint:0xe2c4ff,attack:cast,glow:0xc69ee8},
+ allyHydra:{model:'Skeleton_Minion',hold:[['Skeleton_Blade','handslot.r'],['Skeleton_Shield_Small_A','handslot.l']],tint:0xc8f0b0,attack:cast,glow:0xa3d69b},
+ allyKraken:{model:'Skeleton_Warrior',hold:[['Skeleton_Blade','handslot.r'],['Skeleton_Blade','handslot.l']],tint:0xffc8cc,attack:'2H_Melee_Attack_Spin',glow:0xd69297},
+ allyMagistrate:{model:'Skeleton_Mage',hold:[['spellbook_open','handslot.l']],tint:0xf0e4c8,attack:'1H_Melee_Attack_Chop'},
+ allyPhoenix:{model:'Skeleton_Rogue',hold:[['Skeleton_Staff','handslot.r']],tint:0xffc898,attack:cast,glow:0xffa050},
+ allyArchivist:{model:'Skeleton_Mage',hold:[['Skeleton_Staff','handslot.r'],['spellbook_open','handslot.l']],tint:0xc0f0ee,attack:cast,glow:0x9bd6d2},
 };
+/** Signature of a look, used by the tests to guarantee no two cats share one. */
+export const lookKey=(l:CatLook)=>[l.model,[...(l.items||[])].sort().join('+'),[...(l.hide||[])].sort().join('+'),(l.hold||[]).map(h=>h.join('@')).sort().join('+')].join('|');
 
 /** Enemies: skeletons of the Nightreign host, plus the Quaternius dog (model 'Dog'). */
 export type EnemyLook={model:CharacterName|'Dog';hold?:[string,string][];tint?:number;scale:number;run?:boolean;ghost?:boolean;crate?:boolean;attack?:string};

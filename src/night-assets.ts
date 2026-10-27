@@ -18,7 +18,8 @@ export const nightAssetsFailed=()=>failed;
 /** Skinned body parts share one skeleton and material; merging them keeps each character to a few draw calls. */
 function mergeSkinned(template:T.Object3D){
  const groups=new Map<string,T.SkinnedMesh[]>();
- template.traverse(o=>{if(o instanceof T.SkinnedMesh&&!Array.isArray(o.material)){// GLTFLoader gives every part its own Skeleton object over the same bones, so group by bones.
+ // Headgear stays a separate mesh so a look can hide it (a merged mesh takes the name of its first part).
+ template.traverse(o=>{if(o instanceof T.SkinnedMesh&&!Array.isArray(o.material)&&!/Hat|Helmet/.test(o.name)){// GLTFLoader gives every part its own Skeleton object over the same bones, so group by bones.
   // Parts can only share a draw call when they also share the bind pose (inverse bind matrices).
   const pose=o.skeleton.boneInverses.map(m=>m.elements.map(v=>v.toFixed(4)).join(',')).join(';');
   const key=o.skeleton.bones.map(b=>b.uuid).join()+'|'+pose+':'+o.material.uuid;groups.set(key,[...(groups.get(key)||[]),o]);}});
