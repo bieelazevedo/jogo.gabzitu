@@ -3,8 +3,10 @@ import {validateFarmProgress} from './farm-progress';
 import type { Save } from './types';
 export const SAVE_KEY = 'muralhas-bigodes-v2';
 let scope='';
+let volatileProgress=false;
+export const progressIsVolatile=()=>volatileProgress;
 export const saveScope=()=>scope;
-export function setSaveScope(userId:string|null){scope=userId?':'+userId:'';}
+export function setSaveScope(userId:string|null,volatile=false){scope=userId?':'+userId:'';volatileProgress=volatile;}
 export function fresh(): Save { return { version: 2, formation:{team:['archer','ice'],coopTeam:['archer','ice','bomber'],updatedAt:0}, stars: {}, chaos: {}, records: {}, settings: { effects: .4, music: .16, comedy: .65, reduced: false, quality: 'high' }, skill: 'war', equipment: 'standard' }; }
 export function validateSave(raw: unknown): Save {
     if (!raw || typeof raw !== 'object')
@@ -50,6 +52,7 @@ export function validateSave(raw: unknown): Save {
     return s;
 }
 export function load(): Save { try {
+    if(volatileProgress)return fresh();
     const raw = localStorage.getItem(SAVE_KEY+scope);
     return raw ? validateSave(JSON.parse(raw)) : fresh();
 }
@@ -57,6 +60,7 @@ catch {
     return fresh();
 } }
 export function persist(s: Save): boolean { try {
+    if(volatileProgress)return true;
     localStorage.setItem(SAVE_KEY+scope, JSON.stringify(s));
     return true;
 }
