@@ -7,7 +7,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 /** CC0 KayKit models (Kay Lousberg), baked by scripts/build-models.mjs. */
 export const CHARACTER_NAMES=['Knight','Barbarian','Mage','Rogue','Rogue_Hooded','Rogue_Crimson','Skeleton_Warrior','Skeleton_Minion','Skeleton_Rogue','Skeleton_Mage'] as const;
 export type CharacterName=typeof CHARACTER_NAMES[number];
-const PACKS=['halloween','village','dungeon','items','skeleton_items','nature'] as const;
+const PACKS=['halloween','village','dungeon','items','skeleton_items','nature','meadow'] as const;
 export type PropPart={geometry:T.BufferGeometry;material:T.Material;matrix:T.Matrix4};
 export type NightAssets={characters:Record<CharacterName,T.Object3D>;clips:Map<string,T.AnimationClip>;props:Map<string,T.Object3D>;parts:(name:string)=>PropPart[]};
 
@@ -45,7 +45,7 @@ export function loadNightAssets():Promise<NightAssets>{
   const record={} as Record<CharacterName,T.Object3D>;
   CHARACTER_NAMES.forEach((n,i)=>{const scene=characters[i].scene;mergeSkinned(scene);scene.traverse(o=>{if(o instanceof T.Mesh)o.frustumCulled=false;});record[n]=scene;});
   const clips=new Map(anims.animations.map(c=>[c.name,c]));
-  const props=new Map<string,T.Object3D>();for(const g of packs)for(const child of g.scene.children)props.set(child.name,child);
+  const props=new Map<string,T.Object3D>();packs.forEach((g,i)=>{if(PACKS[i]==='meadow')brightenFoliage(g.scene);for(const child of g.scene.children)props.set(child.name,child);});
   const partCache=new Map<string,PropPart[]>();
   const parts=(name:string)=>{let list=partCache.get(name);if(list)return list;const node=props.get(name);list=[];if(node){const root=new T.Group();const copy=node.clone();copy.position.set(0,0,0);copy.rotation.set(0,0,0);copy.scale.set(1,1,1);root.add(copy);root.updateMatrixWorld(true);copy.traverse(o=>{if(o instanceof T.Mesh&&!Array.isArray(o.material))list!.push({geometry:o.geometry,material:o.material,matrix:o.matrixWorld.clone()});});}partCache.set(name,list);return list;};
   ready={characters:record,clips,props,parts};return ready;
@@ -77,7 +77,7 @@ const extraPacks=new Map<string,Promise<void>>();
 /** Loads another environment pack (e.g. the hex battlefield tiles) into the shared prop library. */
 export function loadExtraPack(name:string){
  let p=extraPacks.get(name);if(p)return p;
- p=loadNightAssets().then(async assets=>{const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const g=await loader.loadAsync(import.meta.env.BASE_URL+'models/env/'+name+'.glb');if(name==='meadow')brightenFoliage(g.scene);for(const child of [...g.scene.children])assets.props.set(child.name,child);});
+ p=loadNightAssets().then(async assets=>{const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const g=await loader.loadAsync(import.meta.env.BASE_URL+'models/env/'+name+'.glb');if(name==='meadow'&&assets.props.has('meadow-Pine_1'))return;if(name==='meadow')brightenFoliage(g.scene);for(const child of [...g.scene.children])assets.props.set(child.name,child);});
  extraPacks.set(name,p);p.catch(()=>extraPacks.delete(name));return p;
 }
 const models=new Map<string,Promise<{scene:T.Object3D;animations:T.AnimationClip[]}>>();

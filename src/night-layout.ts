@@ -16,9 +16,12 @@ const facing=(x:number,z:number,tx=0,tz=0)=>Math.atan2(tx-x,tz-z);
 export const NIGHT_PATHS=[[0,27,-29,14],[-29,14,-24,-25],[-24,-25,25,-27],[25,-27,28,8],[28,8,0,27],[0,27,-24,-25]];
 export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.InstancedMesh[];update:(time:number)=>void;dispose:()=>void}{
  const meshes:T.InstancedMesh[]=[],m=new T.Matrix4(),q=new T.Quaternion(),up=new T.Vector3(0,1,0);
+ const moonlit=new Map<T.Material,T.Material>();
+ // Quaternius foliage is self-lit for daylight scenes; under the moon it keeps only a faint glow.
+ const nightMaterial=(m:T.Material)=>{let v=moonlit.get(m);if(!v){v=m.clone();const sm=v as T.MeshStandardMaterial;if(sm.emissive)sm.emissive.multiplyScalar(.3);moonlit.set(m,v);}return v;};
  const scatter=(name:string,places:Place[],scale=1)=>{
   const parts=assets.parts(name);if(!parts.length||!places.length)return;
-  for(const part of parts){const mesh=new T.InstancedMesh(part.geometry,part.material,places.length);
+  for(const part of parts){const mesh=new T.InstancedMesh(part.geometry,name.startsWith('meadow-')?nightMaterial(part.material):part.material,places.length);
    places.forEach(([x,z,r=0,s=1,y=0],i)=>{q.setFromAxisAngle(up,r);m.compose(new T.Vector3(x,y,z),q,new T.Vector3().setScalar(s*scale));mesh.setMatrixAt(i,m.multiply(part.matrix));});
    mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();mesh.computeBoundingBox();root.add(mesh);meshes.push(mesh);}
  };
@@ -62,12 +65,13 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
 
  // Forest of whispers: Kenney Nature Kit trees on the solid trunks, a dense canopy around the clearings,
  // and undergrowth (bushes, mushrooms, flowers, stumps) kept off the paths and fighting spots.
- const NATURE=5.2;
+ const NATURE=5.2,MEADOW=1.25;
  const forestTrunks=NIGHT_OBSTACLES.filter(o=>o.x<0&&o.z>0&&Math.abs(o.x)<40||(o.x===-40&&o.z===7));
- scatter('tree_detailed_dark',forestTrunks.map((o,i)=>[o.x,o.z,i*1.7,1.15] as Place),NATURE);
+ // Quaternius Stylized Nature trees on the trunks (moonlit: their self-light is dimmed below).
+ for(const [k,name] of ['CommonTree_3','CommonTree_4','CommonTree_5'].entries())scatter('meadow-'+name,forestTrunks.filter((_,i)=>i%3===k).map((o,i)=>[o.x,o.z,i*1.7+k,1.05+hash(i+k)*.25] as Place),MEADOW);
  scatter('tree_pineTallA_detailed',[[-44,30,.4,1.1],[-27,33,2,1],[-12,22,1,.9],[-46,15,3,1.1],[-34,31,1,1],[-48,24,.3,1.2]],NATURE);
  scatter('tree_pineTallC_detailed',[[-19,30,2.5,1],[-41,-4,2.2,1.1],[-26,26,.8,.9]],NATURE);
- scatter('tree_oak_dark',[[-36,26,0,1.1],[-23,11,2,1],[-45,0,4,1.2]],NATURE);
+ scatter('meadow-CommonTree_4',[[-36,26,0,1.1],[-23,11,2,1],[-45,0,4,1.2]],MEADOW);
  scatter('tree_dead_large',[[-25,18,.5],[-44,-8,2]]);
  scatter('pumpkin_orange_jackolantern',[[-21,21,.6,.7],[-31,9,2.4,.6],[-42,12,1,.7],[-16,13,4,.55]]);
  scatter('stump_oldTall',[[-14,16,1],[-33,4,2],[-40,25,3]],3.4);
@@ -76,10 +80,10 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
  const PATHS=NIGHT_PATHS;
  const segment=(x:number,z:number,[ax,az,bx,bz]:number[])=>{const dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));return Math.hypot(x-ax-t*dx,z-az-t*dz);};
  const open=(x:number,z:number)=>PATHS.every(p=>segment(x,z,p)>3)&&NIGHT_CAMPS.every(c=>Math.hypot(c.x-x,c.z-z)>5)&&[...NIGHT_PORTALS,...NIGHT_SPRINGS].every(p=>Math.hypot(p.x-x,p.z-z)>3.5)&&NIGHT_OBSTACLES.every(o=>Math.hypot(o.x-x,o.z-z)>o.r+1)&&Math.hypot(x,z-27)>9;
- const cover:Record<string,Place[]>={plant_bushDetailed:[],plant_bushLarge:[],flower_purpleA:[],flower_redA:[],flower_yellowA:[],mushroom_redGroup:[],mushroom_tanTall:[]};
+ const cover:Record<string,Place[]>={'meadow-Bush_Large':[],'meadow-Bush_Long_1':[],'meadow-Bush_Common_Flowers':[],'meadow-Flower_3_Group':[],'meadow-Fern_1':[],'meadow-Mushroom_RedCap':[],'meadow-Grass_Common_Tall':[]};
  const kinds=Object.keys(cover);for(let i=0;i<320;i++){const x=(hash(i*3.1)-.5)*92,z=(hash(i*7.7+1)-.5)*92;if(!open(x,z))continue;const forest=x<-8&&z>-6,kind=kinds[Math.floor(hash(i*13.3)*kinds.length)];if(!forest&&/mushroom/.test(kind))continue;cover[kind].push([x,z,hash(i)*6.3,.8+hash(i*5)*.6]);}
  // Ground cover reads at roughly knee height; bushes a little taller.
- const coverScale:Record<string,number>={plant_bushDetailed:2.6,plant_bushLarge:2.8,grass:2.2,flower_purpleA:2.4,flower_redA:2.4,flower_yellowA:2.4,mushroom_redGroup:3,mushroom_tanTall:3.2,rock_largeA:2.2};
+ const coverScale:Record<string,number>={'meadow-Bush_Large':.8,'meadow-Bush_Long_1':.85,'meadow-Bush_Common_Flowers':.85,'meadow-Flower_3_Group':1.2,'meadow-Fern_1':1.1,'meadow-Mushroom_RedCap':1.6,'meadow-Grass_Common_Tall':1.2,plant_bushDetailed:2.6,plant_bushLarge:2.8,grass:2.2,rock_largeA:2.2};
  for(const [kind,places] of Object.entries(cover))scatter(kind,places,coverScale[kind]);
 
  // Village without tomorrow: houses on the three solid footprints, a well and work yards.
@@ -142,7 +146,7 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
  scatter('tree_pineTallA_detailed',outer,NATURE*1.2);scatter('tree_pineRoundE',clumps.filter((_,i)=>i%2===0),NATURE*1.4);scatter('tree_fat_darkh',clumps.filter((_,i)=>i%2===1),NATURE*1.5);
  const mountains:Place[]=[];for(let i=0;i<14;i++){const a=i/14*Math.PI*2,r=68+hash(i)*8;mountains.push([Math.sin(a)*r,Math.cos(a)*r,a,1+hash(i+9)*.6,-1]);}
  scatter('mountain_A_grass_trees',mountains.filter((_,i)=>i%3===0),VILLAGE*2.2);scatter('mountain_B_grass_trees',mountains.filter((_,i)=>i%3===1),VILLAGE*2.2);scatter('mountain_C',mountains.filter((_,i)=>i%3===2),VILLAGE*2.4);
- return {meshes,update:t=>sprites.forEach(s=>s.update(t)),dispose:()=>{owned.forEach(m=>m.dispose());root.traverse(o=>{if(o instanceof T.Mesh&&(o.geometry.type==='PlaneGeometry'||o.geometry.type==='SphereGeometry'))o.geometry.dispose();});}};
+ return {meshes,update:t=>sprites.forEach(s=>s.update(t)),dispose:()=>{owned.forEach(m=>m.dispose());moonlit.forEach(m=>m.dispose());root.traverse(o=>{if(o instanceof T.Mesh&&(o.geometry.type==='PlaneGeometry'||o.geometry.type==='SphereGeometry'))o.geometry.dispose();});}};
 }
 
 export type NightArena={group:T.Group;update:(time:number,dt:number)=>void;fog:number;sky:number;dispose:()=>void};
