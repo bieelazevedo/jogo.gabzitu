@@ -12,3 +12,5 @@ it('recusa dados inválidos antes de contactar a autenticação',async()=>{
  await expect(GameAccount.prototype.register.call(account,'novo@example.com','123456',false)).rejects.toThrow('18 anos');
  await expect(GameAccount.prototype.register.call(account,'inválido','123456',true)).rejects.toThrow('email válido');expect(signUp).not.toHaveBeenCalled();
 });
+
+it('reenvia a confirmação para o endereço do jogo sem recriar o utilizador',async()=>{const resend=vi.fn().mockResolvedValue({error:null});const account={client:{auth:{resend}}} as unknown as GameAccount;await GameAccount.prototype.resendConfirmation.call(account,' pessoa@example.com ');expect(resend).toHaveBeenCalledWith({type:'signup',email:'pessoa@example.com',options:{emailRedirectTo:'https://muralhasebigodes.pages.dev/?conta=confirmar'}});});

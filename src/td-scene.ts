@@ -165,6 +165,7 @@ type Effect3D={objs:(T.Sprite|T.Mesh)[]};
  */
 export class TdRenderer{
  readonly overlay:HTMLCanvasElement;private gl:T.WebGLRenderer;private scene=new T.Scene();private camera=new T.OrthographicCamera(-1,1,1,-1,.1,200);
+ private disposed=false;private contextLost=(event:Event)=>{event.preventDefault();if(!this.disposed){this.failed=true;this.onFail();}};
  private assets:NightAssets|null=null;private dog:DogTemplate|null=null;private failed=false;private levelId=0;private map:HexMap|null=null;private world=new T.Group();private dynamic=new T.Group();
  private statics:T.InstancedMesh[]=[];private owned:{dispose:()=>void}[]=[];private cats=new Map<number,CatUnit>();private enemies=new Map<number,EnemyUnit>();private dying:EnemyUnit[]=[];
  private projectiles=new Map<number,Projectile3D>();private effects=new Map<number,Effect3D>();private traps=new Map<number,T.Object3D>();private plots:T.Object3D[]=[];private plotRings:T.Mesh[]=[];
@@ -172,21 +173,21 @@ export class TdRenderer{
  readonly ready:Promise<void>;
  private sun:T.DirectionalLight;private hemi:T.HemisphereLight;private flickers:{light:T.PointLight;base:number;seed:number}[]=[];
  constructor(readonly canvas:HTMLCanvasElement,private onFail:()=>void){
-  this.gl=new T.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.outputColorSpace=T.SRGBColorSpace;this.gl.toneMapping=T.ACESFilmicToneMapping;this.gl.toneMappingExposure=1.05;
+  this.gl=new T.WebGLRenderer({canvas,antialias:!matchMedia('(pointer:coarse)').matches,alpha:false,powerPreference:'high-performance'});this.gl.outputColorSpace=T.SRGBColorSpace;this.gl.toneMapping=T.ACESFilmicToneMapping;this.gl.toneMappingExposure=1.05;
   this.overlay=document.createElement('canvas');this.overlay.className='battle-overlay';this.overlay.setAttribute('aria-hidden','true');Object.assign(this.overlay.style,{position:'absolute',inset:'0',width:'100%',height:'100%',pointerEvents:'none'});canvas.after(this.overlay);this.c2=this.overlay.getContext('2d')!;
   this.hemi=new T.HemisphereLight(0xdff2ff,0x5b6b3c,1.2);this.sun=new T.DirectionalLight(0xfff1d6,2.4);this.sun.position.set(-12,24,14);this.scene.add(this.hemi,this.sun,this.sun.target,this.world,this.dynamic);
   // Soft real-time shadows from the sun (off on the low quality setting).
   this.gl.shadowMap.type=T.PCFSoftShadowMap;this.sun.castShadow=true;this.sun.shadow.bias=-.0015;this.sun.shadow.normalBias=.03;
   const disc=(inner:number,outer:number,color:number,opacity:number)=>{const m=new T.Mesh(inner>0?new T.RingGeometry(inner,outer,72):new T.CircleGeometry(outer,72),new T.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,depthTest:false}));m.rotation.x=-Math.PI/2;m.renderOrder=5;m.visible=false;this.scene.add(m);return m;};
   this.range=disc(0,1,0xf6eebd,.13);this.rangeEdge=disc(.985,1,0xfff3c4,.85);this.aim=disc(0,1,0xffcf7a,.22);
-  this.ready=Promise.all([loadNightAssets(),loadExtraPack('hex'),loadExtraPack('tdkit'),loadExtraPack('pirate'),loadExtraPack('castle'),loadExtraPack('meadow'),loadModel('Dog').catch(()=>null)]).then(([assets,,,,,,dog])=>{this.assets=assets;this.dog=dog;});
-  this.gestures();
+  this.ready=Promise.all([loadNightAssets('td'),loadExtraPack('hex','td'),loadExtraPack('tdkit','td'),loadExtraPack('pirate','td'),loadExtraPack('castle','td'),loadExtraPack('meadow','td'),loadModel('Dog').catch(()=>null)]).then(([assets,,,,,,dog])=>{this.assets=assets;this.dog=dog;});
+  this.canvas.addEventListener('webglcontextlost',this.contextLost);this.gestures();
   this.ready.catch(e=>{console.warn('Campo 3D indisponível; a usar 2D.',e);this.failed=true;this.onFail();});
  }
  /** True while models are still downloading (the overlay shows a loading line). */
  get loading(){return !this.assets&&!this.failed;}
  resize(quality:Save['settings']['quality']){
-  const r=this.canvas.getBoundingClientRect();this.dpr=Math.min(window.devicePixelRatio||1,quality==='low'?1:quality==='medium'?1.5:2);
+  const r=this.canvas.getBoundingClientRect();this.dpr=Math.min(window.devicePixelRatio||1,matchMedia('(pointer:coarse)').matches?1:quality==='low'?1:quality==='medium'?1.5:2);
   const w=Math.max(1,Math.round(r.width)),h=Math.max(1,Math.round(r.height));this.gl.setPixelRatio(this.dpr);const size=this.gl.getSize(new T.Vector2());if(size.x!==w||size.y!==h)this.gl.setSize(w,h,false);
   if(this.overlay.width!==Math.round(w*this.dpr)||this.overlay.height!==Math.round(h*this.dpr)){this.overlay.width=Math.round(w*this.dpr);this.overlay.height=Math.round(h*this.dpr);}
   // Fit the level's playable box (roads and spots), then apply the player's pinch zoom and pan.
@@ -198,7 +199,7 @@ export class TdRenderer{
   this.cx=hwS*2>=b.x1-b.x0?mx:Math.max(b.x0+hwS,Math.min(b.x1-hwS,this.cx));this.cy=hhS*2>=b.y1-b.y0?my:Math.max(b.y0+hhS,Math.min(b.y1-hhS,this.cy));
   this.ox=w/2-this.cx*this.scale;this.oy=h/2-this.cy*this.scale;
   const ppw=this.scale*TD_SCALE,hw=w/2/ppw,hh=h/2/ppw,focus=simToWorld({x:this.cx,y:this.cy});
-  this.gl.shadowMap.enabled=quality!=='low';const span=Math.max(hw,hh/Math.sin(TD_PITCH))*1.15,sh=this.sun.shadow.camera;this.sun.shadow.mapSize.setScalar(quality==='high'?2048:1024);sh.left=-span;sh.right=span;sh.top=span;sh.bottom=-span;sh.near=1;sh.far=90;sh.updateProjectionMatrix();
+  this.gl.shadowMap.enabled=quality!=='low';const span=Math.max(hw,hh/Math.sin(TD_PITCH))*1.15,sh=this.sun.shadow.camera;this.sun.shadow.mapSize.setScalar(matchMedia('(pointer:coarse)').matches?512:quality==='high'?2048:1024);sh.left=-span;sh.right=span;sh.top=span;sh.bottom=-span;sh.near=1;sh.far=90;sh.updateProjectionMatrix();
   this.sun.position.set(focus.x-14,30,focus.z+12);this.sun.target.position.set(focus.x,0,focus.z);this.sun.target.updateMatrixWorld();
   const cam=this.camera;cam.left=-hw;cam.right=hw;cam.top=hh;cam.bottom=-hh;cam.position.set(focus.x,60*Math.sin(TD_PITCH),focus.z+60*COS);cam.lookAt(focus.x,0,focus.z);cam.near=1;cam.far=160;cam.updateProjectionMatrix();
  }
@@ -414,5 +415,5 @@ export class TdRenderer{
   // Soft vignette frames the field like a painted board.
   {c.setTransform(this.dpr,0,0,this.dpr,0,0);const w=this.overlay.width/this.dpr,h=this.overlay.height/this.dpr,g=c.createRadialGradient(w/2,h/2,Math.min(w,h)*.45,w/2,h/2,Math.max(w,h)*.72);g.addColorStop(0,'rgba(8,20,24,0)');g.addColorStop(1,LEVELS[s.levelId-1].theme==='night'?'rgba(6,10,24,.5)':'rgba(10,30,26,.32)');c.fillStyle=g;c.fillRect(0,0,w,h);}
  }
- dispose(){this.clearLevel();for(const m of [this.range,this.rangeEdge,this.aim]){m.geometry.dispose();(m.material as T.Material).dispose();}this.gl.dispose();this.overlay.remove();this.owned.forEach(o=>o.dispose());}
+ dispose(){if(this.disposed)return;this.disposed=true;this.canvas.removeEventListener('webglcontextlost',this.contextLost);this.clearLevel();for(const m of [this.range,this.rangeEdge,this.aim]){m.geometry.dispose();(m.material as T.Material).dispose();}this.gl.dispose();this.gl.forceContextLoss();this.overlay.remove();this.owned.forEach(o=>o.dispose());}
 }

@@ -1,78 +1,36 @@
-# Pedidos acumulados — melhorias do jogo
+# Melhorias em curso — Dungeon Nightreign e Quinta do Caos
 
-Fonte de trabalho: GitHub `bieelazevedo/jogo.gabzitu`, main `c7cba54f3060ade931d47c9f39fa213adcba62ca`. As cópias locais antigas não são a base.
+Novas mensagens acrescentam requisitos; não substituem os pedidos anteriores. Ordem: Nightreign, depois Quinta do Caos. Preferência por recursos gratuitos e licença verificável.
 
-## Ordem combinada
+## Publicado antes desta revisão
+- Cloudflare Pages segue visual-overhaul. Registo sem convite e modo convidado sem guardar progresso.
+- Mapa de 160 × 160 m, módulos medievais Quaternius, árvores altas, quintas e campos de inimigos, vegetação interior e texturas fotográficas.
+- NPC com missões, recompensas e talentos, menus e progresso de campanha incompleta; vitória limpa o checkpoint.
+- Monumentos com áreas de 36–40 m: vagas, participantes fechados, pausa do boss e recompensa por sobrevivência.
+- Identidade Dungeon Nightreign e ícone de instalação; heróis sem traços de gato.
+- Bastião e Carmesim com modelos completos; magia escarlate nas mãos, armas e partículas suaves; poses por classe.
+- Segunda revisão do joystick: dono do gesto touch/pointer, multitouch, recuperação de cancelamento Safari e zona maior. Confirmação física ainda pendente.
 
-1. Gato Nightreign: cenário, personagens e campanha.
-2. Quinta do Caos: cenário e personagens, depois de concluir o primeiro modo.
+## Correção de estabilidade de 27/10
+- Safari usa texturas HTMLImageElement em vez de ImageBitmap; até três GLB em carregamento simultâneo.
+- Tower Defense carrega apenas os seus pacotes, sem heróis modernos nem arquitetura/armas exclusivas do Nightreign.
+- Instalação offline guarda apenas interface/código; modelos são guardados conforme o uso. Até três transferências, sem cópias ArrayBuffer de todos os modelos em paralelo.
+- Resolução e sombras limitadas no toque; contextos WebGL libertados ao sair. Tower Defense regressa ao renderizador 2D se perder o contexto.
+- Email: reproduzido redirecionamento inválido sem https no Site URL do Supabase. Nova consulta confirmou destino HTTPS correto após alteração do utilizador. Botão Reenviar confirmação acrescentado. Não foram enviados emails de teste nem reutilizados tokens reais.
+- Estas medidas tratam causas plausíveis e reproduzíveis de pressão de memória; não constituem confirmação de que o crash no Safari real desapareceu.
 
-## Direção e restrições
+## Trabalho visual local preservado, ainda por publicar
+- Quatro trajes completos: LunarKnight (DJMaesen), AstralMage (rSquare), ForestArcher (outcast945), ReaverKnight (Angy97); CC BY 4.0, com créditos, compressão e animações Quaternius CC0 adaptadas.
+- Modelos ligados à prévia local; validação numérica de deformação. Avaliação visual/animações em combate e ajustes dos acessórios pendentes.
+- Candidata necromante rejeitada por escala/exportação inconsistente; Umbra continua com o modelo anterior até encontrar substituto fiável.
+- Cobertura baixa nas clareiras e entre lugares; quintais de terra mais pequenos e mistura de relva mais irregular. Rever custo gráfico antes de publicar.
 
-- Recursos gratuitos, licença verificável, sem compras ou serviços pagos.
-- Fantasia mais realista e sombria, com estruturas detalhadas; evitar aparência de blocos/PS1.
-- Quaternius Medieval Village MegaKit escolhido pelo utilizador.
-- Pré-visualização ao vivo ao lado da conversa, com avaliação durante o desenvolvimento.
-- Cada mensagem adicional acrescenta requisitos; preservar todos os pedidos anteriores.
+## Ainda a concluir
+- Confirmação física de estabilidade, texturas e joystick no Safari. Controlo do navegador indisponível nas definições Work, portanto não há QA visual automatizado.
+- Emails de novos utilizadores para azevedo-biel@live.com: fila privada e função notify-signup aplicadas; serviço de envio, segredos e agendamento continuam por configurar. Não confundir com emails de confirmação do Supabase.
+- Umbra e restantes ajustes de trajes/poses/armas; desempenho em telemóvel e qualidade do mapa.
+- Melhorias visuais completas da Quinta do Caos, depois do Nightreign; pedidos de campanha e recompensas permanecem no âmbito.
 
-## Implementado em desenvolvimento — sujeito a verificação
-
-- Cópia atual do GitHub isolada em `github-current`.
-- Vitrine `dev/night-art.html` e referências verificadas em `dev/medieval-references.html`.
-- Subconjunto gratuito Quaternius: 25 módulos, pack local comprimido de aproximadamente 1,27 MB.
-- Casas de dois pisos, rua mercantil, quintas, campos cultivados, cercas e áreas de trabalho.
-- Limites de exploração de 96 × 96 para 160 × 160, mapa/minimapa correspondentes.
-- Bosques mais altos, copas sobrepostas, vegetação em setores, caminhos e clareiras.
-- Terra/pedra com texturas PBR locais CC0, alvenaria com mais segmentos e arestas arredondadas.
-- Sombras suaves no desktop; iluminação e composição ainda em avaliação.
-- NPCs Mara, Lio e Astra; missões de combate, visita e guardião; recompensas em moedas, XP e atributos.
-- Diário, diálogo, talentos e treino; regras de compra/entrega validadas pelo anfitrião.
-- Campanha individual guardada localmente por conta enquanto inacabada; continuação; limpeza após vitória.
-- Acampamentos opcionais por proximidade, com orçamento de 40 inimigos.
-
-## A implementar / concluir
-
-- Monumentos de sobrevivência: participantes fixados na ativação, barreira nos dois sentidos, vagas, cronómetro, recompensa de sobrevivência e suspensão da contagem do boss.
-- Refinar o interior do mapa: eliminar vazios sem função, integrar monumentos, vegetação e pontos de interesse.
-- Verificar legibilidade, interação e responsividade dos novos menus e NPCs no jogo real.
-- Rever e completar a melhoria visual dos personagens.
-- Validar regressões da campanha, coop, checkpoints, barreiras e desempenho.
-- Criar uma alteração revisável no GitHub após os testes; nenhuma publicação em produção efetuada.
-- Trabalhar depois a Quinta do Caos com as mesmas prioridades visuais e económicas.
-
-## Estado dos testes até agora
-
-- Um build de produção passou antes das adições recentes à campanha; precisa de repetição no estado final.
-- A primeira execução completa teve timeouts e uma inicialização de textura fora do browser; essa inicialização foi tornada lazy.
-- Comparação com a versão original confirmou que o teste de vitória de equipa passa na base.
-- Testes direcionados e novos testes de missões, talentos, limites e saves estão a ser executados; ainda sem conclusão global de aprovação.
-
-Não confundir a vitrine com uma campanha publicada. Os painéis de demonstração indicam os dados fictícios utilizados; o jogo real usa o estado da partida.
-
-## Revisão de personagens e identidade
-
-- Nome do modo e instalação: Dungeon Nightreign; novo emblema vetorial, PNG 192/512, Apple 180 e maskable.
-- Traços felinos retirados dos heróis Nightreign.
-- Sobreposições de armadura geradas por código rejeitadas pelo utilizador e removidas.
-- Bastião: The Forgotten Knight, modelo completo PBR, animações adaptadas; precisa de QA em movimento/combate.
-- Carmesim: referência explícita Wanda Maximoff; modelo Scarlet Witch (3D Share), CC BY 4.0, animações adaptadas; validação visual pendente.
-- Armas: espada/machados/escudo PBR Quaternius; cajados e arco completos CC BY 4.0.
-- Partículas com máscaras suaves; corte geométrico antigo desativado no Nightreign. Atelier tem botões de ataque/poder/especial para avaliação.
-- Ainda pendente: trajes completos próprios das restantes classes, desempenho em telemóvel e QA visual. Navegador deixou de permitir controlo nas definições Work.
-- Suite completa: 161 testes passaram; um teste antigo que simula 31 fases excedeu 120 s. Não declarar suite integral aprovada.
-- Monumentos já implementados: barreira, vagas, boss congelado e recompensa; círculos ampliados para 36–40 m de diâmetro.
-
-- Magia Carmesim: aura em ambas as mãos, núcleo claro escarlate, partículas orbitais e fumo rubro; feixes ligados aos ossos reais das mãos. Typecheck e avaliação visual em curso.
-
-- Poses individuais adicionadas às sete classes, com transição e remoção dos offsets antes da animação seguinte. Testes verificam ausência de acumulação e saída no combate.
-- Joystick Nightreign: eventos pointer de toque aceites, lostpointercapture liberta, blur repõe o identificador do dedo. Quinta: prevenção de pan da página durante movimento. Verificação física no telemóvel pendente; controlo do browser indisponível.
-
-## Publicação e novos pedidos
-
-- Cloudflare Pages acompanha visual-overhaul, não main.
-- Commit bba9d63 publicado com sucesso em https://muralhasebigodes.pages.dev; preservados os três commits anteriores de visual-overhaul.
-- Commit b346dcc: modo convidado sem persistência, também publicado com sucesso.
-- Supabase: registo sem convite e fila privada de avisos aplicados; teste transacional passou e foi revertido, sem conta de teste persistida.
-- notify-signup publicada; emails para azevedo-biel@live.com ainda dependem de serviço de envio configurado e agendamento. Utilizador não confirmou se o SMTP antigo funciona.
-- Nova correção Safari: transferência explícita pointer→touch, multitouch isolado, eventos acompanhados fora da área, libertação no blur; comando fixo maior. Teste real continua pendente.
-- Registo reduzido a email, palavra-passe, nome opcional e declaração de maioridade/privacidade.
+## Validação
+- Testes direcionados de contas, convidado, joystick e carregamento por modo. Repetir build no estado final.
+- Suite completa anterior: 161 passaram e um teste longo antigo excedeu 120 s; não declarar suite integral aprovada.

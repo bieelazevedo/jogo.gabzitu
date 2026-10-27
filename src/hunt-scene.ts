@@ -30,8 +30,8 @@ export class HuntScene {
  private gold!:T.MeshStandardMaterial;private cyan!:T.MeshStandardMaterial;private ember!:T.MeshStandardMaterial;
  private sphere=new T.SphereGeometry(1,12,8);private box=new T.BoxGeometry(1,1,1);private capsule=new T.CapsuleGeometry(.12,.45,3,6);
  constructor(private canvas:HTMLCanvasElement,private labelRoot:HTMLElement,private local:number,private sound:(kind:string)=>void,private arenaId=1){
-  this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
-  this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
+  this.renderer=new T.WebGLRenderer({canvas,antialias:!matchMedia('(pointer:coarse)').matches,powerPreference:'high-performance'});
+  this.renderer.setPixelRatio(Math.min(devicePixelRatio,matchMedia('(pointer:coarse)').matches?1:1.35));this.renderer.outputColorSpace=T.SRGBColorSpace;this.renderer.toneMapping=T.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
   this.renderer.setClearColor(huntArena(arenaId).sky);this.scene.fog=new T.FogExp2(huntArena(arenaId).sky,.018);
   this.geometries.push(this.sphere,this.box,this.capsule);
   this.hemi=new T.HemisphereLight(0xb9ddff,0x28263a,2.6);this.scene.add(this.hemi);const key=this.key=new T.DirectionalLight(0xffddb2,3.5);key.position.set(-6,12,9);this.scene.add(key);const rim=this.rim=new T.DirectionalLight(0x5cb6db,2);rim.position.set(4,6,-12);this.scene.add(rim);
@@ -158,7 +158,7 @@ export class HuntScene {
  movementHeading(){const e=this.camera.matrixWorld.elements;return Math.atan2(e[8],e[10]);}
  updateNight(s:NightState,dt:number,local:number,yaw=0,zoom=1,pitch=.42,lock?:{x:number;z:number}){
   this.local=local;this.lock=lock;this.night=s;this.orbit=yaw;this.zoomLevel=zoom;this.elevation=pitch;
-  if(!this.world&&!nightAssets()&&!nightAssetsFailed()&&this.assetWait<10){void loadNightAssets();this.assetWait+=dt;if(!this.loading){this.loading=document.createElement('div');this.loading.className='night-loading';this.loading.textContent='A preparar o mundo…';this.labelRoot.append(this.loading);}this.renderer.render(this.scene,this.camera);return;}
+  if(!this.world&&!nightAssets()&&!nightAssetsFailed()){void loadNightAssets();this.assetWait+=dt;if(!this.loading){this.loading=document.createElement('div');this.loading.className='night-loading';this.loading.textContent='A preparar o mundo…';this.labelRoot.append(this.loading);}this.renderer.render(this.scene,this.camera);return;}
   this.loading?.remove();this.loading=undefined;
   if(!this.world){this.nightEffects=new NightEffects();this.nightEffects.handOrigin=(i,side)=>this.heroModels[i]?.handPosition(side);this.scene.add(this.nightEffects.root);this.world=new NightWorld(nightAssets());this.scene.add(this.world.root);this.nightBeacon=this.pivot(this.scene);const beaconRing=this.ring(this.nightBeacon,this.gold,1.3,.05,0,.15);beaconRing.rotation.x=Math.PI/2;const tip=this.add(new T.ConeGeometry(.3,.6,4),this.cyan,this.nightBeacon,0,3,0);tip.rotation.z=Math.PI;this.arenaObjects.forEach(o=>o.scale.multiplyScalar(1.12));
    // With models, the primitive pillars and backdrop give way to KayKit architecture; the engraved floor stays.
@@ -221,5 +221,5 @@ this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)
   for(const label of this.labels){label.age+=dt;const p=new T.Vector3(label.x,3+label.age*2,label.z).project(this.camera);label.element.style.transform=`translate(${(p.x*.5+.5)*this.canvas.clientWidth}px,${(-p.y*.5+.5)*this.canvas.clientHeight}px)`;label.element.style.opacity=String(1-label.age/label.life);}this.labels=this.labels.filter(l=>{if(l.age>=l.life){l.element.remove();return false;}return true;});
   this.renderer.render(this.scene,this.camera);
  }
- dispose(){this.arena?.dispose();this.heroModels.forEach(h=>h.dispose());this.bossModel?.dispose();this.loading?.remove();this.sizeObserver?.disconnect();this.nightEffects?.dispose();this.world?.dispose();this.labels.forEach(l=>l.element.remove());new Set(this.geometries).forEach(g=>g.dispose());new Set(this.materials).forEach(m=>m.dispose());this.textures.forEach(t=>t.dispose());this.renderer.dispose();}
+ dispose(){this.arena?.dispose();this.heroModels.forEach(h=>h.dispose());this.bossModel?.dispose();this.loading?.remove();this.sizeObserver?.disconnect();this.nightEffects?.dispose();this.world?.dispose();this.labels.forEach(l=>l.element.remove());new Set(this.geometries).forEach(g=>g.dispose());new Set(this.materials).forEach(m=>m.dispose());this.textures.forEach(t=>t.dispose());this.renderer.dispose();this.renderer.forceContextLoss();}
 }

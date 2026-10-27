@@ -1,6 +1,6 @@
 import * as T from 'three';
-import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+import type {GLTF} from 'three/addons/loaders/GLTFLoader.js';
+import {gameGLTFLoader} from './game-gltf';
 import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -11,12 +11,17 @@ const PACKS=['halloween','village','dungeon','items','skeleton_items','nature','
 export type PropPart={geometry:T.BufferGeometry;material:T.Material;matrix:T.Matrix4};
 export type NightAssets={characters:Record<CharacterName,T.Object3D>;clips:Map<string,T.AnimationClip>;modern?:{models:Map<string,T.Object3D>;heads:Map<string,T.Object3D>;clips:Map<string,T.AnimationClip>;variants:Map<string,Map<string,T.AnimationClip>>};props:Map<string,T.Object3D>;parts:(name:string)=>PropPart[]};
 
+const gltfCache=new Map<string,Promise<GLTF>>();
+function loadAsset(url:string){let task=gltfCache.get(url);if(!task){task=gameGLTFLoader().loadAsync(url);gltfCache.set(url,task);task.catch(()=>gltfCache.delete(url));}return task;}
+const mergedTemplates=new WeakSet<T.Object3D>();
+let tdPending:Promise<NightAssets>|null=null;
 let pending:Promise<NightAssets>|null=null,ready:NightAssets|null=null,failed=false;
 export const nightAssets=()=>ready;
 export const nightAssetsFailed=()=>failed;
 
 /** Skinned body parts share one skeleton and material; merging them keeps each character to a few draw calls. */
 function mergeSkinned(template:T.Object3D){
+ if(mergedTemplates.has(template))return;mergedTemplates.add(template);
  const groups=new Map<string,T.SkinnedMesh[]>();
  // Headgear stays a separate mesh so a look can hide it (a merged mesh takes the name of its first part).
  template.traverse(o=>{if(o instanceof T.SkinnedMesh&&!Array.isArray(o.material)&&!/Hat|Helmet/.test(o.name)){// GLTFLoader gives every part its own Skeleton object over the same bones, so group by bones.
@@ -32,33 +37,35 @@ function mergeSkinned(template:T.Object3D){
  }
 }
 
-export function loadNightAssets():Promise<NightAssets>{
- if(pending)return pending;
- const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);
+export function loadNightAssets(profile:'night'|'td'='night'):Promise<NightAssets>{
+ const cached=profile==='td'?tdPending:pending;if(cached)return cached;
+
  const base=import.meta.env.BASE_URL+'models/';
- pending=(async()=>{
+ const request=(async()=>{
+  const packNames=profile==='td'?PACKS.filter(n=>!['nature','medieval','weapons','authored-weapons'].includes(n)):PACKS;
+  const authoredNames=['ForgottenKnight','ScarletSorceress'];
   const headNames=['Superhero_Male_FullBody','Superhero_Female_FullBody','Hair_SimpleParted','Hair_Long','Hair_Buzzed','Hair_Beard'];
   const [characters,anims,packs,modernModels,modernAnims,modernHeads]=await Promise.all([
-   Promise.all(CHARACTER_NAMES.map(n=>loader.loadAsync(base+'characters/'+n+'.glb'))),
-   loader.loadAsync(base+'characters/anims.glb'),
-   Promise.all(PACKS.map(n=>loader.loadAsync(base+'env/'+n+'.glb'))),
-   Promise.all(['Male_Ranger','Female_Ranger','Male_Peasant','Female_Peasant','ForgottenKnight','ScarletSorceress'].map(n=>loader.loadAsync(base+'characters/modern/'+n+'.glb'))),
-   Promise.all(['gaits','animations'].map(n=>loader.loadAsync(base+'characters/modern/'+n+'.glb'))),
-   Promise.all(headNames.map(n=>loader.loadAsync(base+'characters/modern/'+n+'.glb'))),
+   Promise.all(CHARACTER_NAMES.map(n=>loadAsset(base+'characters/'+n+'.glb'))),
+   loadAsset(base+'characters/anims.glb'),
+   Promise.all(packNames.map(n=>loadAsset(base+'env/'+n+'.glb'))),
+   Promise.all((profile==='td'?[]:['Male_Ranger','Female_Ranger','Male_Peasant','Female_Peasant',...authoredNames]).map(n=>loadAsset(base+'characters/modern/'+n+'.glb'))),
+   Promise.all((profile==='td'?[]:['gaits','animations']).map(n=>loadAsset(base+'characters/modern/'+n+'.glb'))),
+   Promise.all((profile==='td'?[]:headNames).map(n=>loadAsset(base+'characters/modern/'+n+'.glb'))),
   ]);
   const record={} as Record<CharacterName,T.Object3D>;
   CHARACTER_NAMES.forEach((n,i)=>{const scene=characters[i].scene;mergeSkinned(scene);scene.traverse(o=>{if(o instanceof T.Mesh)o.frustumCulled=false;});record[n]=scene;});
   const clips=new Map(anims.animations.map(c=>[c.name,c]));
-  const props=new Map<string,T.Object3D>();packs.forEach((g,i)=>{if(PACKS[i]==='meadow')brightenFoliage(g.scene);for(const child of g.scene.children)props.set(child.name,child);});
+  const props=new Map<string,T.Object3D>();packs.forEach((g,i)=>{if(packNames[i]==='meadow')brightenFoliage(g.scene);for(const child of g.scene.children)props.set(child.name,child);});
   const partCache=new Map<string,PropPart[]>();
   const parts=(name:string)=>{let list=partCache.get(name);if(list)return list;const node=props.get(name);list=[];if(node){const root=new T.Group();const copy=node.clone();copy.position.set(0,0,0);copy.rotation.set(0,0,0);copy.scale.set(1,1,1);root.add(copy);root.updateMatrixWorld(true);copy.traverse(o=>{if(o instanceof T.Mesh&&!Array.isArray(o.material))list!.push({geometry:o.geometry,material:o.material,matrix:o.matrixWorld.clone()});});}partCache.set(name,list);return list;};
-  const knight=modernModels[4].scene;knight.updateMatrixWorld(true);const box=new T.Box3().setFromObject(knight),size=box.getSize(new T.Vector3()),scale=1.95/size.y,wrapper=new T.Group();wrapper.add(knight);knight.scale.multiplyScalar(scale);knight.position.set(-(box.min.x+box.max.x)*.5*scale,-box.min.y*scale,-(box.min.z+box.max.z)*.5*scale);
-  const scarlet=modernModels[5].scene;scarlet.updateMatrixWorld(true);const sb=new T.Box3().setFromObject(scarlet),ss=1.95/sb.getSize(new T.Vector3()).y,sw=new T.Group();sw.add(scarlet);scarlet.scale.multiplyScalar(ss);scarlet.position.set(-(sb.min.x+sb.max.x)*.5*ss,-sb.min.y*ss,-(sb.min.z+sb.max.z)*.5*ss);
-  const modern={models:new Map<string,T.Object3D>([...['Male_Ranger','Female_Ranger','Male_Peasant','Female_Peasant'].map((n,i)=>[n,modernModels[i].scene] as [string,T.Object3D]),['ForgottenKnight',wrapper],['ScarletSorceress',sw]]),heads:new Map(headNames.map((n,i)=>[n,modernHeads[i].scene])),clips:new Map(modernAnims.flatMap(g=>g.animations.map(c=>[c.name,c] as const))),variants:new Map([['ForgottenKnight',new Map(modernModels[4].animations.map(c=>[c.name,c]))],['ScarletSorceress',new Map(modernModels[5].animations.map(c=>[c.name,c]))]])};
-  ready={characters:record,clips,modern,props,parts};return ready;
+  const authored=(profile==='td'?[]:authoredNames).map((name,i)=>{const model=modernModels[i+4].scene;model.updateMatrixWorld(true);const box=new T.Box3().setFromObject(model),height=box.getSize(new T.Vector3()).y;if(!Number.isFinite(height)||height<=0)throw new Error('Escala inválida: '+name);const scale=1.95/height,wrapper=new T.Group();wrapper.add(model);model.scale.multiplyScalar(scale);model.position.set(-(box.min.x+box.max.x)*.5*scale,-box.min.y*scale,-(box.min.z+box.max.z)*.5*scale);return [name,wrapper] as [string,T.Object3D];});
+  const modern=profile==='td'?undefined:{models:new Map<string,T.Object3D>([...['Male_Ranger','Female_Ranger','Male_Peasant','Female_Peasant'].map((n,i)=>[n,modernModels[i].scene] as [string,T.Object3D]),...authored]),heads:new Map(headNames.map((n,i)=>[n,modernHeads[i].scene])),clips:new Map(modernAnims.flatMap(g=>g.animations.map(c=>[c.name,c] as const))),variants:new Map(authoredNames.map((name,i)=>[name,new Map(modernModels[i+4].animations.map(c=>[c.name,c]))]))};
+  const assets={characters:record,clips,modern,props,parts};if(profile==='night')ready=assets;return assets;
  })();
- pending.catch(e=>{failed=true;console.warn('Modelos 3D indisponíveis; a usar geometria simples.',e);});
- return pending;
+ if(profile==='td')tdPending=request;else pending=request;
+ request.catch(e=>{if(profile==='night')failed=true;console.warn('Modelos 3D indisponíveis; a usar geometria simples.',e);});
+ return request;
 }
 
 /**
@@ -75,21 +82,21 @@ export function brightenFoliage(root:T.Object3D){const seen=new Set<T.Material>(
 let kit:Promise<NightAssets>|null=null;
 /** Just one adventurer plus the shared clip library (no props): enough to animate a single KayKit character elsewhere. */
 export function loadCharacterKit(name:CharacterName){
- if(kit)return kit;const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const base=import.meta.env.BASE_URL+'models/characters/';
- kit=Promise.all([loader.loadAsync(base+name+'.glb'),loader.loadAsync(base+'anims.glb')]).then(([character,anims])=>{const scene=character.scene;mergeSkinned(scene);scene.traverse(o=>{if(o instanceof T.Mesh)o.frustumCulled=false;});
+ if(kit)return kit;const base=import.meta.env.BASE_URL+'models/characters/';
+ kit=Promise.all([loadAsset(base+name+'.glb'),loadAsset(base+'anims.glb')]).then(([character,anims])=>{const scene=character.scene;mergeSkinned(scene);scene.traverse(o=>{if(o instanceof T.Mesh)o.frustumCulled=false;});
   return {characters:{[name]:scene} as unknown as Record<CharacterName,T.Object3D>,clips:new Map(anims.animations.map(c=>[c.name,c])),props:new Map(),parts:()=>[]};});
  kit.catch(()=>{kit=null;});return kit;
 }
 const extraPacks=new Map<string,Promise<void>>();
 /** Loads another environment pack (e.g. the hex battlefield tiles) into the shared prop library. */
-export function loadExtraPack(name:string){
- let p=extraPacks.get(name);if(p)return p;
- p=loadNightAssets().then(async assets=>{const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const g=await loader.loadAsync(import.meta.env.BASE_URL+'models/env/'+name+'.glb');for(const child of [...g.scene.children])assets.props.set(child.name,child);});
- extraPacks.set(name,p);p.catch(()=>extraPacks.delete(name));return p;
+export function loadExtraPack(name:string,profile:'night'|'td'='night'){
+ const key=profile+':'+name;let p=extraPacks.get(key);if(p)return p;
+ p=loadNightAssets(profile).then(async assets=>{const g=await loadAsset(import.meta.env.BASE_URL+'models/env/'+name+'.glb');for(const child of [...g.scene.children])assets.props.set(child.name,child);});
+ extraPacks.set(key,p);p.catch(()=>extraPacks.delete(key));return p;
 }
 const models=new Map<string,Promise<{scene:T.Object3D;animations:T.AnimationClip[]}>>();
 /** A standalone animated model from public/models/characters (own rig and clips, e.g. the Quaternius dog). */
-export function loadModel(name:string){let p=models.get(name);if(!p){const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);p=loader.loadAsync(import.meta.env.BASE_URL+'models/characters/'+name+'.glb').then(g=>{g.scene.traverse(o=>{if(o instanceof T.Mesh)o.frustumCulled=false;});return {scene:g.scene,animations:g.animations};});models.set(name,p);}return p;}
+export function loadModel(name:string){let p=models.get(name);if(!p){p=loadAsset(import.meta.env.BASE_URL+'models/characters/'+name+'.glb').then(g=>{g.scene.traverse(o=>{if(o instanceof T.Mesh)o.frustumCulled=false;});return {scene:g.scene,animations:g.animations};});models.set(name,p);}return p;}
 
 const fxCache=new Map<string,T.Texture>();
 /** CC0 Kenney particle textures in public/fx (glow, flare, spark, star, slash, magic, rune, ring, smoke, scorch, trace, twirl, fire). */
