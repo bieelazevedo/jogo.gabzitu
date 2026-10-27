@@ -60,7 +60,7 @@ class CatUnit{
   const look=CAT_LOOKS[t.kind],skeleton=look.model.startsWith('Skeleton');
   this.base=prop(assets,'building_tower_base_blue');const box=new T.Box3().setFromObject(this.base);const k=Math.min(.62,.8/Math.max(.01,box.max.y-box.min.y));this.base.scale.setScalar(k);this.top=box.max.y*k;
   this.root.position.set(at.x,at.y,at.z);this.root.add(this.base);
-  this.actor=new Actor(assets,look.model,{items:look.items??[],tint:look.tint,scale:1.02*(look.scale||1)});
+  this.actor=new Actor(assets,look.model,{items:look.items??[],tint:look.tint,scale:1.2*(look.scale||1)});
   for(const [item,bone] of look.hold||[])this.actor.hold(item,bone);
   // Ears only: from this camera height the tail reads as a hook.
   if(!skeleton)catFeatures(this.actor,look.fur??0xc8a070).tail.forEach(t=>t.visible=false);
@@ -156,7 +156,10 @@ export class TdRenderer{
   const w=Math.max(1,Math.round(r.width)),h=Math.max(1,Math.round(r.height));this.gl.setPixelRatio(this.dpr);const size=this.gl.getSize(new T.Vector2());if(size.x!==w||size.y!==h)this.gl.setSize(w,h,false);
   if(this.overlay.width!==Math.round(w*this.dpr)||this.overlay.height!==Math.round(h*this.dpr)){this.overlay.width=Math.round(w*this.dpr);this.overlay.height=Math.round(h*this.dpr);}
   // Fit the level's playable box (roads and spots), then apply the player's pinch zoom and pan.
-  const b=this.box,base=Math.min(w/(b.x1-b.x0),h/(b.y1-b.y0));this.scale=base*this.zoom;
+  const b=this.box,base=Math.min(w/(b.x1-b.x0),h/(b.y1-b.y0));
+  // Wide phone screens: start closer (towards filling the width) and let the player drag; pinch out shows the whole map.
+  if(this.autoZoom&&w>40&&h>40){this.autoZoom=false;this.zoom=Math.max(1,Math.min(1.9,(w/(b.x1-b.x0))/base*.92));this.cy=(b.y0+b.y1)/2;this.cx=b.x0+(w/2)/(base*this.zoom);this.hintUntil=this.clock+7;}
+  this.scale=base*this.zoom;
   const hwS=w/2/this.scale,hhS=h/2/this.scale,mx=(b.x0+b.x1)/2,my=(b.y0+b.y1)/2;
   this.cx=hwS*2>=b.x1-b.x0?mx:Math.max(b.x0+hwS,Math.min(b.x1-hwS,this.cx));this.cy=hhS*2>=b.y1-b.y0?my:Math.max(b.y0+hhS,Math.min(b.y1-hhS,this.cy));
   this.ox=w/2-this.cx*this.scale;this.oy=h/2-this.cy*this.scale;
@@ -169,9 +172,9 @@ export class TdRenderer{
  pixelsPerUnit(){return this.scale;}
  private box={x0:-30,x1:1030,y0:-20,y1:620};private zoom=1;private cx=500;private cy=300;
  /** True when the last touch on the map panned or zoomed it (so lifting the finger is not a tap). */
- dragged=false;onView?:()=>void;
+ dragged=false;onView?:()=>void;private autoZoom=true;private hintUntil=0;
  private fitLevel(level:Level){const pts=[...level.spots,...level.paths.flat().map(p=>({x:Math.max(0,Math.min(1000,p.x)),y:p.y}))];
-  this.box={x0:Math.min(...pts.map(p=>p.x))-55,x1:Math.max(...pts.map(p=>p.x))+55,y0:Math.min(...pts.map(p=>p.y))-75,y1:Math.max(...pts.map(p=>p.y))+40};this.zoom=1;this.cx=500;this.cy=300;}
+  this.box={x0:Math.min(...pts.map(p=>p.x))-55,x1:Math.max(...pts.map(p=>p.x))+55,y0:Math.min(...pts.map(p=>p.y))-75,y1:Math.max(...pts.map(p=>p.y))+40};this.zoom=1;this.cx=500;this.cy=300;this.autoZoom=true;}
  private gestures(){
   const c=this.canvas;let last:{x:number;y:number;d:number}|null=null,start={x:0,y:0};
   const read=(e:TouchEvent)=>{const t=Array.from(e.touches);const x=t.reduce((a,v)=>a+v.clientX,0)/t.length,y=t.reduce((a,v)=>a+v.clientY,0)/t.length;return {x,y,d:t.length>1?Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY):0};};
@@ -341,6 +344,14 @@ export class TdRenderer{
    if(e.armor>0&&e.broken<=0){c.fillStyle='#c9d4dc';c.fillRect(p.x-width/2,p.y-lift+5,Math.min(width,e.armor/40*width),1.5);}}
   for(const e of s.effects)if(e.label){const f=1-e.life/e.maxLife;c.save();c.globalAlpha=Math.min(1,e.life*3);c.font='bold 13px sans-serif';c.textAlign='center';c.strokeStyle='#173038';c.lineWidth=3;c.strokeText(e.label,e.x,e.y-48-f*16);c.fillStyle=e.color;c.fillText(e.label,e.x,e.y-48-f*16);c.restore();}
   this.vfx.draw(c,s,settings);
+  // Build spots: a "+" badge of constant screen size above every free plot, pulsing while a cat is being placed.
+  {const px=1/this.scale,occupied=new Set(s.towers.map(t=>t.spot)),placing=!!selected.preview;
+   level.spots.forEach((p,i)=>{if(occupied.has(i))return;const chosen=selected.spot===i,lift=(this.ground(i)+.15)*COS*TD_SCALE,r=(chosen?17:placing?15+Math.sin(this.clock*7)*2:13)*px,y=p.y-lift;
+    c.save();c.globalAlpha=chosen||placing?1:.86;c.fillStyle=chosen?'#ffe08a':'#f7eccbee';c.strokeStyle=chosen?'#8a5a12':'#2f5b45';c.lineWidth=2.5*px;c.beginPath();c.arc(p.x,y,r,0,TAU);c.fill();c.stroke();
+    c.strokeStyle=chosen?'#6b4310':'#2f5b45';c.lineWidth=3*px;c.lineCap='round';c.beginPath();c.moveTo(p.x-r*.45,y);c.lineTo(p.x+r*.45,y);c.moveTo(p.x,y-r*.45);c.lineTo(p.x,y+r*.45);c.stroke();
+    if(this.map?.spots[i]?.high){c.fillStyle='#2f5b45';c.font=`bold ${9*px}px sans-serif`;c.textAlign='center';c.fillText('▲',p.x,y-r-3*px);}c.restore();});}
+  if(this.clock<this.hintUntil&&this.zoom>1.05){const px=1/this.scale,x=this.cx,y=this.cy-(this.canvas.clientHeight/2-22)/this.scale,a=Math.min(1,(this.hintUntil-this.clock)/1.5);
+   c.save();c.globalAlpha=a;c.font=`600 ${12*px}px sans-serif`;c.textAlign='center';const text='Arrasta o mapa · dois dedos para ver tudo',tw=c.measureText(text).width;c.fillStyle='#14262bdd';c.beginPath();c.roundRect(x-tw/2-10*px,y-14*px,tw+20*px,22*px,11*px);c.fill();c.fillStyle='#f3e6bd';c.fillText(text,x,y+2*px);c.restore();}
   if(s.war>0){c.strokeStyle='#e8be6d';c.lineWidth=4;c.strokeRect(3,3,994,594);}
  }
  dispose(){this.clearLevel();for(const m of [this.range,this.rangeEdge,this.aim]){m.geometry.dispose();(m.material as T.Material).dispose();}this.gl.dispose();this.overlay.remove();this.owned.forEach(o=>o.dispose());}
