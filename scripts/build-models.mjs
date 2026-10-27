@@ -95,4 +95,15 @@ if(!ONLY||ONLY==='nature'){const zipPath=join(CACHE,'kenney_nature-kit.zip');if(
  target.getRoot().listExtensionsUsed().filter(e=>e.extensionName==='KHR_materials_unlit').forEach(e=>e.dispose());
  await target.transform(unpartition(),weld());await finish(target,join(OUT,'env','nature.glb'));
  await writeFile(join(OUT,'LICENSE-kenney-nature-kit.txt'),zip.getEntry('License.txt').getData());}
+// Kenney Tower Defense Kit (CC0): modular stone towers, build foundations, spawn pad and siege ammo.
+const KENNEY_TD='https://kenney.nl/media/pages/assets/tower-defense-kit/a402493eaa-1726471567/kenney_tower-defense-kit.zip';
+const TDKIT='tower-round-base tower-round-bottom-a tower-round-bottom-b tower-round-bottom-c tower-round-middle-a tower-round-middle-b tower-round-middle-c tower-round-top-a tower-round-top-b tower-round-top-c tower-round-crystals spawn-round selection-a weapon-ballista weapon-cannon weapon-catapult weapon-ammo-arrow weapon-ammo-boulder weapon-ammo-cannonball detail-tree detail-tree-large detail-rocks detail-rocks-large detail-crystal detail-crystal-large wood-structure'.split(' ');
+if(!ONLY||ONLY==='tdkit'){const zipPath=join(CACHE,'kenney_tower-defense-kit.zip');if(!await exists(zipPath)){const r=await fetch(KENNEY_TD);if(!r.ok)throw Error(r.status+' td kit');await writeFile(zipPath,Buffer.from(await r.arrayBuffer()));}
+ const zip=new AdmZip(zipPath),target=new (await import('@gltf-transform/core')).Document(),scene=target.createScene('tdkit');target.getRoot().setDefaultScene(scene);
+ const dir=join(CACHE,'tdkit');zip.extractEntryTo('Models/GLB format/',dir,false,true);
+ for(const item of TDKIT){if(!await exists(join(dir,item+'.glb')))throw Error('Em falta: '+item);const src=await io.read(join(dir,item+'.glb'));
+  for(const m of src.getRoot().listMaterials())m.setRoughnessFactor(.8).setMetallicFactor(0);
+  const map=mergeDocuments(target,src),copy=map.get(src.getRoot().getDefaultScene()||src.getRoot().listScenes()[0]);const holder=target.createNode(item);for(const child of copy.listChildren())holder.addChild(child);scene.addChild(holder);copy.dispose();}
+ await target.transform(unpartition(),weld());await finish(target,join(OUT,'env','tdkit.glb'));
+ await writeFile(join(OUT,'LICENSE-kenney-tower-defense-kit.txt'),zip.getEntry('License.txt').getData());}
 for(const [name,path] of Object.entries(LICENSES))await fetchTo(path,join(OUT,`LICENSE-kaykit-${name}.txt`));

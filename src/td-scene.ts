@@ -30,7 +30,7 @@ const THEMES:Record<'garden'|'town'|'night',Theme>={
  night:{grass:0x8d9ab8,road:0xa8acc0,sky:0x1c2840,hemi:[0x9fb8ff,0x2a2238,1.15],sun:[0xb9ccff,1.6],near:['gravestone','grave_A','pumpkin_orange_jackolantern','bone_A','rock_single_A'],far:['tree_dead_large','tree_pine_orange_medium','tree_pine_yellow_large','mountain_C_grass_trees','hills_C_trees','tree_dead_medium','trees_A_large'],field:['tree_dead_medium','tree_dead_small','grave_B','gravemarker_A','lantern_standing','tree_pine_orange_medium'],buildings:['crypt','building_destroyed','building_tower_B_red'],night:true},
 };
 /** Kenney Nature Kit undergrowth (CC0) scattered along the roads. */
-const SMALL=['plant_bushDetailed','plant_bushLarge','flower_purpleA','flower_redA','flower_yellowA','mushroom_redGroup','grass_leafsLarge','stump_roundDetailed'];
+const SMALL=['plant_bushDetailed','plant_bushLarge','flower_purpleA','flower_redA','flower_yellowA','mushroom_redGroup','stump_roundDetailed','rock_single_B'];
 const themeOf=(l:Level)=>THEMES[l.theme==='town'||l.theme==='archive'?'town':l.theme==='night'?'night':'garden'];
 /** Halloween Bits are modelled at character scale; the hexagon pack is about 5× smaller. */
 const BIT=.5;
@@ -40,9 +40,9 @@ const bitScale=(name:string)=>/^(tree_dead|tree_pine|grave|gravestone|pumpkin|bo
 /** Collects static props and turns each prop part into one InstancedMesh. */
 class Batch{
  private items=new Map<string,{m:T.Matrix4;c?:T.Color}[]>();private q=new T.Quaternion();private up=new T.Vector3(0,1,0);
- add(name:string,x:number,y:number,z:number,rot=0,scale=1,color?:number){scale*=bitScale(name)*(/^building_(home|church|tavern|well|market|blacksmith|windmill|lumbermill|watermill|barracks|archeryrange)/.test(name)?1.3:1);const m=new T.Matrix4().compose(new T.Vector3(x,y,z),this.q.setFromAxisAngle(this.up,rot).clone(),new T.Vector3(scale,scale,scale));let list=this.items.get(name);if(!list){list=[];this.items.set(name,list);}list.push({m,c:color===undefined?undefined:new T.Color(color)});}
+ add(name:string,x:number,y:number,z:number,rot=0,scale=1,color?:number){if(color===undefined&&/^(plant_|flower_)/.test(name))color=0xd8ff6a;scale*=bitScale(name)*(/^building_(home|church|tavern|well|market|blacksmith|windmill|lumbermill|watermill|barracks|archeryrange)/.test(name)?1.3:1);const m=new T.Matrix4().compose(new T.Vector3(x,y,z),this.q.setFromAxisAngle(this.up,rot).clone(),new T.Vector3(scale,scale,scale));let list=this.items.get(name);if(!list){list=[];this.items.set(name,list);}list.push({m,c:color===undefined?undefined:new T.Color(color)});}
  build(assets:NightAssets,root:T.Object3D){const meshes:T.InstancedMesh[]=[];
-  for(const [name,list] of this.items){for(const part of assets.parts(name)){const mesh=new T.InstancedMesh(part.geometry,part.material,list.length);list.forEach((it,i)=>{mesh.setMatrixAt(i,it.m.clone().multiply(part.matrix));if(it.c)mesh.setColorAt(i,it.c);});mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);}}
+  for(const [name,list] of this.items){const flat=/^hex_(grass|road|water)|^spawn|^building_dirt/.test(name);for(const part of assets.parts(name)){const mesh=new T.InstancedMesh(part.geometry,part.material,list.length);mesh.castShadow=!flat;mesh.receiveShadow=true;list.forEach((it,i)=>{mesh.setMatrixAt(i,it.m.clone().multiply(part.matrix));if(it.c)mesh.setColorAt(i,it.c);});mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);}}
   return meshes;}
 }
 
@@ -53,17 +53,39 @@ function blobShadow(size:number){if(!shadowTexture){const c=document.createEleme
 
 const additive=(map:string,color:number|string,opacity=1)=>new T.SpriteMaterial({map:fxTexture(map),color,transparent:true,opacity,depthWrite:false,blending:T.AdditiveBlending});
 
+
+/** Kenney tower pieces are coloured by one palette texture; this repaints its orange-red swatches in a cat's colour. */
+const paletteCache=new Map<string,T.Material>();
+function recolored(source:T.Material,hue:number){
+ const key=source.uuid+':'+hue;let m=paletteCache.get(key);if(m)return m;
+ const base=source as T.MeshStandardMaterial,image=base.map?.image as CanvasImageSource&{width:number;height:number}|undefined;m=base.clone();
+ if(image&&image.width){const c=document.createElement('canvas');c.width=image.width;c.height=image.height;const g=c.getContext('2d')!;g.drawImage(image,0,0);const d=g.getImageData(0,0,c.width,c.height),px=d.data;
+  for(let i=0;i<px.length;i+=4){const r=px[i]/255,gg=px[i+1]/255,b=px[i+2]/255,max=Math.max(r,gg,b),min=Math.min(r,gg,b),delta=max-min;if(delta<.25||max!==r)continue;
+   const l=(max+min)/2,sat=delta/(1-Math.abs(2*l-1)),col=new T.Color().setHSL(hue/360,Math.min(1,sat*.9),l);px[i]=col.r*255;px[i+1]=col.g*255;px[i+2]=col.b*255;}
+  g.putImageData(d,0,0);const tex=new T.CanvasTexture(c);tex.colorSpace=T.SRGBColorSpace;tex.flipY=base.map!.flipY;(m as T.MeshStandardMaterial).map=tex;}
+ paletteCache.set(key,m);return m;
+}
+const hueOf=(hex:string)=>{const hsl={h:0,s:0,l:0};new T.Color(hex).getHSL(hsl);return Math.round(hsl.h*360);};
+/** Stacks Kenney tower pieces: taller and more ornate with each upgrade; returns the floor height for the cat. */
+function buildTower(assets:NightAssets,kind:CatKind,level:number,branch:string){
+ const group=new T.Group(),S=1.4,hue=CAT_LOOKS[kind].model.startsWith('Skeleton')?0:hueOf(CATS[kind].color);let y=0,floor=0;
+ const pieces=level===1?['tower-round-bottom-a','tower-round-top-a']:level===2?['tower-round-bottom-b','tower-round-middle-a','tower-round-top-c']:['tower-round-bottom-c','tower-round-middle-a',branch==='b'?'tower-round-middle-c':'tower-round-middle-b','tower-round-top-b'];
+ pieces.forEach((name,i)=>{const o=prop(assets,name);o.scale.set(S*1.55,S*.95,S*1.55);o.traverse(c=>{if(c instanceof T.Mesh){c.material=recolored(c.material as T.Material,hue);c.castShadow=true;c.receiveShadow=true;}});
+  const box=new T.Box3().setFromObject(o);o.position.y=y-box.min.y;group.add(o);const h=box.max.y-box.min.y;if(i===pieces.length-1)floor=y+h*.3;y+=h*(i===pieces.length-1?1:.98);});
+ return {group,top:floor};
+}
 /** A cat standing guard on its tower. */
 class CatUnit{
- readonly root=new T.Group();readonly actor:Actor;private base:T.Object3D;private top:number;private casts=0;private busyUntil=0;private aura?:T.Sprite;private ring:T.Mesh;private level=0;private stars:T.Sprite[]=[];
+ readonly root=new T.Group();readonly actor:Actor;private assets:NightAssets;private base:T.Object3D;private top:number;private casts=0;private busyUntil=0;private aura?:T.Sprite;private ring:T.Mesh;private level=0;private stars:T.Sprite[]=[];
  constructor(assets:NightAssets,private t:Tower,parent:T.Object3D,at:{x:number;y:number;z:number}){
   const look=CAT_LOOKS[t.kind],skeleton=look.model.startsWith('Skeleton');
-  this.base=prop(assets,'building_tower_base_blue');const box=new T.Box3().setFromObject(this.base);const k=Math.min(.62,.8/Math.max(.01,box.max.y-box.min.y));this.base.scale.setScalar(k);this.top=box.max.y*k;
+  ({group:this.base,top:this.top}=buildTower(assets,t.kind,t.level,t.branch));this.assets=assets;
   this.root.position.set(at.x,at.y,at.z);this.root.add(this.base);
   this.actor=new Actor(assets,look.model,{items:look.items??[],tint:look.tint,scale:1.2*(look.scale||1)});
   for(const [item,bone] of look.hold||[])this.actor.hold(item,bone);
   // Ears only: from this camera height the tail reads as a hook.
   if(!skeleton)catFeatures(this.actor,look.fur??0xc8a070).tail.forEach(t=>t.visible=false);
+  this.actor.root.traverse(o=>{if(o instanceof T.Mesh)o.castShadow=true;});
   this.actor.root.position.y=this.top;this.root.add(this.actor.root);this.actor.play('Idle',{speed:.8+hash(t.id)*.4});
   if(look.glow){this.aura=new T.Sprite(additive('glow',look.glow,.55));this.aura.scale.setScalar(1.1);this.aura.position.y=this.top+.65;this.root.add(this.aura);}
   this.ring=new T.Mesh(new T.RingGeometry(.72,.86,40),new T.MeshBasicMaterial({color:t.owner===1?0x79bed2:0xf3d48a,transparent:true,opacity:.0,depthWrite:false}));this.ring.rotation.x=-Math.PI/2;this.ring.position.y=this.top+.04;this.root.add(this.ring);
@@ -78,7 +100,7 @@ class CatUnit{
   r.rotation.y=turn(r.rotation.y,heading(Math.cos(t.angle),Math.sin(t.angle)),dt*8);
   if((t.casts||0)!==this.casts){this.casts=t.casts||0;a.play(look.attack,{loop:false,restart:true,fade:.06,speed:Math.max(1,a.duration(look.attack)/Math.max(.35,stats(t,s).interval*.9))});this.busyUntil=time+Math.min(a.duration(look.attack)*.8,.9);}
   else if(time>this.busyUntil){if(moving>.6)a.play('Running_A',{fade:.12});else a.play(s.enemies.length?'Idle_Combat':'Idle',{fade:.3});}
-  if(this.level!==t.level){this.level=t.level;this.stars.forEach(sp=>{sp.removeFromParent();sp.material.dispose();});this.stars=[];for(let i=1;i<t.level;i++){const sp=new T.Sprite(additive('star',t.branch==='b'?0x9fe8ff:0xffd77a,.95));sp.scale.setScalar(.36);sp.position.set((i-(t.level)/2)*.32,this.top+.25,.95);this.root.add(sp);this.stars.push(sp);}a.root.scale.setScalar(1+(t.level-1)*.08);}
+  if(this.level!==t.level){if(this.level){this.base.removeFromParent();({group:this.base,top:this.top}=buildTower(this.assets,t.kind,t.level,t.branch));this.root.add(this.base);if(this.aura)this.aura.position.y=this.top+.65;this.ring.position.y=this.top+.04;}this.level=t.level;this.stars.forEach(sp=>{sp.removeFromParent();sp.material.dispose();});this.stars=[];for(let i=1;i<t.level;i++){const sp=new T.Sprite(additive('star',t.branch==='b'?0x9fe8ff:0xffd77a,.95));sp.scale.setScalar(.36);sp.position.set((i-(t.level)/2)*.32,this.top+.25,.95);this.root.add(sp);this.stars.push(sp);}a.root.scale.setScalar(1+(t.level-1)*.08);}
   if(this.aura){const k=t.shot>0?1.6:1;this.aura.material.opacity=.32+Math.sin(time*3+t.id)*.1+(t.shot>0?.35:0);this.aura.scale.setScalar(1.1*k);}
   (this.ring.material as T.MeshBasicMaterial).opacity=selected?.85:t.owner===1?.6:0;
   a.update(dt);
@@ -100,7 +122,8 @@ class EnemyUnit{
    if(look.crate){const crate=prop(assets,'crate_A_big');crate.scale.setScalar(2.2);crate.position.set(0,-.2,0);this.actor.bone('head')?.add(crate);}
    if(look.ghost)for(const m of this.actor.materials){m.transparent=true;m.opacity=.62;m.emissive.setHex(0x3a7cff);m.emissiveIntensity=.55;}
    this.materials=this.actor.materials;this.root.add(this.actor.root);this.actor.play(look.run?'Running_C':'Walking_D_Skeletons',{speed:.9+hash(e.id)*.2});this.height=2.4*look.scale;}
-  this.shadow=blobShadow(1.4*Math.max(.6,look.scale*1.6));this.root.add(this.shadow);
+  this.root.traverse(o=>{if(o instanceof T.Mesh)o.castShadow=true;});
+  this.shadow=blobShadow(1.4*Math.max(.6,look.scale*1.6));(this.shadow.material as T.MeshBasicMaterial).opacity=.55;this.root.add(this.shadow);
   this.root.position.set(at.x,0,at.z);this.last.copy(this.root.position);parent.add(this.root);
   if(look.ghost)this.shadow.visible=false;
  }
@@ -142,10 +165,12 @@ export class TdRenderer{
  constructor(readonly canvas:HTMLCanvasElement,private onFail:()=>void){
   this.gl=new T.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});this.gl.outputColorSpace=T.SRGBColorSpace;this.gl.toneMapping=T.ACESFilmicToneMapping;this.gl.toneMappingExposure=1.05;
   this.overlay=document.createElement('canvas');this.overlay.className='battle-overlay';this.overlay.setAttribute('aria-hidden','true');Object.assign(this.overlay.style,{position:'absolute',inset:'0',width:'100%',height:'100%',pointerEvents:'none'});canvas.after(this.overlay);this.c2=this.overlay.getContext('2d')!;
-  this.hemi=new T.HemisphereLight(0xdff2ff,0x5b6b3c,1.2);this.sun=new T.DirectionalLight(0xfff1d6,2.4);this.sun.position.set(-12,24,14);this.scene.add(this.hemi,this.sun,this.world,this.dynamic);
+  this.hemi=new T.HemisphereLight(0xdff2ff,0x5b6b3c,1.2);this.sun=new T.DirectionalLight(0xfff1d6,2.4);this.sun.position.set(-12,24,14);this.scene.add(this.hemi,this.sun,this.sun.target,this.world,this.dynamic);
+  // Soft real-time shadows from the sun (off on the low quality setting).
+  this.gl.shadowMap.type=T.PCFSoftShadowMap;this.sun.castShadow=true;this.sun.shadow.bias=-.0015;this.sun.shadow.normalBias=.03;
   const disc=(inner:number,outer:number,color:number,opacity:number)=>{const m=new T.Mesh(inner>0?new T.RingGeometry(inner,outer,72):new T.CircleGeometry(outer,72),new T.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,depthTest:false}));m.rotation.x=-Math.PI/2;m.renderOrder=5;m.visible=false;this.scene.add(m);return m;};
   this.range=disc(0,1,0xf6eebd,.13);this.rangeEdge=disc(.985,1,0xfff3c4,.85);this.aim=disc(0,1,0xffcf7a,.22);
-  this.ready=Promise.all([loadNightAssets(),loadExtraPack('hex'),loadModel('Dog').catch(()=>null)]).then(([assets,,dog])=>{this.assets=assets;this.dog=dog;});
+  this.ready=Promise.all([loadNightAssets(),loadExtraPack('hex'),loadExtraPack('tdkit'),loadModel('Dog').catch(()=>null)]).then(([assets,,,dog])=>{this.assets=assets;this.dog=dog;});
   this.gestures();
   this.ready.catch(e=>{console.warn('Campo 3D indisponível; a usar 2D.',e);this.failed=true;this.onFail();});
  }
@@ -164,6 +189,8 @@ export class TdRenderer{
   this.cx=hwS*2>=b.x1-b.x0?mx:Math.max(b.x0+hwS,Math.min(b.x1-hwS,this.cx));this.cy=hhS*2>=b.y1-b.y0?my:Math.max(b.y0+hhS,Math.min(b.y1-hhS,this.cy));
   this.ox=w/2-this.cx*this.scale;this.oy=h/2-this.cy*this.scale;
   const ppw=this.scale*TD_SCALE,hw=w/2/ppw,hh=h/2/ppw,focus=simToWorld({x:this.cx,y:this.cy});
+  this.gl.shadowMap.enabled=quality!=='low';const span=Math.max(hw,hh/Math.sin(TD_PITCH))*1.15,sh=this.sun.shadow.camera;this.sun.shadow.mapSize.setScalar(quality==='high'?2048:1024);sh.left=-span;sh.right=span;sh.top=span;sh.bottom=-span;sh.near=1;sh.far=90;sh.updateProjectionMatrix();
+  this.sun.position.set(focus.x-14,30,focus.z+12);this.sun.target.position.set(focus.x,0,focus.z);this.sun.target.updateMatrixWorld();
   const cam=this.camera;cam.left=-hw;cam.right=hw;cam.top=hh;cam.bottom=-hh;cam.position.set(focus.x,60*Math.sin(TD_PITCH),focus.z+60*COS);cam.lookAt(focus.x,0,focus.z);cam.near=1;cam.far=160;cam.updateProjectionMatrix();
  }
  point(clientX:number,clientY:number):Point{const r=this.canvas.getBoundingClientRect();return {x:(clientX-r.left-this.ox)/this.scale,y:(clientY-r.top-this.oy)/this.scale};}
@@ -204,7 +231,9 @@ export class TdRenderer{
   const nearEnd=(c:HexCell)=>[...ends].some(e=>Math.hypot(e.x-c.x,e.z-c.z)<4.5);
   // Ponds: a few open tiles in the middle of the field become water.
   const ponds=new Set(cells.filter(c=>!c.road&&c.near>=3&&field(c)&&!spotCells.has(c)&&!nearSpot(c)&&hash(c.q*31+c.r*17+level.id)<.12).slice(0,4));
-  for(const c of cells){const h=hash(c.q*92821+c.r*68917),tint=new T.Color(theme.grass).multiplyScalar(.93+h*.12).getHex();
+  // Meadow colour drifts in broad patches (low-frequency noise) so the hex grid reads as terrain, not a board.
+  const patch=(x:number,z:number)=>.5+.25*Math.sin(x*.21+level.id)+.18*Math.sin(z*.27-x*.09)+.12*Math.sin((x+z)*.47);
+  for(const c of cells){const h=hash(c.q*92821+c.r*68917),k=patch(c.x,c.z),tint=new T.Color(theme.grass).lerp(new T.Color(theme.night?0x6c7c9c:0x9cc884),Math.max(0,Math.min(1,k))*.55).multiplyScalar(.95+h*.08).getHex();
    if(c.road){const {name,rot}=roadTile(c.edges);batch.add(name,c.x,0,c.z,rot*Math.PI/3,1,theme.road);continue;}
    const y=c.high?.55:0;batch.add('hex_grass',c.x,y,c.z,Math.floor(h*6)*Math.PI/3,1,tint);if(c.high)batch.add('hex_grass_bottom',c.x,-.45,c.z,0,1,tint);
    if(spotCells.has(c)||nearEnd(c))continue;
@@ -221,17 +250,18 @@ export class TdRenderer{
    if(c.near===1){if(h<.22)batch.add(pick(theme.near,h*31),c.x+(hash(h)-.5)*.8,0,c.z+(hash(h*3)-.5)*.6,rot,1);
     else if(h<.5&&!theme.night)for(let k=0;k<2;k++)batch.add(pick(SMALL,h*97+k),c.x+(hash(h*5+k)-.5)*1.3,0,c.z+(hash(h*7+k)-.5)*1.1,rot+k,1.5);continue;}
    if(ponds.has(c)){batch.add('hex_water',c.x,0,c.z,0,1);batch.add(h<.5?'waterlily_A':'waterlily_B',c.x+.3,0,c.z-.2,rot,1);continue;}
+   if(!theme.night&&h>.8)for(let k=0;k<2;k++)batch.add(hash(h*k+3)<.5?'plant_bushDetailed':'flower_yellowA',c.x+(hash(h*13+k)-.5)*1.6,0,c.z+(hash(h*17+k)-.5)*1.5,hash(k+h)*TAU,1.7+hash(h*k)*.6);
    if(nearSpot(c)&&c.near<4){if(h<.35&&!theme.night)batch.add(pick(SMALL,h*41),c.x+(hash(h*9)-.5)*.9,0,c.z+(hash(h*11)-.5)*.8,rot,1.4);continue;}
    if(h<(c.near>=3?.55:.32)){const name=pick(theme.field,h*71);batch.add(name,c.x,0,c.z,Math.floor(rot/(Math.PI/3))*Math.PI/3,1);}
   }
   // Skeleton gates at the entries; the Ordem's castle guards the refuge.
-  for(const route of map.routes){const a=route[0],b=route[1]||a,ang=Math.atan2(b.x-a.x,b.z-a.z);batch.add('building_destroyed',a.x-Math.sin(ang)*1.6,0,a.z-Math.cos(ang)*1.6,ang,1.2);batch.add('gravestone',a.x+Math.cos(ang)*1.3,0,a.z-Math.sin(ang)*1.3,ang);batch.add('grave_A',a.x-Math.cos(ang)*1.3,0,a.z+Math.sin(ang)*1.3,ang+.4);batch.add('lantern_standing',a.x+Math.cos(ang)*1.1+.4,0,a.z-Math.sin(ang)*1.1+.6,0);
+  for(const route of map.routes){const a=route[0],b=route[1]||a,ang=Math.atan2(b.x-a.x,b.z-a.z);batch.add('spawn-round',a.x,.02,a.z,ang,1.6);batch.add('building_destroyed',a.x-Math.sin(ang)*2.2,0,a.z-Math.cos(ang)*2.2,ang,1.1);batch.add('gravestone',a.x+Math.cos(ang)*1.3,0,a.z-Math.sin(ang)*1.3,ang);batch.add('grave_A',a.x-Math.cos(ang)*1.3,0,a.z+Math.sin(ang)*1.3,ang+.4);batch.add('lantern_standing',a.x+Math.cos(ang)*1.1+.4,0,a.z-Math.sin(ang)*1.1+.6,0);
    this.light(0x9f7bff,a.x,1.6,a.z,6);}
   const exits=[...new Set(map.routes.map(r=>r[r.length-1]))];
   for(const e of exits){batch.add('building_castle_blue',e.x+1.4,0,e.z,-Math.PI/2,1.25);batch.add('flag_blue',e.x-.6,0,e.z-1.3,0,1.4);batch.add('flag_blue',e.x-.6,0,e.z+1.3,0,1.4);this.light(0xffc070,e.x,2,e.z,7);}
   this.statics=batch.build(assets,this.world);
   // Build plots: tilled earth with a soft ring; towers replace them visually.
-  for(const [i,c] of map.spots.entries()){const plot=prop(assets,'building_dirt');plot.scale.setScalar(.82);plot.position.set(c.x,(c.high?.55:0)+.01,c.z);this.world.add(plot);this.plots[i]=plot;
+  for(const [i,c] of map.spots.entries()){const plot=prop(assets,'tower-round-base');plot.scale.setScalar(1.45);plot.traverse(o=>{if(o instanceof T.Mesh){o.material=recolored(o.material as T.Material,42);o.receiveShadow=true;}});plot.position.set(c.x,(c.high?.55:0)+.01,c.z);this.world.add(plot);this.plots[i]=plot;
    const ring=new T.Mesh(new T.RingGeometry(.62,.78,36),new T.MeshBasicMaterial({color:0xf3e2a6,transparent:true,opacity:.55,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.set(c.x,(c.high?.55:0)+.08,c.z);ring.renderOrder=2;this.world.add(ring);this.plotRings[i]=ring;
    if(c.high){const flag=prop(assets,'flag_blue');flag.position.set(c.x+.7,c.high?.55:0,c.z-.45);flag.scale.setScalar(.9);this.world.add(flag);}}
   // Fireflies by day, embers by night: a few additive sprites drifting over the field.
@@ -268,7 +298,7 @@ export class TdRenderer{
    unit.update(t,s,dt,time,selected.spot===t.spot);}
   for(const [id,u] of this.cats)if(!live.has(id)){u.dispose();this.cats.delete(id);}
   const occupied=new Set(s.towers.map(t=>t.spot));
-  this.plots.forEach((p,i)=>{p.visible=!occupied.has(i);const ring=this.plotRings[i];ring.visible=!occupied.has(i);const m=ring.material as T.MeshBasicMaterial;const chosen=selected.spot===i;m.color.setHex(chosen?0xffe08a:0xf3e2a6);m.opacity=chosen?.95:.35+Math.sin(time*2.4+i)*.12;ring.scale.setScalar(chosen?1.12+Math.sin(time*6)*.04:1);});
+  this.plots.forEach((p,i)=>{p.visible=!occupied.has(i);const ring=this.plotRings[i];ring.visible=!occupied.has(i)&&selected.spot===i;const m=ring.material as T.MeshBasicMaterial;const chosen=selected.spot===i;m.color.setHex(chosen?0xffe08a:0xf3e2a6);m.opacity=chosen?.95:.35+Math.sin(time*2.4+i)*.12;ring.scale.setScalar(chosen?1.12+Math.sin(time*6)*.04:1);});
  }
  private syncEnemies(s:State,level:Level,dt:number,time:number){
   const live=new Set<number>();
@@ -353,6 +383,8 @@ export class TdRenderer{
   if(this.clock<this.hintUntil&&this.zoom>1.05){const px=1/this.scale,x=this.cx,y=this.cy-(this.canvas.clientHeight/2-22)/this.scale,a=Math.min(1,(this.hintUntil-this.clock)/1.5);
    c.save();c.globalAlpha=a;c.font=`600 ${12*px}px sans-serif`;c.textAlign='center';const text='Arrasta o mapa · dois dedos para ver tudo',tw=c.measureText(text).width;c.fillStyle='#14262bdd';c.beginPath();c.roundRect(x-tw/2-10*px,y-14*px,tw+20*px,22*px,11*px);c.fill();c.fillStyle='#f3e6bd';c.fillText(text,x,y+2*px);c.restore();}
   if(s.war>0){c.strokeStyle='#e8be6d';c.lineWidth=4;c.strokeRect(3,3,994,594);}
+  // Soft vignette frames the field like a painted board.
+  {c.setTransform(this.dpr,0,0,this.dpr,0,0);const w=this.overlay.width/this.dpr,h=this.overlay.height/this.dpr,g=c.createRadialGradient(w/2,h/2,Math.min(w,h)*.45,w/2,h/2,Math.max(w,h)*.72);g.addColorStop(0,'rgba(8,20,24,0)');g.addColorStop(1,LEVELS[s.levelId-1].theme==='night'?'rgba(6,10,24,.5)':'rgba(10,30,26,.32)');c.fillStyle=g;c.fillRect(0,0,w,h);}
  }
  dispose(){this.clearLevel();for(const m of [this.range,this.rangeEdge,this.aim]){m.geometry.dispose();(m.material as T.Material).dispose();}this.gl.dispose();this.overlay.remove();this.owned.forEach(o=>o.dispose());}
 }
