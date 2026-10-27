@@ -357,6 +357,8 @@ export class Renderer {
         this.canvas.height = h;
     } }
     point(clientX: number, clientY: number): Point { const r = this.canvas.getBoundingClientRect(); return { x: (clientX - r.left) * W / r.width, y: (clientY - r.top) * H / r.height }; }
+    screen(p: Point) { const r = this.canvas.getBoundingClientRect(); return { x: r.left + p.x * r.width / W, y: r.top + p.y * r.height / H }; }
+    dispose() {}
     draw(s: State, selected: Selection, settings: Save['settings'], remote = false) {
         this.resize(settings.quality);
         const c = this.c, l = LEVELS[s.levelId - 1];

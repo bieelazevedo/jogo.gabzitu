@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="pt-PT"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TD 3D</title>
+<style>body{margin:0;background:#111}.canvas-wrap{position:fixed;inset:0}.canvas-wrap canvas{display:block;width:100%;height:100%}</style></head>
+<body><div class="canvas-wrap"><canvas id="c"></canvas></div><script type="module">
+// Dev-only: the 3D tower defense battlefield driven by a scripted battle (?level=N&t=seconds).
+import {TdRenderer} from '/src/td-scene.ts';
+import {createState,command,step} from '/src/simulation.ts';
+import {LEVELS,COMMON,CATS,STEP} from '/src/data.ts';
+const q=new URLSearchParams(location.search),level=+(q.get('level')||1),secs=+(q.get('t')||25);
+const kinds=(q.get('cats')||'archer,ice,bomber,knight,witch,engineer,monk,commander,pirate,samurai,astronomer,allyLegollas').split(',');
+const s=createState(level,'campaign',[kinds]);s.players[0].infiniteMoney=true;s.players[0].coins=1e9;
+const spots=LEVELS[level-1].spots.length;for(let i=0;i<Math.min(spots,+(q.get('n')||10));i++)command(s,0,{type:'build',spot:i,kind:kinds[i%kinds.length]});
+for(const t of s.towers.slice(0,4)){command(s,0,{type:'upgrade',id:t.id});}
+command(s,0,{type:'wave'});for(let i=0;i<secs/STEP;i++){step(s);if(i%300===0&&!s.active.length)command(s,0,{type:'wave'});}
+const r=new TdRenderer(document.getElementById('c'),()=>console.error('fail'));window.__td={s,r};
+const sel={spot:q.has('sel')?+q.get('sel'):null,preview:null,aim:null};
+await r.ready;let frames=0;const settings={effects:1,music:0,reduced:false,quality:'high'};
+function loop(){step(s);r.draw(s,sel,settings);if(++frames===40)document.body.dataset.ready='1';requestAnimationFrame(loop);}loop();
+</script></body></html>

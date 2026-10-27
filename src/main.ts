@@ -19,13 +19,15 @@ import { CATS, CHAPTERS, COMMON, ENEMIES, H, LEVELS, STEP, W, waveFor } from './
 import { command, createState, dist, previewWave, refund, stats, step, upgradeCost } from './simulation';
 import { completed, fresh, load, persist, recordWin, starsFor, totalStars, validateSave,setSaveScope } from './persistence';
 import { drawCat,portrait, Renderer, thumbnail } from './render';
+import type {TdRenderer} from './td-scene';
+type BattleRenderer = Renderer | TdRenderer;
 import { AudioManager } from './audio';
 import { PeerSession, validCommandPacket, validName } from './network';
 import type { Ability, CatKind, Command, Point, State } from './types';
 installGameTouchGuard();
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const receivedInvite=new URLSearchParams(location.hash.slice(1)).get('convite');if(receivedInvite&&/^[a-f0-9]{48}$/.test(receivedInvite)){sessionStorage.setItem('mb-invite',receivedInvite);accountView.tab='register';history.replaceState({},'',location.pathname+location.search);}
-let save = load(), screen = 'account', state: State | null = null, renderer: Renderer | null = null, selected: number | null = null, preview: CatKind | null = null, aim: Point | null = null, aiming = false;
+let save = load(), screen = 'account', state: State | null = null, renderer: BattleRenderer | null = null, selected: number | null = null, preview: CatKind | null = null, aim: Point | null = null, aiming = false;
 let chosenLevel = 1, chosenMode: State['mode'] = 'campaign', team: CatKind[] = ['archer', 'ice'], resultShown = false, lastTime = 0, acc = 0, lastHud = 0, lastSnapshot = 0, lastAudioKills = 0;
 let peer: PeerSession | null = null, localPlayer = 0, remoteName = 'À espera de companhia', remoteTeam: CatKind[] = ['archer', 'ice', 'bomber'], remoteReady = false, localReady = false, networkStatus = '', manualOutput = '', manualStep = '', oldRemoteTick = -1;
 let dialog = '', muted = false, networkPaused = false, wasPaused = false;
@@ -60,9 +62,11 @@ account.onStatus=()=>{const el=document.getElementById('sync-status');if(el)el.t
 account.onUser=(user,recovery)=>{void (async()=>{if(farmStop){farmStop();farmStop=null;}if(huntStop){huntStop();huntStop=null;}if(peer){peer.close();peer=null;}state=null;setSaveScope(user?.id||null);save=load();account.admin=false;adminPrefs.money=false;adminPrefs.life=false;if(recovery){accountView.tab='password';setScreen('account');return;}if(user){account.status='A recuperar o progresso da conta…';if(screen==='account')render();try{const remote=await account.pull();await account.checkAdmin();const cp=readCheckpoint();applyCloud({...remote,checkpoint:cp&&(!remote.checkpoint||cp.savedAt>remote.checkpoint.savedAt)?cp:remote.checkpoint});account.status='Progresso da conta recuperado';queueCloud();}catch(error){toast(error instanceof Error?error.message:'A cópia local continua disponível.');}}if(screen!=='privacy'){if(account.user&&location.hash.startsWith('#quinta='))await beginFarm(location.href);else setScreen(account.user?(location.hash.startsWith('#sala=')?'coop':'home'):'account');}})();};
 function header() { return `<header class="site-header app-header">${button('← Menu', 'home', 'secondary')}<div class="brand"><img class="brand-emblem" src="/icon.svg" alt=""><span>Muralhas <em>&</em> Bigodes<small>A ORDEM DO NOVELO</small></span></div><span class="star-total">✦ ${totalStars(save)} <small>/ ${LEVELS.length*3}</small></span>${button('⛶', 'fullscreen', 'icon-button')}</header>`; }
 function footer() { return ''; }
-function setScreen(next: string) {if(!['account','privacy'].includes(next))registrationDraft=null;screen = next; dialog = ''; renderer = null; render(); }
+// Dev server only: ?devgame=N opens level N without an account, for layout checks on phone sizes.
+const DEV_GUEST = import.meta.env.DEV && new URLSearchParams(location.search).has('devgame');
+function setScreen(next: string) {if(!['account','privacy'].includes(next))registrationDraft=null;screen = next; dialog = ''; renderer?.dispose(); renderer = null; render(); }
 function render() {
-    if(!account.user&&!['account','privacy'].includes(screen)){screen='account';}
+    if(!account.user&&!DEV_GUEST&&!['account','privacy'].includes(screen)){screen='account';}
     if (screen === 'game') {
         renderGame();
         return;
@@ -126,17 +130,48 @@ function renderGame() {
         return;
     const l = LEVELS[state.levelId - 1];
     app.innerHTML = `<div class="game-shell"><header class="game-header">${button('←', 'exit', 'icon-button')}<div class="game-title"><span>FASE ${String(l.id).padStart(2, '0')} ${state.mode === 'coop' ? '· DUAS PATAS EXTRAS' : ''}</span><strong>${l.name}</strong></div><div class="hud-stat"><span>♥</span><b id="hp">100</b><small>REFÚGIO</small></div><div class="hud-stat gold"><span>◉</span><b id="coins">0</b><small>MOEDAS</small></div><div class="hud-stat"><b id="wave">0 / 10</b><small>ONDAS</small></div><div class="game-tools">${button('1×', 'speed', 'compact')}${button('Ⅱ', 'pause', 'compact')}${button(gameIcon('settings'),'battle-tools','compact battle-tools-open')}</div></header><main class="battle-layout"><section class="battlefield"><div class="battle-caption"><span id="phase-label">PREPARA AS DEFESAS</span><span id="enemy-count">0 inimigos</span></div><div class="canvas-wrap"><canvas id="battle-canvas" tabindex="0" aria-label="Campo de batalha. Toca numa posição marcada com mais para construir."></canvas></div><div class="battle-message" id="announcement" role="status"></div><div id="tutorial"></div><aside id="inspector" class="inspector" hidden></aside></section></main><footer class="battle-footer"><div class="cat-dock" aria-label="Arrasta um gato para construir">${dockMarkup()}</div><div class="ability-bar"><button data-action="skill:yarn" class="ability" title="145 de dano mágico numa área de 110; recarga 38 s">${gameIcon("yarn")}<small id="cd-yarn">Novelos</small></button><button data-action="skill:${state.players[localPlayer].skills[1]}" class="ability">${gameIcon(state.players[localPlayer].skills[1])}<small id="cd-secondary">Pronto</small></button><button data-action="skill:uia" id="uia-button" class="ability legendary-ability" hidden>${gameIcon("uia")}<small id="cd-uia">Uia</small></button></div><div class="next-wave"><button id="wave-preview" data-action="scout" class="scout-button" aria-label="Ver próxima onda e combinações de equipa">${gameIcon("scout")}<small>Espiar</small></button>${button('Iniciar onda <span>▶</span>', 'wave', 'primary')}</div></footer></div><div id="modal-root"></div><div class="rotate-overlay"><span>↻</span><h2>Mais espaço para os bigodes.</h2><p>Roda o dispositivo para jogar na horizontal.</p></div>`;
+    renderer?.dispose();
     renderer = new Renderer(document.querySelector<HTMLCanvasElement>('#battle-canvas')!);
+    upgradeRenderer();
     document.querySelector<HTMLElement>('.battlefield')!.style.setProperty('--battle-bg',`url('${thumbnail(l)}')`);
     selected = null;
     preview = null;
     aim = null;
     aiming = false;
-    document.querySelector('#battle-canvas')!.addEventListener('pointerdown', canvasPointer);
+    document.querySelector('#battle-canvas')!.addEventListener('pointerup', canvasPointer);
     renderInspector();
     updateHud();
     if (state.levelId === 1 && state.mode === 'campaign' && !save.stars[1])
         document.querySelector('#tutorial')!.innerHTML = `<div class="tutorial"><b>A tua primeira muralha</b><p>Arrasta um gato da barra para um +.<br>Larga para construir. Toca no gato para melhorar.<br>Também podes escolher um gato e tocar no +.</p>${button('Já percebi ×', 'tutorial-close', 'text-button')}</div>`;
+}
+/** Swaps the 2D battlefield for the 3D hex battlefield once its models are loaded; the 2D view stays as fallback. */
+function upgradeRenderer() {
+    const flat = renderer, wrap = document.querySelector<HTMLElement>('.canvas-wrap');
+    if (!(flat instanceof Renderer) || !wrap || new URLSearchParams(location.search).has('2d'))
+        return;
+    void import('./td-scene').then(({ TdRenderer }) => {
+        if (renderer !== flat || screen !== 'game')
+            return;
+        const canvas = document.createElement('canvas');
+        canvas.className = 'battle-3d';
+        Object.assign(canvas.style, { position: 'absolute', inset: '0', visibility: 'hidden', touchAction: 'none' });
+        wrap.append(canvas);
+        let td: TdRenderer;
+        const revert = () => { if (renderer === td) { renderer = flat; flat.canvas.style.display = ''; flat.canvas.id = 'battle-canvas'; } td?.dispose(); canvas.remove(); };
+        try { td = new TdRenderer(canvas, revert); }
+        catch { canvas.remove(); return; }
+        void td.ready.then(() => {
+            if (renderer !== flat || screen !== 'game') { td.dispose(); canvas.remove(); return; }
+            flat.canvas.style.display = 'none';
+            flat.canvas.removeAttribute('id');
+            canvas.id = 'battle-canvas';
+            canvas.style.visibility = '';
+            canvas.addEventListener('pointerup', canvasPointer);
+            td.onView = placeInspector;
+            renderer = td;
+            placeInspector();
+        }, () => {});
+    }, () => {});
 }
 function renderInspector(){
  if(!state)return;const el=document.querySelector<HTMLElement>('#inspector');if(!el)return;
@@ -154,12 +189,12 @@ function nearestSpot(clientX: number, clientY: number) {
     const r = renderer.canvas.getBoundingClientRect();
     if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom)
         return null;
-    const p = renderer.point(clientX, clientY), nearest = LEVELS[state.levelId - 1].spots.map((v, i) => ({ i, d: Math.hypot((v.x-p.x)*r.width/W,(v.y-p.y)*r.height/H) })).sort((a, b) => a.d - b.d)[0];
-    return nearest.d < 28 ? nearest.i : null;
+    const view = renderer, nearest = LEVELS[state.levelId - 1].spots.map((v, i) => { const q = view.screen(v); return { i, d: Math.hypot(q.x - clientX, q.y - clientY) }; }).sort((a, b) => a.d - b.d)[0];
+    return nearest.d < 32 ? nearest.i : null;
 }
 function canvasPointer(event: Event) {
     const e = event as PointerEvent;
-    if (!renderer || !state)
+    if (!renderer || !state || ('dragged' in renderer && renderer.dragged))
         return;
     audio.unlock();
     const p = renderer.point(e.clientX, e.clientY);
@@ -192,7 +227,7 @@ function placeInspector() {
         return;
     const r = renderer.canvas.getBoundingClientRect(), fr = field.getBoundingClientRect();
     const pos = selected === null ? { x: W / 2, y: H / 2 } : LEVELS[state.levelId - 1].spots[selected];
-    const x = r.left - fr.left + pos.x * r.width / W, y = r.top - fr.top + pos.y * r.height / H, width = el.offsetWidth, height = Math.min(el.offsetHeight, fr.height - 20);
+    const q = renderer.screen(pos), x = q.x - fr.left, y = q.y - fr.top, width = el.offsetWidth, height = Math.min(el.offsetHeight, fr.height - 20);
     let left = x + 34;
     if (left + width > fr.width - 12)
         left = x - width - 34;
@@ -1017,7 +1052,7 @@ function frame(now: number) {
     requestAnimationFrame(frame);
 }
 app.innerHTML='<main class="loading-screen"><span>✦</span><h1>Muralhas & Bigodes</h1><p>A reunir a Ordem do Novelo…</p></main>';
-void artReady.then(()=>{render();requestAnimationFrame(frame);});
+void artReady.then(()=>{render();requestAnimationFrame(frame);if(DEV_GUEST){chosenLevel=Number(new URLSearchParams(location.search).get('devgame'))||1;startGame();(window as unknown as {__mb:unknown}).__mb={renderer:()=>renderer,state:()=>state,spots:()=>state?LEVELS[state.levelId-1].spots:[]};}});
 if (location.hash.startsWith('#sala=')&&account.user) {
     screens.navigation.coop = 'invite';
     setScreen('coop');

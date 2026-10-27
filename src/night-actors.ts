@@ -22,7 +22,7 @@ const HEROES:Record<NightClass,HeroLook>={
 };
 
 /** Cat ears and tail keep the Ordem do Novelo identity on top of the human adventurer models. */
-function catFeatures(actor:Actor,fur:number){
+export function catFeatures(actor:Actor,fur:number){
  const furMat=new T.MeshStandardMaterial({color:fur,roughness:.8}),inner=new T.MeshStandardMaterial({color:0xd98c96,roughness:.9});actor.materials.push(furMat,inner);
  const ear=new T.ConeGeometry(.2,.42,4),earInner=new T.ConeGeometry(.11,.26,4);
  const head=actor.bone('head');

@@ -53,6 +53,17 @@ export function loadNightAssets():Promise<NightAssets>{
  return pending;
 }
 
+const extraPacks=new Map<string,Promise<void>>();
+/** Loads another environment pack (e.g. the hex battlefield tiles) into the shared prop library. */
+export function loadExtraPack(name:string){
+ let p=extraPacks.get(name);if(p)return p;
+ p=loadNightAssets().then(async assets=>{const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const g=await loader.loadAsync(import.meta.env.BASE_URL+'models/env/'+name+'.glb');for(const child of [...g.scene.children])assets.props.set(child.name,child);});
+ extraPacks.set(name,p);p.catch(()=>extraPacks.delete(name));return p;
+}
+const models=new Map<string,Promise<{scene:T.Object3D;animations:T.AnimationClip[]}>>();
+/** A standalone animated model from public/models/characters (own rig and clips, e.g. the Quaternius dog). */
+export function loadModel(name:string){let p=models.get(name);if(!p){const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);p=loader.loadAsync(import.meta.env.BASE_URL+'models/characters/'+name+'.glb').then(g=>{g.scene.traverse(o=>{if(o instanceof T.Mesh)o.frustumCulled=false;});return {scene:g.scene,animations:g.animations};});models.set(name,p);}return p;}
+
 const fxCache=new Map<string,T.Texture>();
 /** CC0 Kenney particle textures in public/fx (glow, flare, spark, star, slash, magic, rune, ring, smoke, scorch, trace, twirl, fire). */
 export function fxTexture(name:string){let t=fxCache.get(name);if(!t){t=new T.TextureLoader().load(import.meta.env.BASE_URL+'fx/'+name+'.webp');t.colorSpace=T.SRGBColorSpace;fxCache.set(name,t);}return t;}
