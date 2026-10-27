@@ -1,0 +1,67 @@
+/* Gato Nightreign HUD, landscape first (the phone is held sideways).
+   Left thumb: floating joystick anywhere in the lower-left zone. Right thumb: Atacar in the corner with the
+   class skills on an inner arc and learned spells on an outer arc. Frames and bars: Kenney Fantasy UI Borders
+   and UI Pack RPG Expansion (CC0). */
+.night .night-travel{display:none}
+.night .night-move-zone{position:absolute;left:0;bottom:0;width:44%;height:66%;z-index:5;touch-action:none}
+.night .night-move-zone .hunt-stick{position:absolute;left:max(118px,calc(env(safe-area-inset-left) + 104px));top:calc(100% - 104px);bottom:auto;width:104px;height:104px;transform:translate(-50%,-50%);opacity:.5;transition:opacity .15s;pointer-events:none}
+.night .night-move-zone .hunt-stick.active{opacity:1}
+.night .night-move-zone .hunt-stick.running .hunt-stick-ring{border-color:#ffd27acc;box-shadow:0 0 16px #ffc45a66}
+.night .night-move-zone .hunt-stick small{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px}
+
+/* Right thumb arc. Positions are centres relative to a 305×262 box anchored bottom-right; Atacar sits at (250, 52). */
+@media(orientation:landscape){
+ .night .hunt-actions{position:absolute;display:block;width:305px;height:262px;right:max(10px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));transform:none;z-index:7;pointer-events:none}
+ .night .hunt-actions button{position:absolute;pointer-events:auto;width:62px;height:62px;min-width:62px;min-height:62px;margin:0}
+ .night .hunt-actions .hunt-attack{left:211px;bottom:13px;width:78px;height:78px;min-width:78px;border-radius:50%}
+ .night .hunt-actions .hunt-power{left:107px;bottom:21px}
+ .night .hunt-actions .night-defense{left:125px;bottom:82px}
+ .night .hunt-actions .night-control{left:173px;bottom:123px}
+ .night .hunt-actions .hunt-ultimate{left:236px;bottom:132px}
+ /* Icon-only skills: the ring shows the cooldown; only seconds or the Especial charge appear inside. */
+ .night .hunt-actions button small{position:absolute;left:50%;bottom:4px;top:auto;transform:translateX(-50%);margin:0;font-size:10px;font-weight:800;max-width:56px;overflow:hidden;white-space:nowrap;text-shadow:0 1px 3px #000,0 0 2px #000}
+ .night .hunt-actions button:not(:disabled):not(.hunt-ultimate) small,.night .hunt-actions .hunt-attack small{display:none}
+ .night .night-spells button small{display:none}
+ .night .night-spells button:disabled small{display:block;bottom:auto;top:50%;transform:translate(-50%,-50%);font:800 12px system-ui;color:#fff;text-shadow:0 1px 3px #000}
+ .night .hunt-actions .night-jump{display:none}
+ /* Learned spells: outer arc, filled in order through --slot. */
+ .night .night-spells{position:absolute;display:block;width:305px;height:262px;right:max(10px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom));z-index:7;pointer-events:none;flex-direction:initial}
+ .night .night-spells button{position:absolute;width:48px;height:48px;min-width:48px;min-height:48px;padding:5px}
+ .night .night-spells button svg.gi{width:22px;height:22px}
+ .night .night-spells button small{bottom:-12px;font-size:8px}
+ .night .night-spells button{left:var(--sx,47.8px);bottom:var(--sy,53px)}
+ /* Potion and jump sit beside the life bar, within reach of the left thumb. */
+ .night .night-potion{display:flex}
+ .night .night-potion{position:absolute;z-index:7;left:calc(50% - 232px);bottom:max(14px,env(safe-area-inset-bottom));width:54px;height:54px;min-height:54px;border-radius:50%;padding:6px;flex-direction:column;align-items:center;justify-content:center;border:2px solid #7ff0c0aa;background:radial-gradient(circle at 35% 25%,#2f5a4c,#0f2420 75%);color:#9ff5d0;box-shadow:0 0 12px #3fbf8a44}
+ .night .night-potion small{position:absolute;top:100%;font:700 9px system-ui;color:#e8efe8;margin-top:2px;white-space:nowrap}
+ .night .night-potion svg.gi{width:26px;height:26px}
+ /* Top bar: minimap left, title centre, timer and three small tools right. */
+ .night .night-tools{top:max(50px,calc(env(safe-area-inset-top) + 44px));right:max(10px,env(safe-area-inset-right));flex-direction:row;gap:6px}
+ .night .night-tools button{min-width:44px;width:44px;height:44px;min-height:44px;padding:4px;font-size:16px;line-height:1}
+ .night .night-tools button small{display:block;font-size:7px;letter-spacing:0}
+ .night .night-party{left:max(12px,env(safe-area-inset-left));top:max(142px,calc(env(safe-area-inset-top) + 134px))}
+ .night .night-party span{font-size:10px;padding:2px 7px;min-width:96px}
+ /* Life, stamina and experience: Kenney RPG bars, centred at the bottom. */
+ .night .hunt-player{left:50%;transform:translateX(-50%);bottom:max(10px,env(safe-area-inset-bottom));width:min(300px,34vw)}
+}
+.night .hunt-hp,.night .hunt-stamina,.night .night-xp{background:none;border:0;border-image:url('/ui/bar-back.png') 0 9 fill / 0 9px stretch;box-shadow:none;overflow:visible}
+.night .hunt-hp{height:16px}.night .hunt-stamina{height:9px;margin-top:3px}.night .night-xp{height:6px;margin-top:3px}
+.night .hunt-hp i,.night .hunt-stamina i,.night .night-xp i{background:none;border-image:url('/ui/bar-red.png') 0 9 fill / 0 9px stretch;height:100%;min-width:18px;display:block;transition:width .2s}
+.night .hunt-stamina i{border-image-source:url('/ui/bar-green.png')}.night .night-xp i{border-image-source:url('/ui/bar-yellow.png')}
+/* Panels and menu buttons: gold Fantasy UI Borders frame. */
+.night .night-panel-card{border:14px solid transparent;border-image:url('/ui/frame-panel.png') 16 / 14px stretch;background:#0c151dee padding-box;box-shadow:0 10px 40px #000c}
+.night .night-panel-card button,.night .night-menu button,.night .night-room button{border:10px solid transparent;border-image:url('/ui/frame-button.png') 16 / 10px stretch;background:linear-gradient(160deg,#243846,#101d27) padding-box;border-radius:0}
+.night .night-panel-card button.primary,.night .night-menu button.primary{background:linear-gradient(160deg,#7a5a24,#3d2b10) padding-box;color:#fff1cf}
+.night .night-panel-card button:disabled{opacity:.5}
+
+.night-panel[data-overlay="map"] .night-panel-card{padding:6px}
+.night-map-screen .night-map-canvas{width:min(84dvh,62vw)}
+.night-map-screen .night-choice-grid{grid-template-columns:1fr 1fr;gap:5px}
+.night-map-screen .night-choice-grid button{min-height:34px;padding:2px 6px;font-size:12px;border-width:7px}
+.night-map-legend{gap:3px 8px}.night-map-legend li{font-size:11px}
+/* Portrait during a run: ask to rotate instead of squeezing the combat HUD. */
+.night .night-rotate{display:none}
+@media(orientation:portrait){.night .night-rotate{display:flex;position:absolute;inset:0;z-index:30;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:30px;text-align:center;background:#071017ee;color:#f3e2b8}
+ .night .night-rotate svg.gi{width:64px;height:64px;transform:rotate(90deg);animation:night-rotate 1.6s ease-in-out infinite}
+ .night .night-rotate strong{font:700 22px Georgia,serif}.night .night-rotate span{font-size:14px;color:#c9d2cc;max-width:260px}}
+@keyframes night-rotate{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(90deg)}}

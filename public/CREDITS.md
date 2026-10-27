@@ -5,6 +5,9 @@
 - **Nature Kit** — Kenney (www.kenney.nl). Licença em `/models/LICENSE-kenney-nature-kit.txt`.
 - A variante carmesim da Carmesim é uma recoloração da textura da Rogue (KayKit), feita por `scripts/build-models.mjs`.
 
+## Lua (domínio público)
+- Mapa de cor da Lua LRO — NASA Scientific Visualization Studio (svs.gsfc.nasa.gov/4720), domínio público.
+
 ## Efeitos de partículas (CC0)
 - **Particle Pack** — Kenney (www.kenney.nl). Licença em `/fx/LICENSE-kenney-particle-pack.txt`.
 

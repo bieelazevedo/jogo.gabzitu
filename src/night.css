@@ -31,3 +31,28 @@
 @keyframes night-dodge-tap{0%{box-shadow:0 0 0 0 #bfe8ffcc}100%{box-shadow:0 0 0 22px #bfe8ff00}}
 .night .hunt-stick small{white-space:nowrap}.night .hunt-stick small:after{content:' · 2× esquiva';opacity:.7;font-size:.85em;letter-spacing:0}
 .night .night-credits{margin-top:6px;font-size:12px;color:#cfd6cf;max-width:520px}.night .night-credits summary{cursor:pointer;color:#f3d79a;min-height:32px;display:inline-flex;align-items:center}.night .night-credits p{margin:4px 0 0;line-height:1.4}
+/* Minimap: the rendered world seen from above; tap to open the full map. Replaces the header menu button. */
+.night .night-game-header>button[data-night="pause"]{display:none}
+.night .night-minimap{position:absolute;left:max(12px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));z-index:7;width:96px;height:96px;min-height:96px;padding:0;border-radius:50%;overflow:hidden;border:2px solid #e2c98acc;background:#0d1a22;box-shadow:0 4px 14px #0008,inset 0 0 18px #000a}
+.night .night-minimap canvas{width:100%;height:100%;display:block;border-radius:50%}
+.night .night-minimap i{position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 1px #0006,inset 0 0 22px #0009;pointer-events:none}
+.night .night-minimap:after{content:'N';position:absolute;top:2px;left:50%;transform:translateX(-50%);font:700 10px system-ui;color:#f3e2b8;text-shadow:0 1px 2px #000}
+.night .night-party{top:max(112px,calc(env(safe-area-inset-top) + 104px));gap:3px}
+.night .night-party span{font-size:11px;padding:3px 8px}
+.night-map-canvas{width:min(78vh,92vw,560px);height:auto;aspect-ratio:1;border-radius:14px;border:2px solid #e2c98a66;box-shadow:0 6px 24px #000a}
+@media(orientation:portrait){.night .night-minimap{width:84px;height:84px;min-height:84px;top:max(64px,calc(env(safe-area-inset-top) + 56px))}.night .night-party{top:max(156px,calc(env(safe-area-inset-top) + 150px))}}
+/* Full-screen map: the photograph on the left, legend and travel on the right (stacked in portrait). */
+.night-panel[data-overlay="map"] .night-panel-card{width:min(96vw,980px);max-height:94dvh;padding:12px}
+.night-map-screen{display:grid;grid-template-columns:auto minmax(200px,1fr);gap:14px;align-items:start}
+.night-map-screen .night-map-canvas{width:min(80dvh,60vw);height:auto;aspect-ratio:1;cursor:pointer}
+.night-map-screen aside h2{margin:2px 0 8px;font-size:20px}
+.night-map-legend{list-style:none;margin:0 0 8px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+.night-map-legend li{display:flex;align-items:center;gap:6px;font-size:12px;color:#d9dccf}
+.night-map-legend svg.gi{width:20px;height:20px;color:#f3e2b8}
+.night-map-screen aside p{font-size:12px;margin:0 0 8px;color:#bfc9c4}
+.night-map-screen .night-choice-grid{grid-template-columns:1fr;gap:6px}
+.night-map-screen .night-choice-grid button{min-height:40px;padding:6px 10px;font-size:13px}
+@media(orientation:portrait){.night-map-screen{grid-template-columns:1fr}.night-map-screen .night-map-canvas{width:min(92vw,60dvh)}}
+.night .night-minimap{width:124px;height:124px;min-height:124px}
+@media(orientation:portrait){.night .night-minimap{width:110px;height:110px;min-height:110px}.night .night-party{top:max(180px,calc(env(safe-area-inset-top) + 174px))}}
+.night .night-party{top:max(140px,calc(env(safe-area-inset-top) + 132px))}

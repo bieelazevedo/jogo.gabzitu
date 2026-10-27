@@ -13,7 +13,8 @@ const facing=(x:number,z:number,tx=0,tz=0)=>Math.atan2(tx-x,tz-z);
  * so the whole world costs a few dozen draw calls. Solid props sit on NIGHT_OBSTACLES so the
  * visuals match the host simulation's collisions; everything else stays clear of camps, paths and portals.
  */
-export function dressNightWorld(assets:NightAssets,root:T.Object3D){
+export const NIGHT_PATHS=[[0,27,-29,14],[-29,14,-24,-25],[-24,-25,25,-27],[25,-27,28,8],[28,8,0,27],[0,27,-24,-25]];
+export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.InstancedMesh[];update:(time:number)=>void;dispose:()=>void}{
  const meshes:T.InstancedMesh[]=[],m=new T.Matrix4(),q=new T.Quaternion(),up=new T.Vector3(0,1,0);
  const scatter=(name:string,places:Place[],scale=1)=>{
   const parts=assets.parts(name);if(!parts.length||!places.length)return;
@@ -22,6 +23,30 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D){
    mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();mesh.computeBoundingBox();root.add(mesh);meshes.push(mesh);}
  };
  const obstacle=(x:number,z:number)=>NIGHT_OBSTACLES.find(o=>Math.hypot(o.x-x,o.z-z)<.5)!;
+ const owned:T.Material[]=[],sprites:{sprite:T.Sprite|T.Mesh;update:(t:number)=>void}[]=[];
+ const glowSprite=(map:string,color:number,x:number,y:number,z:number,size:number,opacity=.9)=>{const m=new T.SpriteMaterial({map:fxTexture(map),color,transparent:true,opacity,depthWrite:false,blending:T.AdditiveBlending});owned.push(m);const sp=new T.Sprite(m);sp.position.set(x,y,z);sp.scale.setScalar(size);root.add(sp);return sp;};
+ const decalPlane=(map:string,color:number,x:number,y:number,z:number,size:number,vertical=false)=>{const m=new T.MeshBasicMaterial({map:fxTexture(map),color,transparent:true,opacity:.85,depthWrite:false,side:T.DoubleSide,blending:T.AdditiveBlending});owned.push(m);const mesh=new T.Mesh(new T.PlaneGeometry(size,size),m);mesh.position.set(x,y,z);if(!vertical)mesh.rotation.x=-Math.PI/2;root.add(mesh);return mesh;};
+
+ // Ground: KayKit hexagon grass tiles over the whole map, tinted per district through instance colours.
+ {const parts=assets.parts('hex_grass'),S=3.2,W=2*S,R=1.15*S,places:{x:number;z:number;c:T.Color}[]=[];
+  const tint=(x:number,z:number)=>{if(Math.hypot(x,z-27)<11)return 0xb4bca8;if(Math.hypot(x+24,z+27)<20)return 0x8c8aa2;if(Math.hypot(x-25,z+29)<18)return 0xaaa486;if(Math.hypot(x-28,z-9)<19)return 0xa6a888;if(x<-8&&z>-6)return 0x6e8c62;return 0x8fa27c;};
+  for(let row=0;row*1.5*R<120;row++)for(let col=0;col*W<124;col++){const x=-62+col*W+(row%2)*S,z=-60+row*1.5*R;places.push({x,z,c:new T.Color(tint(x,z)).multiplyScalar(.92+hash(row*31+col)*.16)});}
+  for(const part of parts){const mesh=new T.InstancedMesh(part.geometry,part.material,places.length);places.forEach((p,i)=>{m.compose(new T.Vector3(p.x,0,p.z),q.identity(),new T.Vector3(S,S,S));mesh.setMatrixAt(i,m.multiply(part.matrix));mesh.setColorAt(i,p.c);});mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);}}
+ // Velvet crypts stand on bare earth (Halloween Bits dirt tiles).
+ {const dirt:Place[]=[];for(let x=-42;x<=-14;x+=4.6)for(let z=-43;z<=-17;z+=4.6)if(Math.hypot(x+27,z+30)<15)dirt.push([x,z,Math.floor(hash(x*z)*4)*Math.PI/2,1.15,.01]);scatter('floor_dirt',dirt);}
+ // Stone paths (Halloween Bits) follow the routes between districts.
+ {const variants:Record<string,Place[]>={path_A:[],path_B:[],path_C:[],path_D:[]},keys=Object.keys(variants);let n=0;
+  for(const [x,z,tx,tz] of NIGHT_PATHS){const len=Math.hypot(tx-x,tz-z),nx=-(tz-z)/len,nz=(tx-x)/len;for(let d=0;d<len;d+=1.9)for(const side of [-1,1]){const t=d/len;variants[keys[Math.floor(hash(n++)*4)]].push([x+(tx-x)*t+nx*side*.95,z+(tz-z)*t+nz*side*.95,Math.floor(hash(n*7)*4)*Math.PI/2,1.05,.005]);}}
+  for(const [k,v] of Object.entries(variants))scatter(k,v);}
+ // Sanctuary beacon: a pulsing light above the central column instead of a polygon crystal.
+ const beacon=glowSprite('glow',0x7fe9ff,0,3.4,27,3.2),flare=glowSprite('flare',0xbff6ff,0,3.4,27,2.4),halo=glowSprite('light',0x5fd0e8,0,3.4,27,6,.35);
+ sprites.push({sprite:beacon,update:t=>{beacon.scale.setScalar(3+Math.sin(t*2)*.3);(flare.material as T.SpriteMaterial).rotation=t*.6;halo.scale.setScalar(6+Math.sin(t*1.3)*.6);}});
+ // Broken crown landmark: turning rune discs and a golden core above the colonnade.
+ const crown=new T.Group();crown.position.set(25,6,-29);root.add(crown);const discs=[0,1,2].map(i=>{const d=decalPlane(i===1?'rune':'magic',i===1?0x7fe9ff:0xf3cd8a,0,0,0,6+i*1.2,true);d.removeFromParent();crown.add(d);d.rotation.set(.6+i*.65,i*.8,0);return d;});const core=glowSprite('glow',0xffd08a,25,6,-29,3);
+ sprites.push({sprite:core,update:t=>{crown.rotation.y=t*.13;discs.forEach((d,i)=>{d.rotation.z=t*(.2+i*.1)*(i%2?-1:1);});core.scale.setScalar(2.8+Math.sin(t*1.7)*.3);}});
+ // Moon: NASA LRO colour map (public domain) on a sphere, with a soft halo.
+ {const m=new T.MeshBasicMaterial({map:fxTexture('moon'),color:0xdde8ff});owned.push(m);const moon=new T.Mesh(new T.SphereGeometry(4,32,20),m);moon.position.set(-15,26,-62);moon.rotation.y=2.2;root.add(moon);glowSprite('glow',0x9fc4ff,-15,26,-62.5,22,.35);}
+ 
 
  // Sanctuary: tiled court, decorated pillars, an entrance arch and candle-lit benches.
  const tiles:Place[]=[];for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)tiles.push([i*4,27+j*4,0,1,-.06]);
@@ -48,10 +73,10 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D){
  scatter('stump_oldTall',[[-14,16,1],[-33,4,2],[-40,25,3]],3.4);
  scatter('statue_head',[[-31,17,2.4,1.1]],NATURE);scatter('statue_ring',[[-22,27,.6]],NATURE);
  // Undergrowth everywhere outside paths, camps, portals and springs.
- const PATHS=[[0,27,-29,14],[-29,14,-24,-25],[-24,-25,25,-27],[25,-27,28,8],[28,8,0,27],[0,27,-24,-25]];
+ const PATHS=NIGHT_PATHS;
  const segment=(x:number,z:number,[ax,az,bx,bz]:number[])=>{const dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));return Math.hypot(x-ax-t*dx,z-az-t*dz);};
  const open=(x:number,z:number)=>PATHS.every(p=>segment(x,z,p)>3)&&NIGHT_CAMPS.every(c=>Math.hypot(c.x-x,c.z-z)>5)&&[...NIGHT_PORTALS,...NIGHT_SPRINGS].every(p=>Math.hypot(p.x-x,p.z-z)>3.5)&&NIGHT_OBSTACLES.every(o=>Math.hypot(o.x-x,o.z-z)>o.r+1)&&Math.hypot(x,z-27)>9;
- const cover:Record<string,Place[]>={plant_bushDetailed:[],plant_bushLarge:[],grass:[],flower_purpleA:[],flower_redA:[],flower_yellowA:[],mushroom_redGroup:[],mushroom_tanTall:[],rock_largeA:[]};
+ const cover:Record<string,Place[]>={plant_bushDetailed:[],plant_bushLarge:[],flower_purpleA:[],flower_redA:[],flower_yellowA:[],mushroom_redGroup:[],mushroom_tanTall:[]};
  const kinds=Object.keys(cover);for(let i=0;i<520;i++){const x=(hash(i*3.1)-.5)*92,z=(hash(i*7.7+1)-.5)*92;if(!open(x,z))continue;const forest=x<-8&&z>-6,kind=kinds[Math.floor(hash(i*13.3)*kinds.length)];if(!forest&&/mushroom/.test(kind))continue;cover[kind].push([x,z,hash(i)*6.3,.8+hash(i*5)*.6]);}
  // Ground cover reads at roughly knee height; bushes a little taller.
  const coverScale:Record<string,number>={plant_bushDetailed:2.6,plant_bushLarge:2.8,grass:2.2,flower_purpleA:2.4,flower_redA:2.4,flower_yellowA:2.4,mushroom_redGroup:3,mushroom_tanTall:3.2,rock_largeA:2.2};
@@ -117,7 +142,7 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D){
  scatter('tree_pineTallA_detailed',outer,NATURE*1.2);scatter('tree_pineRoundE',clumps.filter((_,i)=>i%2===0),NATURE*1.4);scatter('tree_fat_darkh',clumps.filter((_,i)=>i%2===1),NATURE*1.5);
  const mountains:Place[]=[];for(let i=0;i<14;i++){const a=i/14*Math.PI*2,r=68+hash(i)*8;mountains.push([Math.sin(a)*r,Math.cos(a)*r,a,1+hash(i+9)*.6,-1]);}
  scatter('mountain_A_grass_trees',mountains.filter((_,i)=>i%3===0),VILLAGE*2.2);scatter('mountain_B_grass_trees',mountains.filter((_,i)=>i%3===1),VILLAGE*2.2);scatter('mountain_C',mountains.filter((_,i)=>i%3===2),VILLAGE*2.4);
- return meshes;
+ return {meshes,update:t=>sprites.forEach(s=>s.update(t)),dispose:()=>{owned.forEach(m=>m.dispose());root.traverse(o=>{if(o instanceof T.Mesh&&(o.geometry.type==='PlaneGeometry'||o.geometry.type==='SphereGeometry'))o.geometry.dispose();});}};
 }
 
 export type NightArena={group:T.Group;update:(time:number,dt:number)=>void;fog:number;sky:number;dispose:()=>void};
@@ -132,12 +157,13 @@ export function dressNightArena(assets:NightAssets,root:T.Object3D,stage=1):Nigh
  const inward=(a:number)=>a+Math.PI;
  const decal=(map:string,color:number,size:number,opacity:number,additive=true,y=.03)=>{const m=new T.MeshBasicMaterial({map:fxTexture(map),color,transparent:true,opacity,depthWrite:false,side:T.DoubleSide,blending:additive?T.AdditiveBlending:T.NormalBlending});owned.push(m);const mesh=new T.Mesh(new T.PlaneGeometry(size,size),m);mesh.rotation.x=-Math.PI/2;mesh.position.y=y;group.add(mesh);return mesh;};
  // Floor: 4 m dungeon tiles covering the fighting disc, rubble tiles for the ruined courtyard.
- const tile=stage===2?'floor_tile_large_rocks':'floor_tile_large';const tiles:[number,number][]=[];for(let x=-16;x<=16;x+=4)for(let z=-16;z<=16;z+=4)if(Math.hypot(x,z)<17)tiles.push([x,z]);
- for(const part of assets.parts(tile)){const mesh=new T.InstancedMesh(part.geometry,part.material,tiles.length),m=new T.Matrix4();tiles.forEach(([x,z],i)=>{m.makeTranslation(x,-.06,z);mesh.setMatrixAt(i,m.multiply(part.matrix));});mesh.computeBoundingSphere();group.add(mesh);}
+ const tile='floor_tile_large',floorTint=new T.Color([0x8f96a3,0x8a7a70,0x8780a6][stage-1]);const tiles:[number,number][]=[];for(let x=-16;x<=16;x+=4)for(let z=-16;z<=16;z+=4)if(Math.hypot(x,z)<17)tiles.push([x,z]);
+ for(const part of assets.parts(tile)){const mesh=new T.InstancedMesh(part.geometry,part.material,tiles.length),m=new T.Matrix4();tiles.forEach(([x,z],i)=>{m.makeTranslation(x,-.06,z);mesh.setMatrixAt(i,m.multiply(part.matrix));mesh.setColorAt(i,floorTint.clone().multiplyScalar(.9+hash(x*7+z)*.2));});mesh.computeBoundingSphere();group.add(mesh);}
  // The edge of the fight is a glowing ring so players read the limit without walls in the way.
  decal('ring',stage===3?0xb98cff:0xf3cd8a,30,.5);
- const animated:{update:(t:number,dt:number)=>void}[]=[];
- const flames=(x:number,y:number,z:number,color=0xff8a3c,size=1.1)=>{const m=new T.SpriteMaterial({map:fxTexture('fire'),color,transparent:true,depthWrite:false,blending:T.AdditiveBlending});owned.push(m);const f=new T.Sprite(m);f.position.set(x,y,z);f.scale.setScalar(size);group.add(f);const light=new T.PointLight(color,4,9,1.8);light.position.set(x,y+.3,z);group.add(light);const seed=Math.random()*10;animated.push({update:t=>{f.scale.set(size*(.9+Math.sin(t*9+seed)*.1),size*(1.1+Math.sin(t*13+seed)*.15),1);light.intensity=3.5+Math.sin(t*11+seed)*.8;}});};
+ const animated:{update:(t:number,dt:number)=>void}[]=[];let lights=0;
+ const flames=(x:number,y:number,z:number,color=0xff8a3c,size=1.1)=>{const m=new T.SpriteMaterial({map:fxTexture('fire'),color,transparent:true,depthWrite:false,blending:T.AdditiveBlending});owned.push(m);const f=new T.Sprite(m);f.position.set(x,y,z);f.scale.setScalar(size);group.add(f);// Only a few flames cast real light: point lights are expensive on phones.
+  const light=lights++<3?new T.PointLight(color,4,9,1.8):null;if(light){light.position.set(x,y+.3,z);group.add(light);}const seed=Math.random()*10;animated.push({update:t=>{f.scale.set(size*(.9+Math.sin(t*9+seed)*.1),size*(1.1+Math.sin(t*13+seed)*.15),1);if(light)light.intensity=3.5+Math.sin(t*11+seed)*.8;}});};
  if(stage===1){// Claustro da Lua: gothic cloister of arches, graves and candles under the moon.
   ring(10,16.5,(x,z,a,i)=>{add(i%2?'arch':'pillar',x,z,inward(a),i%2?1.05:1);});
   ring(10,18.5,(x,z,a,i)=>{add(['grave_A','gravestone','grave_B','gravemarker_A'][i%4],x,z,inward(a),1);},.31);
@@ -147,8 +173,8 @@ export function dressNightArena(assets:NightAssets,root:T.Object3D,stage=1):Nigh
   ring(4,16,(x,z,a)=>{add('post_lantern',x,z,inward(a),1.1);},Math.PI/4);
   decal('magic',0x9fd8ff,10,.18);
  }else if(stage===2){// Pátio das Cinzas: a burnt courtyard with collapsed houses, braziers and drifting embers.
-  ring(7,21,(x,z,a,i)=>add(i%2?'building_destroyed':'building_home_B_red',x,z,inward(a),VILLAGE*1.2));
-  ring(12,16.6,(x,z,a,i)=>{if(i%3===1)return;add('wall_straight',x,z,inward(a)+Math.PI/2,VILLAGE*.9);});
+  ring(7,27,(x,z,a,i)=>add(i%2?'building_destroyed':'building_home_B_red',x,z,inward(a),VILLAGE*1.2));
+  ring(12,21.5,(x,z,a,i)=>{if(i%3===1)return;add('wall_straight',x,z,inward(a)+Math.PI/2,VILLAGE*.8);});
   ring(6,15.2,(x,z,a)=>{add('barrel_large',x,z,a,.55);flames(x,1.6,z);});
   for(let i=0;i<7;i++){const a=i*2.1,r=3+i%3*3.5;decal('scorch',0x1a1410,3+i%3,.75,false,.035+i*.002).position.set(Math.sin(a)*r,.035+i*.002,Math.cos(a)*r);}
   add('crates_stacked',-17,9,.6,.9);add('keg_decorated',16,-10,2,.8);add('sword_shield',12,13,2.2,.9,.4);add('sword_shield',-13,-12,5,.9,.4);

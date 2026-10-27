@@ -26,7 +26,6 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",
-    "nipplejs": "1.0.4",
     "three": "0.180.0"
   }
 }

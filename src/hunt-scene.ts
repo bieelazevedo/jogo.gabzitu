@@ -20,7 +20,7 @@ export class HuntScene {
  readonly scene=new T.Scene();readonly camera=new T.PerspectiveCamera(43,1,.1,160);
  private materials:T.Material[]=[];private geometries:T.BufferGeometry[]=[];private textures:T.Texture[]=[];
  private nightEffects?:NightEffects;private nightBeacon?:T.Group;private night?:NightState;private world?:NightWorld;private arenaObjects:T.Object3D[]=[];private classKey="";private orbit=0;private zoomLevel=1;private elevation=.42;private nightStage=0;
- private heroModels:HeroActor[]=[];private bossModel?:BossActor;private bossForm=0;private assetWait=0;private hitStop=0;private arena?:NightArena;private arenaFloor:T.Material[]=[];private hemi!:T.HemisphereLight;private key!:T.DirectionalLight;private rim!:T.DirectionalLight;private loading?:HTMLElement;
+ private heroModels:HeroActor[]=[];private bossModel?:BossActor;private bossForm=0;private assetWait=0;private hitStop=0;private arena?:NightArena;private mapImage?:HTMLCanvasElement;private arenaFloor:T.Material[]=[];private hemi!:T.HemisphereLight;private key!:T.DirectionalLight;private rim!:T.DirectionalLight;private loading?:HTMLElement;
  private heroes:Rig[]=[];private boss!:Rig;private warning!:T.Mesh;private boundary!:T.Mesh;
  private projectileMeshes=new Map<number,T.Group>();private effects:{mesh:T.Object3D;age:number;life:number;kind:string;velocity:T.Vector3}[]=[];
  private labels:{element:HTMLElement;x:number;z:number;age:number;life:number}[]=[];
@@ -136,6 +136,23 @@ export class HuntScene {
   if(b.attack===4){this.warning.position.set((b.x+b.tx)/2,.04,(b.z+b.tz)/2);this.warning.rotation.z=Math.atan2(b.tx-b.x,b.tz-b.z);}
   const m=this.warning.material as T.MeshBasicMaterial,fill=1-b.timer/b.total;m.opacity=.3+fill*.5+(fill>.8?Math.sin(time*40)*.2:Math.sin(time*17)*.05);m.map=key===4?fxTexture('trace'):fxTexture('magic');m.color.setHex(b.attack===3?0x9677ff:0xff6650);
  }
+ /**
+  * Top-down photograph of the rendered world (models, paths, districts) used as the map and minimap background.
+  * Rendered once with an orthographic camera; covers x,z in [-54, 54], north (−z) at the top.
+  */
+ worldMap(){
+  if(this.mapImage||!this.world||!nightAssets())return this.mapImage;
+  const size=512,rt=new T.WebGLRenderTarget(size,size);rt.texture.colorSpace=T.SRGBColorSpace;
+  const camera=new T.OrthographicCamera(-54,54,54,-54,1,300);camera.position.set(0,150,0);camera.up.set(0,0,-1);camera.lookAt(0,0,0);
+  const hidden=[...this.scene.children.filter(o=>o.visible&&o!==this.world!.root&&!(o instanceof T.Light)),...this.world.transient()];hidden.forEach(o=>o.visible=false);const fog=this.scene.fog;this.scene.fog=null;const exposure=this.renderer.toneMappingExposure;this.renderer.toneMappingExposure=1.3;
+  // Neutral daylight for the map photo: the blue night fill turns foliage cyan from above.
+  const hemi=[this.hemi.color.getHex(),this.hemi.intensity],key=[this.key.color.getHex(),this.key.intensity];this.hemi.color.setHex(0xffffff);this.hemi.intensity=2.2;this.key.color.setHex(0xfff4e0);this.key.intensity=2.4;
+  this.renderer.setRenderTarget(rt);this.renderer.render(this.scene,camera);const pixels=new Uint8Array(size*size*4);this.renderer.readRenderTargetPixels(rt,0,0,size,size,pixels);this.renderer.setRenderTarget(null);
+  hidden.forEach(o=>o.visible=true);this.scene.fog=fog;this.renderer.toneMappingExposure=exposure;this.hemi.color.setHex(hemi[0]);this.hemi.intensity=hemi[1];this.key.color.setHex(key[0]);this.key.intensity=key[1];rt.dispose();
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=size;const c=canvas.getContext('2d')!,image=c.createImageData(size,size);
+  for(let y=0;y<size;y++)image.data.set(pixels.subarray((size-1-y)*size*4,(size-y)*size*4),y*size*4);c.putImageData(image,0,0);
+  this.mapImage=canvas;return canvas;
+ }
  movementHeading(){const e=this.camera.matrixWorld.elements;return Math.atan2(e[8],e[10]);}
  updateNight(s:NightState,dt:number,local:number,yaw=0,zoom=1,pitch=.42){
   this.local=local;this.night=s;this.orbit=yaw;this.zoomLevel=zoom;this.elevation=pitch;
@@ -144,6 +161,8 @@ export class HuntScene {
   if(!this.world){this.nightEffects=new NightEffects();this.scene.add(this.nightEffects.root);this.world=new NightWorld(nightAssets());this.scene.add(this.world.root);this.nightBeacon=this.pivot(this.scene);const beaconRing=this.ring(this.nightBeacon,this.gold,1.3,.05,0,.15);beaconRing.rotation.x=Math.PI/2;const tip=this.add(new T.ConeGeometry(.3,.6,4),this.cyan,this.nightBeacon,0,3,0);tip.rotation.z=Math.PI;this.arenaObjects.forEach(o=>o.scale.multiplyScalar(1.12));
    // With models, the primitive pillars and backdrop give way to KayKit architecture; the engraved floor stays.
    const assets=nightAssets();if(assets){
+    // Arena moon: NASA LRO colour map (public domain).
+    for(const o of this.arenaObjects)if(o instanceof T.Mesh&&o.material instanceof T.MeshBasicMaterial&&o.material.color.getHex()===0xb6e4eb){o.material.map=fxTexture('moon');o.material.color.setHex(0xdde8ff);o.material.needsUpdate=true;}
     // Textured models read better under a cooler moon key and a softer sky fill than flat-shaded primitives.
     this.hemi.intensity=1.5;this.hemi.color.setHex(0x9fc4ff);this.hemi.groundColor.setHex(0x2a2238);this.key.color.setHex(0xc9dcff);this.key.intensity=2.6;this.key.position.set(-10,16,6);this.rim.color.setHex(0xffa56b);this.rim.intensity=1.6;this.renderer.toneMappingExposure=1.1;
 this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)||o.material instanceof T.MeshBasicMaterial&&!this.arenaFloor.includes(o.material);if(!keep)o.removeFromParent();return keep;});}}
@@ -182,6 +201,8 @@ this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)
   const local=s.players[this.local],b=s.boss;const centre=new T.Vector3((local.x+b.x)*.3,0,(local.z+b.z)*.3);if(!this.night)this.target.lerp(centre,Math.min(1,dt*3));const portrait=this.aspect<1;const spread=Math.hypot(local.x-b.x,local.z-b.z);const distance=portrait?32:19+Math.max(0,spread-7)*.4;
   if(this.night){const rig=this.heroes[this.local],focus=new T.Vector3(rig?.root.position.x??local.x,0,rig?.root.position.z??local.z);if(this.target.distanceTo(focus)>20)this.target.copy(focus);else this.target.lerp(focus,1-Math.exp(-18*dt));}
   let zoom=this.night?(portrait?9.2:7.4)*this.zoomLevel:distance;if(this.night&&this.night.phase!=='boss')zoom=nightBoom(this.target.x,this.target.z,this.orbit,zoom,NIGHT_OBSTACLES);
+  // In boss arenas the boom shortens near the edge so the camera never enters the surrounding scenery.
+  if(this.night&&this.night.phase!=='explore'){for(let k=0;k<8&&Math.hypot(this.target.x+Math.sin(this.orbit)*zoom,this.target.z+Math.cos(this.orbit)*zoom)>15.5;k++)zoom*=.85;}
   const destination=this.night?new T.Vector3(this.target.x+Math.sin(this.orbit)*zoom,1.65+zoom*Math.tan(this.elevation),this.target.z+Math.cos(this.orbit)*zoom):new T.Vector3(this.target.x,distance*.8,this.target.z+distance);
   if(this.night&&this.camera.position.distanceTo(destination)>25)this.camera.position.copy(destination);else this.camera.position.lerp(destination,1-Math.exp(-(this.night?22:3)*dt));this.shake=Math.max(0,this.shake-dt);if(this.shake>0){this.camera.position.x+=Math.sin(time*110)*this.shake;this.camera.position.y+=Math.cos(time*90)*this.shake;}
   this.camera.lookAt(this.target.x,this.night?1.65:.6,this.target.z);this.boundary.material=this.cyan;this.cyan.emissiveIntensity=.65+Math.sin(time*2)*.12;
