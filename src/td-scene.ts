@@ -21,17 +21,22 @@ const world=(p:Point)=>simToWorld(p);
 
 /** Road tiles of the KayKit hexagon pack and the hex edges each one joins (E=0, counter-clockwise). */
 const ROAD_TILES:[string,number[]][]=[['hex_road_A',[0,3]],['hex_road_B',[3,1]],['hex_road_C',[3,2]],['hex_road_D',[3,1,5]],['hex_road_E',[3,0,1]],['hex_road_F',[3,0,5]],['hex_road_G',[3,2,4]],['hex_road_M',[3]]];
+/** River tiles share the road layout: A straight, B gentle bend, C sharp bend. */
+const RIVER_TILES:[string,number[]][]=[['hex_river_A',[0,3]],['hex_river_B',[3,1]],['hex_river_C',[3,2]],['hex_river_A',[3]]];
+function riverTile(mask:number){for(const [name,edges] of RIVER_TILES)for(let rot=0;rot<6;rot++)if(edges.reduce((m,e)=>m|1<<(e+rot)%6,0)===mask)return {name,rot};return {name:'hex_river_A',rot:0};}
 function roadTile(mask:number){for(const [name,edges] of ROAD_TILES)for(let rot=0;rot<6;rot++)if(edges.reduce((m,e)=>m|1<<(e+rot)%6,0)===mask)return {name,rot};return {name:'hex_road_L',rot:0};}
 
 type Theme={grass:number;road:number;sky:number;hemi:[number,number,number];sun:[number,number];near:string[];far:string[];field:string[];buildings:string[];night:boolean};
-const THEMES:Record<'garden'|'town'|'night',Theme>={
+const THEMES:Record<string,Theme>={
  garden:{grass:0xcfe8b8,road:0xffffff,sky:0x9fc9d9,hemi:[0xdff2ff,0x5b6b3c,1.25],sun:[0xfff1d6,2.4],near:['rock_single_A','rock_single_C','rock_single_E','tree_single_A'],far:['trees_A_medium','trees_A_small','trees_A_large','hills_A_trees','hills_B_trees','tree_single_B','trees_B_small'],field:['trees_A_small','trees_B_small','tree_single_B','trees_A_medium','rock_single_B','hill_single_A'],buildings:['building_windmill_blue','building_home_A_blue','building_well_blue','building_lumbermill_blue','building_home_B_blue','building_market_blue'],night:false},
  town:{grass:0xc4dcae,road:0xfff3e0,sky:0xbfd2d8,hemi:[0xfff2e0,0x6b5b44,1.2],sun:[0xffe4c0,2.3],near:['barrel','crate_A_big','sack','rock_single_D'],far:['building_home_A_blue','building_home_B_blue','trees_A_medium','hills_C_trees','trees_A_small','building_church_blue'],field:['building_home_A_blue','building_home_B_blue','building_well_blue','tree_single_A','tree_single_B','building_church_blue'],buildings:['building_barracks_blue','building_archeryrange_blue','building_church_blue','building_watermill_blue'],night:false},
  night:{grass:0x8d9ab8,road:0xa8acc0,sky:0x1c2840,hemi:[0x9fb8ff,0x2a2238,1.15],sun:[0xb9ccff,1.6],near:['gravestone','grave_A','pumpkin_orange_jackolantern','bone_A','rock_single_A'],far:['tree_dead_large','tree_pine_orange_medium','tree_pine_yellow_large','mountain_C_grass_trees','hills_C_trees','tree_dead_medium','trees_A_large'],field:['tree_dead_medium','tree_dead_small','grave_B','gravemarker_A','lantern_standing','tree_pine_orange_medium'],buildings:['crypt','building_destroyed','building_tower_B_red'],night:true},
 };
 /** Kenney Nature Kit undergrowth (CC0) scattered along the roads. */
 const SMALL=['plant_bushDetailed','plant_bushLarge','flower_purpleA','flower_redA','flower_yellowA','mushroom_redGroup','stump_roundDetailed','rock_single_B'];
-const themeOf=(l:Level)=>THEMES[l.theme==='town'||l.theme==='archive'?'town':l.theme==='night'?'night':'garden'];
+THEMES.coast={...THEMES.garden,grass:0xe2eab4,sky:0x8fd0e0,near:['pirate-rocks-sand-a','pirate-rocks-sand-b','pirate-barrel','pirate-crate','rock_single_C'],far:['pirate-palm-detailed-bend','pirate-palm-detailed-straight','pirate-palm-bend','trees_A_medium','tree_single_A'],field:['pirate-palm-detailed-bend','pirate-palm-detailed-straight','pirate-rocks-sand-b','crate','tree_single_B'],buildings:['pirate-tower-watch','pirate-structure','building_home_A_blue','building_watermill_blue']};
+THEMES.archive={...THEMES.town,grass:0xc0d4a8,sky:0xb4c4d8,near:['barrel','crate_A_big','sack','castle-rocks-large'],field:['building_church_blue','building_home_B_blue','castle-tree-large','castle-tree-small','building_well_blue','building_tower_A_blue'],buildings:['castle-tower-square','building_barracks_blue','building_archeryrange_blue']};
+const themeOf=(l:Level)=>THEMES[l.theme==='coast'?'coast':l.theme==='archive'?'archive':l.theme==='town'?'town':l.theme==='night'?'night':'garden'];
 /** Halloween Bits are modelled at character scale; the hexagon pack is about 5× smaller. */
 const BIT=.5;
 
@@ -40,7 +45,7 @@ const bitScale=(name:string)=>/^(tree_dead|tree_pine|grave|gravestone|pumpkin|bo
 /** Collects static props and turns each prop part into one InstancedMesh. */
 class Batch{
  private items=new Map<string,{m:T.Matrix4;c?:T.Color}[]>();private q=new T.Quaternion();private up=new T.Vector3(0,1,0);
- add(name:string,x:number,y:number,z:number,rot=0,scale=1,color?:number){if(color===undefined&&/^(plant_|flower_)/.test(name))color=0xd8ff6a;scale*=bitScale(name)*(/^building_(home|church|tavern|well|market|blacksmith|windmill|lumbermill|watermill|barracks|archeryrange)/.test(name)?1.3:1);const m=new T.Matrix4().compose(new T.Vector3(x,y,z),this.q.setFromAxisAngle(this.up,rot).clone(),new T.Vector3(scale,scale,scale));let list=this.items.get(name);if(!list){list=[];this.items.set(name,list);}list.push({m,c:color===undefined?undefined:new T.Color(color)});}
+ add(name:string,x:number,y:number,z:number,rot=0,scale=1,color?:number){if(name.startsWith('pirate-'))scale*=.42;if(color===undefined&&/^(plant_|flower_)/.test(name))color=0xd8ff6a;scale*=bitScale(name)*(/^building_(home|church|tavern|well|market|blacksmith|windmill|lumbermill|watermill|barracks|archeryrange)/.test(name)?1.3:1);const m=new T.Matrix4().compose(new T.Vector3(x,y,z),this.q.setFromAxisAngle(this.up,rot).clone(),new T.Vector3(scale,scale,scale));let list=this.items.get(name);if(!list){list=[];this.items.set(name,list);}list.push({m,c:color===undefined?undefined:new T.Color(color)});}
  build(assets:NightAssets,root:T.Object3D){const meshes:T.InstancedMesh[]=[];
   for(const [name,list] of this.items){const flat=/^hex_(grass|road|water)|^spawn|^building_dirt/.test(name);for(const part of assets.parts(name)){const mesh=new T.InstancedMesh(part.geometry,part.material,list.length);mesh.castShadow=!flat;mesh.receiveShadow=true;list.forEach((it,i)=>{mesh.setMatrixAt(i,it.m.clone().multiply(part.matrix));if(it.c)mesh.setColorAt(i,it.c);});mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);}}
   return meshes;}
@@ -171,7 +176,7 @@ export class TdRenderer{
   this.gl.shadowMap.type=T.PCFSoftShadowMap;this.sun.castShadow=true;this.sun.shadow.bias=-.0015;this.sun.shadow.normalBias=.03;
   const disc=(inner:number,outer:number,color:number,opacity:number)=>{const m=new T.Mesh(inner>0?new T.RingGeometry(inner,outer,72):new T.CircleGeometry(outer,72),new T.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,depthTest:false}));m.rotation.x=-Math.PI/2;m.renderOrder=5;m.visible=false;this.scene.add(m);return m;};
   this.range=disc(0,1,0xf6eebd,.13);this.rangeEdge=disc(.985,1,0xfff3c4,.85);this.aim=disc(0,1,0xffcf7a,.22);
-  this.ready=Promise.all([loadNightAssets(),loadExtraPack('hex'),loadExtraPack('tdkit'),loadModel('Dog').catch(()=>null)]).then(([assets,,,dog])=>{this.assets=assets;this.dog=dog;});
+  this.ready=Promise.all([loadNightAssets(),loadExtraPack('hex'),loadExtraPack('tdkit'),loadExtraPack('pirate'),loadExtraPack('castle'),loadModel('Dog').catch(()=>null)]).then(([assets,,,,,dog])=>{this.assets=assets;this.dog=dog;});
   this.gestures();
   this.ready.catch(e=>{console.warn('Campo 3D indisponível; a usar 2D.',e);this.failed=true;this.onFail();});
  }
@@ -202,7 +207,7 @@ export class TdRenderer{
  /** True when the last touch on the map panned or zoomed it (so lifting the finger is not a tap). */
  dragged=false;onView?:()=>void;private autoZoom=true;private hintUntil=0;
  private fitLevel(level:Level){const pts=[...level.spots,...level.paths.flat().map(p=>({x:Math.max(0,Math.min(1000,p.x)),y:p.y}))];
-  this.box={x0:Math.min(...pts.map(p=>p.x))-55,x1:Math.max(...pts.map(p=>p.x))+55,y0:Math.min(...pts.map(p=>p.y))-75,y1:Math.max(...pts.map(p=>p.y))+40};this.zoom=1;this.cx=500;this.cy=300;this.autoZoom=true;}
+  this.box={x0:Math.min(...pts.map(p=>p.x))-55,x1:Math.max(...pts.map(p=>p.x))+55,y0:Math.min(...pts.map(p=>p.y))-75,y1:Math.max(...pts.map(p=>p.y))+(hexMap(level).spec?.sea!==undefined?90:40)};this.zoom=1;this.cx=500;this.cy=300;this.autoZoom=true;}
  private gestures(){
   const c=this.canvas;let last:{x:number;y:number;d:number}|null=null,start={x:0,y:0};
   const read=(e:TouchEvent)=>{const t=Array.from(e.touches);const x=t.reduce((a,v)=>a+v.clientX,0)/t.length,y=t.reduce((a,v)=>a+v.clientY,0)/t.length;return {x,y,d:t.length>1?Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY):0};};
@@ -234,11 +239,21 @@ export class TdRenderer{
   const ponds=new Set(cells.filter(c=>!c.road&&c.near>=3&&field(c)&&!spotCells.has(c)&&!nearSpot(c)&&hash(c.q*31+c.r*17+level.id)<.12).slice(0,4));
   // Meadow colour drifts in broad patches (low-frequency noise) so the hex grid reads as terrain, not a board.
   const patch=(x:number,z:number)=>.5+.25*Math.sin(x*.21+level.id)+.18*Math.sin(z*.27-x*.09)+.12*Math.sin((x+z)*.47);
+  const spec=map.spec,pick=(list:string[],k:number)=>list[Math.floor(hash(k)*list.length)];
   for(const c of cells){const h=hash(c.q*92821+c.r*68917),k=patch(c.x,c.z),tint=new T.Color(theme.grass).lerp(new T.Color(theme.night?0x6c7c9c:0x9cc884),Math.max(0,Math.min(1,k))*.55).multiplyScalar(.95+h*.08).getHex();
-   if(c.road){const {name,rot}=roadTile(c.edges);batch.add(name,c.x,0,c.z,rot*Math.PI/3,1,theme.road);continue;}
+   if(c.river){const {name,rot}=riverTile(c.river);batch.add(name,c.x,0,c.z,rot*Math.PI/3,1,tint);
+    // Where a road meets the river, a KayKit stone bridge carries it across.
+    if(c.road){const e=[0,1,2,3,4,5].find(d=>c.edges&1<<d)??0;batch.add('building_bridge_A',c.x,0,c.z,e*Math.PI/3,1.45);}
+    else if(h<.25)batch.add('waterplant_A',c.x+.5,0,c.z+.3,h*TAU,1);continue;}
+   if(c.road){const {name,rot}=roadTile(c.edges);batch.add(name,c.x,0,c.z,rot*Math.PI/3,1,theme.road);if(c.dock){batch.add('pirate-structure-platform-dock',c.x,0,c.z+1.9,0,1.1);}continue;}
+   if(c.water){batch.add('hex_water',c.x,0,c.z,0,1);const sea=spec?.sea!==undefined&&c.r>=spec.sea;
+    if(!sea&&h<.35)batch.add(h<.18?'waterlily_A':'waterlily_B',c.x+(h-.17),0,c.z-.2,h*TAU,1);
+    if(sea&&c.r===spec!.sea!+1&&h<.13&&Math.abs(c.x)<22)batch.add(pick(['pirate-ship-pirate-large','pirate-ship-pirate-medium','pirate-ship-large','pirate-ship-wreck'],h*7),c.x,-.25,c.z+.6,Math.PI/2+(h-.06)*3,.9);
+    if(sea&&c.r===spec!.sea!&&h<.2)batch.add('pirate-rocks-sand-a',c.x,-.1,c.z,h*TAU,1.3);
+    continue;}
    const y=c.high?.55:0;batch.add('hex_grass',c.x,y,c.z,Math.floor(h*6)*Math.PI/3,1,tint);if(c.high)batch.add('hex_grass_bottom',c.x,-.45,c.z,0,1,tint);
    if(spotCells.has(c)||nearEnd(c))continue;
-   const pick=(list:string[],k:number)=>list[Math.floor(hash(k)*list.length)];const rot=hash(c.q*7+c.r*13)*TAU;
+   const rot=hash(c.q*7+c.r*13)*TAU;
    if(!field(c)){// Outer frame: dense woods and mountains that make the battlefield a valley.
     const edge=Math.max(Math.abs(c.x)-20.5,Math.abs(c.z)-15);if(c.near<=1)continue;
     // Budget: a dense tree line hugs the field; farther out only sparse single trees and the odd mountain
@@ -255,6 +270,13 @@ export class TdRenderer{
    if(nearSpot(c)&&c.near<4){if(h<.35&&!theme.night)batch.add(pick(SMALL,h*41),c.x+(hash(h*9)-.5)*.9,0,c.z+(hash(h*11)-.5)*.8,rot,1.4);continue;}
    if(h<(c.near>=3?.55:.32)){const name=pick(theme.field,h*71);batch.add(name,c.x,0,c.z,Math.floor(rot/(Math.PI/3))*Math.PI/3,1);}
   }
+  // Citadel levels: a crenellated wall with square towers along the far edge, banners by the roads, and the
+  // skeletons' siege engines parked by their entries (Kenney Castle Kit).
+  if(spec?.walls){for(let x=-24;x<=24;x+=2.2)batch.add(Math.round(x/2.2)%4===0?'castle-tower-square':'castle-wall',x,0,-16.6,0,2.2,theme.night?0xb8c0d8:0xffffff);
+   for(const c of cells)if(c.near===1&&field(c)&&!c.water&&!c.river&&!spotCells.has(c)&&hash(c.q*13+c.r*7)<.07)batch.add('castle-flag-banner-long',c.x,0,c.z,hash(c.q)*TAU,1.2);
+   for(const route of map.routes){const a=route[0],b=route[2]||route[1]||a;batch.add(hash(a.q+a.r)<.5?'castle-siege-trebuchet':'castle-siege-ram',a.x+(b.z-a.z)*.6+1.5,0,a.z-(b.x-a.x)*.6+1.5,Math.atan2(b.x-a.x,b.z-a.z),1.5);}}
+  // Coast: ships wait by the docks where skeletons land.
+  for(const c of cells)if(c.dock)batch.add('pirate-ship-pirate-medium',c.x+.5,-.25,c.z+4.6,Math.PI/2,1);
   // Skeleton gates at the entries; the Ordem's castle guards the refuge.
   for(const route of map.routes){const a=route[0],b=route[1]||a,ang=Math.atan2(b.x-a.x,b.z-a.z);batch.add('spawn-round',a.x,.02,a.z,ang,1.6);batch.add('building_destroyed',a.x-Math.sin(ang)*2.2,0,a.z-Math.cos(ang)*2.2,ang,1.1);batch.add('gravestone',a.x+Math.cos(ang)*1.3,0,a.z-Math.sin(ang)*1.3,ang);batch.add('grave_A',a.x-Math.cos(ang)*1.3,0,a.z+Math.sin(ang)*1.3,ang+.4);batch.add('lantern_standing',a.x+Math.cos(ang)*1.1+.4,0,a.z-Math.sin(ang)*1.1+.6,0);
    this.light(0x9f7bff,a.x,1.6,a.z,6);}

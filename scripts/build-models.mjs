@@ -106,4 +106,19 @@ if(!ONLY||ONLY==='tdkit'){const zipPath=join(CACHE,'kenney_tower-defense-kit.zip
   const map=mergeDocuments(target,src),copy=map.get(src.getRoot().getDefaultScene()||src.getRoot().listScenes()[0]);const holder=target.createNode(item);for(const child of copy.listChildren())holder.addChild(child);scene.addChild(holder);copy.dispose();}
  await target.transform(unpartition(),weld());await finish(target,join(OUT,'env','tdkit.glb'));
  await writeFile(join(OUT,'LICENSE-kenney-tower-defense-kit.txt'),zip.getEntry('License.txt').getData());}
+// More Kenney kits (CC0): ships, docks and palms for the coast; bridges, siege engines and walls for the citadel levels.
+const KENNEY_KITS={
+ pirate:{url:'https://kenney.nl/media/pages/assets/pirate-kit/e6d4bb1525-1771333093/kenney_pirate-kit.zip',items:'ship-pirate-large ship-pirate-medium ship-large ship-wreck boat-row-small structure-platform-dock structure-platform-dock-small structure palm-detailed-bend palm-detailed-straight palm-bend barrel crate chest cannon flag-pirate-high rocks-sand-a rocks-sand-b patch-sand tower-complete-small tower-watch'},
+ castle:{url:'https://kenney.nl/media/pages/assets/castle-kit/a395102d20-1711543616/kenney_castle-kit.zip',items:'bridge-straight bridge-straight-pillar bridge-draw siege-trebuchet siege-catapult siege-ballista siege-tower siege-ram flag-banner-long flag-wide wall wall-corner wall-doorway gate tower-square tower-hexagon-base tower-hexagon-mid tower-hexagon-top tower-hexagon-roof tree-large tree-small rocks-large stairs-stone'},
+};
+for(const [pack,{url,items}] of Object.entries(KENNEY_KITS)){if(ONLY&&ONLY!==pack)continue;
+ const zipPath=join(CACHE,'kenney_'+pack+'.zip');if(!await exists(zipPath)){const r=await fetch(url);if(!r.ok)throw Error(r.status+' '+pack);await writeFile(zipPath,Buffer.from(await r.arrayBuffer()));}
+ const zip=new AdmZip(zipPath),dir=join(CACHE,'kenney-'+pack);zip.extractEntryTo('Models/GLB format/',dir,false,true);
+ const target=new (await import('@gltf-transform/core')).Document(),scene=target.createScene(pack);target.getRoot().setDefaultScene(scene);
+ for(const item of items.split(' ')){if(!await exists(join(dir,item+'.glb')))throw Error('Em falta: '+pack+'/'+item);const src=await io.read(join(dir,item+'.glb'));
+  for(const m of src.getRoot().listMaterials())m.setRoughnessFactor(.8).setMetallicFactor(0);
+  const map=mergeDocuments(target,src),copy=map.get(src.getRoot().getDefaultScene()||src.getRoot().listScenes()[0]);const holder=target.createNode(pack+'-'+item);for(const child of copy.listChildren())holder.addChild(child);scene.addChild(holder);copy.dispose();}
+ // Prefixed names: Kenney and KayKit both have a 'barrel', 'crate', 'wall'…
+ await target.transform(unpartition(),weld());await finish(target,join(OUT,'env',pack+'.glb'));
+ const license=zip.getEntries().find(e=>/License\.txt$/i.test(e.entryName));if(license)await writeFile(join(OUT,`LICENSE-kenney-${pack}-kit.txt`),license.getData());}
 for(const [name,path] of Object.entries(LICENSES))await fetchTo(path,join(OUT,`LICENSE-kaykit-${name}.txt`));

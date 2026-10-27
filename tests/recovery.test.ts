@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {adultFromDate,mergeProgress} from '../src/account';
-import {validateCheckpoint} from '../src/checkpoint';
+import {validateCheckpoint,MAP_LAYOUT} from '../src/checkpoint';
 import {createState,command} from '../src/simulation';
 import {fresh} from '../src/persistence';
 
@@ -18,7 +18,7 @@ describe('conta e recuperação',()=>{
  });
  it('recupera defesas e dinheiro sem partilhar referências',()=>{
   const s=createState();command(s,0,{type:'build',kind:'archer',spot:0});
-  const cp=validateCheckpoint({version:1,savedAt:new Date().toISOString(),state:s});
+  const cp=validateCheckpoint({version:1,layout:MAP_LAYOUT,savedAt:new Date().toISOString(),state:s});
   expect(cp.state.towers).toHaveLength(1);expect(cp.state.players[0].coins).toBe(s.players[0].coins);
   cp.state.players[0].coins=0;expect(s.players[0].coins).toBeGreaterThan(0);
  });
