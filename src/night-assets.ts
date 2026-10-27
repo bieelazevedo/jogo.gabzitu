@@ -54,6 +54,14 @@ export function loadNightAssets():Promise<NightAssets>{
  return pending;
 }
 
+let kit:Promise<NightAssets>|null=null;
+/** Just one adventurer plus the shared clip library (no props): enough to animate a single KayKit character elsewhere. */
+export function loadCharacterKit(name:CharacterName){
+ if(kit)return kit;const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const base=import.meta.env.BASE_URL+'models/characters/';
+ kit=Promise.all([loader.loadAsync(base+name+'.glb'),loader.loadAsync(base+'anims.glb')]).then(([character,anims])=>{const scene=character.scene;mergeSkinned(scene);scene.traverse(o=>{if(o instanceof T.Mesh)o.frustumCulled=false;});
+  return {characters:{[name]:scene} as unknown as Record<CharacterName,T.Object3D>,clips:new Map(anims.animations.map(c=>[c.name,c])),props:new Map(),parts:()=>[]};});
+ kit.catch(()=>{kit=null;});return kit;
+}
 const extraPacks=new Map<string,Promise<void>>();
 /** Loads another environment pack (e.g. the hex battlefield tiles) into the shared prop library. */
 export function loadExtraPack(name:string){

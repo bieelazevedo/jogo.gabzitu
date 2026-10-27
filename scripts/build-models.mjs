@@ -2,8 +2,8 @@
 // Run: node scripts/build-models.mjs   (dev only; the generated files are committed)
 import {NodeIO} from '@gltf-transform/core';
 import {ALL_EXTENSIONS} from '@gltf-transform/extensions';
-import {dedup,prune,meshopt,resample,textureCompress,unpartition,mergeDocuments,weld} from '@gltf-transform/functions';
-import {MeshoptEncoder,MeshoptDecoder} from 'meshoptimizer';
+import {dedup,prune,meshopt,resample,textureCompress,unpartition,mergeDocuments,weld,simplify} from '@gltf-transform/functions';
+import {MeshoptEncoder,MeshoptDecoder,MeshoptSimplifier} from 'meshoptimizer';
 import sharp from 'sharp';
 import AdmZip from 'adm-zip';
 import {mkdir,writeFile,readFile,access} from 'node:fs/promises';
@@ -121,4 +121,16 @@ for(const [pack,{url,items}] of Object.entries(KENNEY_KITS)){if(ONLY&&ONLY!==pac
  // Prefixed names: Kenney and KayKit both have a 'barrel', 'crate', 'wall'…
  await target.transform(unpartition(),weld());await finish(target,join(OUT,'env',pack+'.glb'));
  const license=zip.getEntries().find(e=>/License\.txt$/i.test(e.entryName));if(license)await writeFile(join(OUT,`LICENSE-kenney-${pack}-kit.txt`),license.getData());}
+// Quaternius Stylized Nature MegaKit (CC0), from a public mirror of the Quaternius packs: lush trees, bushes,
+// grass, wheat, flowers, rocks and mushrooms for the farm. Normal maps are dropped; colour textures go to 512px WebP.
+const MEADOW='CommonTree_3 CommonTree_4 CommonTree_5 Pine_1 Birch_3 Bush_Common Bush_Common_Flowers Bush_Large Bush_Large_Flowers Bush_Long_1 Grass_Common_Short Grass_Common_Tall Grass_Wheat Grass_Wide_Short Flower_2_Group Flower_3_Group Flower_7_Group Clover_1 Fern_1 Plant_1 Plant_7 Mushroom_RedCap Pebble_Round_1 Pebble_Round_3 Rock_Medium_1 Rock_Medium_2 RockPath_Round_Small_1'.split(' ');
+if(!ONLY||ONLY==='meadow'){const repo=join(CACHE,'quaternius-mirror'),dir=join(repo,'quaternius/stylized-nature-megakit/glTF');
+ if(!await exists(dir)){const {execSync}=await import('node:child_process');execSync(`git clone -q --filter=blob:none --no-checkout --depth 1 https://github.com/tilakpatell/tilakverse-assets ${repo}`);execSync('git sparse-checkout init --no-cone && git sparse-checkout set "quaternius/stylized-nature-megakit/glTF/*" "quaternius/stylized-nature-megakit/License_Source.txt" && git checkout -q',{cwd:repo,shell:'/bin/bash'});}
+ const target=new (await import('@gltf-transform/core')).Document(),scene=target.createScene('meadow');target.getRoot().setDefaultScene(scene);
+ for(const item of MEADOW){const src=await io.read(join(dir,item+'.gltf'));
+  for(const m of src.getRoot().listMaterials()){m.setNormalTexture(null);m.setMetallicFactor(0).setRoughnessFactor(.9);}
+  const map=mergeDocuments(target,src),copy=map.get(src.getRoot().getDefaultScene()||src.getRoot().listScenes()[0]);const holder=target.createNode('meadow-'+item);for(const child of copy.listChildren())holder.addChild(child);scene.addChild(holder);copy.dispose();}
+ // Trees are dense; meshoptimizer's simplifier halves them with no visible loss at game distance.
+ await target.transform(unpartition(),weld(),simplify({simplifier:MeshoptSimplifier,ratio:.5,error:.002}));await finish(target,join(OUT,'env','meadow.glb'));
+ await writeFile(join(OUT,'LICENSE-quaternius-nature-megakit.txt'),await readFile(join(repo,'quaternius/stylized-nature-megakit/License_Source.txt')));}
 for(const [name,path] of Object.entries(LICENSES))await fetchTo(path,join(OUT,`LICENSE-kaykit-${name}.txt`));

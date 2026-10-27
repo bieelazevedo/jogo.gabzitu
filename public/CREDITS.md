@@ -4,6 +4,7 @@
 - **KayKit Character Pack: Adventurers** e **Skeletons**, **Medieval Hexagon Pack**, **Halloween Bits**, **Dungeon Remastered** — Kay Lousberg (www.kaylousberg.com). Licenças em `/models/LICENSE-kaykit-*.txt`.
 - **Tower Defense Kit** — Kenney (www.kenney.nl): torres modulares (recoloridas na cor de cada gato), fundações de construção e portal dos inimigos. Licença em `/models/LICENSE-kenney-tower-defense-kit.txt`.
 - **Pirate Kit** e **Castle Kit** — Kenney (www.kenney.nl): navios, cais e palmeiras da costa; muralhas, estandartes e armas de cerco da cidadela. Licenças em `/models/LICENSE-kenney-pirate-kit.txt` e `/models/LICENSE-kenney-castle-kit.txt`.
+- **Stylized Nature MegaKit** — Quaternius (quaternius.com), via o espelho público github.com/tilakpatell/tilakverse-assets: natureza da Quinta do Caos. Licença em `/models/LICENSE-quaternius-nature-megakit.txt`.
 - **Nature Kit** — Kenney (www.kenney.nl). Licença em `/models/LICENSE-kenney-nature-kit.txt`.
 - **Shiba Inu** (cão dos esqueletos no tower defense) — Quaternius (quaternius.com), CC0; versão comprimida em `/models/characters/Dog.glb`.
 - O tower defense usa os tiles hexagonais, edifícios e decoração do Medieval Hexagon Pack; os mapas são gerados a partir dos percursos de cada fase (`src/td-hex.ts`).
