@@ -131,6 +131,6 @@ if(!ONLY||ONLY==='meadow'){const repo=join(CACHE,'quaternius-mirror'),dir=join(r
   for(const m of src.getRoot().listMaterials()){m.setNormalTexture(null);m.setMetallicFactor(0).setRoughnessFactor(.9);}
   const map=mergeDocuments(target,src),copy=map.get(src.getRoot().getDefaultScene()||src.getRoot().listScenes()[0]);const holder=target.createNode('meadow-'+item);for(const child of copy.listChildren())holder.addChild(child);scene.addChild(holder);copy.dispose();}
  // Trees are dense; meshoptimizer's simplifier halves them with no visible loss at game distance.
- await target.transform(unpartition(),weld(),simplify({simplifier:MeshoptSimplifier,ratio:.5,error:.002}));await finish(target,join(OUT,'env','meadow.glb'));
+ await target.transform(unpartition(),weld(),simplify({simplifier:MeshoptSimplifier,ratio:.3,error:.01}));await finish(target,join(OUT,'env','meadow.glb'));
  await writeFile(join(OUT,'LICENSE-quaternius-nature-megakit.txt'),await readFile(join(repo,'quaternius/stylized-nature-megakit/License_Source.txt')));}
 for(const [name,path] of Object.entries(LICENSES))await fetchTo(path,join(OUT,`LICENSE-kaykit-${name}.txt`));

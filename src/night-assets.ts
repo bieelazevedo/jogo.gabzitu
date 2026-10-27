@@ -54,6 +54,17 @@ export function loadNightAssets():Promise<NightAssets>{
  return pending;
 }
 
+/**
+ * Quaternius foliage is built from alpha-cut leaf cards shaded for a stylised engine: drawn from both sides and
+ * lifted with a little self-light, it reads as lush green instead of near-black under a top-down sun.
+ */
+export function brightenFoliage(root:T.Object3D){const seen=new Set<T.Material>();root.traverse(o=>{if(!(o instanceof T.Mesh))return;for(const m of Array.isArray(o.material)?o.material:[o.material]){if(seen.has(m)||!(m instanceof T.MeshStandardMaterial))continue;seen.add(m);
+ const leaf=/Leaf|Leaves|Grass|Flower|Bush|Clover|Fern|Plant/i.test(m.name+' '+(m.map?.name||''));// Their vertex colours are wind and occlusion masks for Quaternius's own shader, not albedo.
+ m.vertexColors=false;m.side=T.DoubleSide;if(leaf){m.alphaTest=Math.max(m.alphaTest,.45);m.transparent=false;}
+ // Grass ships as a white mask (tinted by the original shader); autumn-red twisted leaves are recoloured to spring green.
+ // Leaf-card normals point every way, so the sun alone leaves canopies dark: most of their light is self-lit.
+ if(m.name==='Grass')m.color.setHex(0x93c95a);else if(m.name==='Leaves_TwistedTree')m.color.setRGB(.3,2.2,.5);else if(leaf)m.color.setScalar(.6);
+ if(leaf){m.emissive.copy(m.color).multiplyScalar(m.name==='Grass'?.35:1.15);m.emissiveMap=m.name==='Grass'?null:m.map;}else m.emissive.setHex(0x101010);m.emissiveMap=m.map;m.roughness=.85;m.metalness=0;}});}
 let kit:Promise<NightAssets>|null=null;
 /** Just one adventurer plus the shared clip library (no props): enough to animate a single KayKit character elsewhere. */
 export function loadCharacterKit(name:CharacterName){
@@ -66,7 +77,7 @@ const extraPacks=new Map<string,Promise<void>>();
 /** Loads another environment pack (e.g. the hex battlefield tiles) into the shared prop library. */
 export function loadExtraPack(name:string){
  let p=extraPacks.get(name);if(p)return p;
- p=loadNightAssets().then(async assets=>{const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const g=await loader.loadAsync(import.meta.env.BASE_URL+'models/env/'+name+'.glb');for(const child of [...g.scene.children])assets.props.set(child.name,child);});
+ p=loadNightAssets().then(async assets=>{const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const g=await loader.loadAsync(import.meta.env.BASE_URL+'models/env/'+name+'.glb');if(name==='meadow')brightenFoliage(g.scene);for(const child of [...g.scene.children])assets.props.set(child.name,child);});
  extraPacks.set(name,p);p.catch(()=>extraPacks.delete(name));return p;
 }
 const models=new Map<string,Promise<{scene:T.Object3D;animations:T.AnimationClip[]}>>();

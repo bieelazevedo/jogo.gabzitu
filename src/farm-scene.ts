@@ -5,7 +5,7 @@ import * as T from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
-import {Actor,loadCharacterKit,type NightAssets} from './night-assets';
+import {Actor,brightenFoliage,loadCharacterKit,type NightAssets} from './night-assets';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 import {SPECIES,FARM_WALLS,BUSHES,ZONES,SUPPLY,blocked,inBush,insideBarn,segmentRect,type Species} from './farm-data';
 import {farmAim,type FarmView} from './farm-simulation';
@@ -69,14 +69,14 @@ export class FarmScene{
   * loaded. Placement, colliders and the hide-in-bush fade are unchanged.
   */
  private async loadMeadow(){try{
-  const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const gltf=await loader.loadAsync('/models/env/meadow.glb');if(this.disposed)return;
+  const loader=new GLTFLoader();loader.setMeshoptDecoder(MeshoptDecoder);const gltf=await loader.loadAsync('/models/env/meadow.glb');if(this.disposed)return;brightenFoliage(gltf.scene);
   const lib=new Map(gltf.scene.children.map(c=>[c.name.replace('meadow-',''),c]));
   const info=new Map<string,{parts:{geometry:T.BufferGeometry;material:T.Material;matrix:T.Matrix4}[];height:number}>();
   const prepare=(name:string)=>{let v=info.get(name);if(v)return v;const node=lib.get(name)!;const holder=new T.Group(),copy=node.clone();copy.position.set(0,0,0);copy.rotation.set(0,0,0);copy.scale.set(1,1,1);holder.add(copy);holder.updateMatrixWorld(true);
    const parts:{geometry:T.BufferGeometry;material:T.Material;matrix:T.Matrix4}[]=[];copy.traverse(o=>{if(o instanceof T.Mesh&&!Array.isArray(o.material)){parts.push({geometry:o.geometry,material:o.material,matrix:o.matrixWorld.clone()});this.geometries.add(o.geometry);this.materials.add(o.material);}});
    const box=new T.Box3().setFromObject(holder);v={parts,height:Math.max(.01,box.max.y-box.min.y)};info.set(name,v);return v;};
   const plant=(name:string,places:[number,number,number,number][],height:number,shadow=true)=>{if(!places.length||!lib.has(name))return;const {parts,height:h}=prepare(name),m=new T.Matrix4(),q=new T.Quaternion(),up=new T.Vector3(0,1,0);
-   for(const part of parts){const mesh=new T.InstancedMesh(part.geometry,part.material,places.length);places.forEach(([x,z,rot,scale],i)=>{const k=height/h*scale;m.compose(new T.Vector3(x,0,z),q.setFromAxisAngle(up,rot),new T.Vector3(k,k,k));mesh.setMatrixAt(i,m.multiply(part.matrix));});mesh.castShadow=shadow;mesh.receiveShadow=true;mesh.computeBoundingSphere();this.scene.add(mesh);}};
+   for(const part of parts){const mesh=new T.InstancedMesh(part.geometry,part.material,places.length);places.forEach(([x,z,rot,scale],i)=>{const k=height/h*scale;m.compose(new T.Vector3(x,0,z),q.setFromAxisAngle(up,rot),new T.Vector3(k,k,k));mesh.setMatrixAt(i,m.multiply(part.matrix));});mesh.castShadow=shadow;mesh.receiveShadow=false;mesh.computeBoundingSphere();this.scene.add(mesh);}};
   const rnd=(n:number)=>{const v=Math.sin(n*127.1+311.7)*43758.5453;return v-Math.floor(v);};
   this.nature?.removeFromParent();this.nature=undefined;
   const kinds=['CommonTree_3','CommonTree_4','CommonTree_5','Pine_1','Birch_3'],trees=new Map<string,[number,number,number,number][]>();
