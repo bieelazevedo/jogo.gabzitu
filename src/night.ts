@@ -153,7 +153,11 @@ function drawMinimap(){const canvas=root.querySelector<HTMLCanvasElement>('.nigh
   if(host()&&!(overlay==='pause'&&!room)){acc+=dt;let count=0;while(acc>=.05&&count++<4){const all=state.players.map((p,i)=>p.id===self?input:p.bot?nightBot(state!,i):now-(seen[p.id]||lastStateAt)<2500?inputs[p.id]||nightIdle():nightBot(state!,i));nightStep(state,all,.05);for(const a of all){a.dodge=a.power=a.ultimate=a.potion=a.interact=a.utility=a.hex=a.jump=false;a.extra=undefined;}acc-=.05;}}
   if(room&&now-lastSend>=80){lastSend=now;if(host()){for(const [id,l]of room.links)if(l.ready)room.frame(id,{type:'night-state',state});}else{room.send({type:'night-input',input});input.dodge=input.power=input.ultimate=input.potion=input.interact=input.utility=input.hex=input.jump=false;input.extra=undefined;}}
   let visual=state;if(room&&!host()&&!blocked){const delay=Math.min(.12,(now-lastStateAt)/1000),index=me();visual={...state,players:state.players.map((p,i)=>i===index&&p.hp>0?{...p,x:p.x+input.x*(p.running?9.2:6.6)*delay,z:p.z+input.z*(p.running?9.2:6.6)*delay,moving:Math.min(1,Math.hypot(input.x,input.z))}:p)};}
-  const follow=visual.players[me()];if(lookPointer<0&&now>manualUntil){if(!moving&&target&&(input.attack||follow.action>0))yaw=nightCombatFollow(yaw,follow,target,dt);}scene.updateNight(visual,Math.min(dt,.05),me(),yaw,zoom,pitch);hud(now);
+  const follow=visual.players[me()];
+  // Engaged: trading blows, being hit, a foe winding up on this hero, or the boss. The camera then frames the fight.
+  const near=target&&Math.hypot(target.x-follow.x,target.z-follow.z)<10,engaged=!!near&&follow.hp>0&&(state.phase!=='explore'||input.attack||follow.action>0||follow.hit>0||state.enemies.some(e=>e.hp>0&&e.wind>0&&Math.hypot(e.tx-follow.x,e.tz-follow.z)<2.5&&Math.hypot(e.x-follow.x,e.z-follow.z)<8));
+  if(lookPointer<0&&now>manualUntil&&target&&(engaged||!moving&&(input.attack||follow.action>0)))yaw=nightCombatFollow(yaw,follow,target,dt*(moving?.6:1),engaged);
+  scene.updateNight(visual,Math.min(dt,.05),me(),yaw,zoom,pitch,engaged&&target?{x:target.x,z:target.z}:undefined);hud(now);
  }
  function stop(){if(closed)return;closed=true;preview?.dispose();preview=null;cancelAnimationFrame(raf);cleanupControls();room?.close();codeHost?.close();scene?.dispose();root.remove();options.onExit();}
  if(import.meta.env.DEV)(window as unknown as {__night:unknown}).__night={state:()=>state,scene:()=>scene,hold:(v:boolean)=>{attackHeld=v;},input:(i:Partial<NightInput>)=>{input={...input,...i};}};

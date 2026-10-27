@@ -17,6 +17,7 @@ function angle(a:number,b:number,t:number){return a+Math.atan2(Math.sin(b-a),Mat
 export class HuntScene {
  private sizeObserver?:ResizeObserver;
  readonly renderer:T.WebGLRenderer;
+ private lock?:{x:number;z:number};private lockPull=new T.Vector3();private lockOffset=new T.Vector3();
  readonly scene=new T.Scene();readonly camera=new T.PerspectiveCamera(43,1,.1,160);
  private materials:T.Material[]=[];private geometries:T.BufferGeometry[]=[];private textures:T.Texture[]=[];
  private nightEffects?:NightEffects;private nightBeacon?:T.Group;private night?:NightState;private world?:NightWorld;private arenaObjects:T.Object3D[]=[];private classKey="";private orbit=0;private zoomLevel=1;private elevation=.42;private nightStage=0;
@@ -154,8 +155,8 @@ export class HuntScene {
   this.mapImage=canvas;return canvas;
  }
  movementHeading(){const e=this.camera.matrixWorld.elements;return Math.atan2(e[8],e[10]);}
- updateNight(s:NightState,dt:number,local:number,yaw=0,zoom=1,pitch=.42){
-  this.local=local;this.night=s;this.orbit=yaw;this.zoomLevel=zoom;this.elevation=pitch;
+ updateNight(s:NightState,dt:number,local:number,yaw=0,zoom=1,pitch=.42,lock?:{x:number;z:number}){
+  this.local=local;this.lock=lock;this.night=s;this.orbit=yaw;this.zoomLevel=zoom;this.elevation=pitch;
   if(!this.world&&!nightAssets()&&!nightAssetsFailed()&&this.assetWait<10){void loadNightAssets();this.assetWait+=dt;if(!this.loading){this.loading=document.createElement('div');this.loading.className='night-loading';this.loading.textContent='A preparar o mundo…';this.labelRoot.append(this.loading);}this.renderer.render(this.scene,this.camera);return;}
   this.loading?.remove();this.loading=undefined;
   if(!this.world){this.nightEffects=new NightEffects();this.scene.add(this.nightEffects.root);this.world=new NightWorld(nightAssets());this.scene.add(this.world.root);this.nightBeacon=this.pivot(this.scene);const beaconRing=this.ring(this.nightBeacon,this.gold,1.3,.05,0,.15);beaconRing.rotation.x=Math.PI/2;const tip=this.add(new T.ConeGeometry(.3,.6,4),this.cyan,this.nightBeacon,0,3,0);tip.rotation.z=Math.PI;this.arenaObjects.forEach(o=>o.scale.multiplyScalar(1.12));
@@ -199,7 +200,10 @@ this.arenaObjects=this.arenaObjects.filter(o=>{const keep=!(o instanceof T.Mesh)
  update(s:HuntState,dt:number){
   this.clock+=dt;const time=this.clock;if(this.clock-this.hudTime>2){this.hudTime=this.clock;this.sound('ambience');}for(const e of s.events)if(e.id>this.eventId){this.eventId=e.id;this.spawn(e);}this.heroes.forEach((r,i)=>this.animateHero(r,s.players[i],dt,time));this.animateBoss(s.boss,dt,time,s.status);if(this.night){const animDt=this.hitStop>0?dt*.08:dt;this.hitStop=Math.max(0,this.hitStop-dt);this.heroModels.forEach((h,i)=>h.update(this.night!.players[i],animDt,time,this.night!.players[i].y));if(this.bossModel?.root.visible)this.bossModel.update(s.boss,animDt,time,s.status);}this.telegraph(s.boss,time);if(this.night&&this.night.phase!=='boss')this.warning.visible=false;
   const local=s.players[this.local],b=s.boss;const centre=new T.Vector3((local.x+b.x)*.3,0,(local.z+b.z)*.3);if(!this.night)this.target.lerp(centre,Math.min(1,dt*3));const portrait=this.aspect<1;const spread=Math.hypot(local.x-b.x,local.z-b.z);const distance=portrait?32:19+Math.max(0,spread-7)*.4;
-  if(this.night){const rig=this.heroes[this.local],focus=new T.Vector3(rig?.root.position.x??local.x,0,rig?.root.position.z??local.z);if(this.target.distanceTo(focus)>20)this.target.copy(focus);else this.target.lerp(focus,1-Math.exp(-18*dt));}
+  if(this.night){const rig=this.heroes[this.local],focus=new T.Vector3(rig?.root.position.x??local.x,0,rig?.root.position.z??local.z);
+   // During a fight the frame eases toward the enemy (up to 3 m), so hero and foe stay on screen together.
+   const pull=this.lockPull.set(0,0,0);if(this.lock){pull.set(this.lock.x-focus.x,0,this.lock.z-focus.z).multiplyScalar(.3);if(pull.length()>3)pull.setLength(3);}this.lockOffset.lerp(pull,1-Math.exp(-4*dt));focus.add(this.lockOffset);
+   if(this.target.distanceTo(focus)>20)this.target.copy(focus);else this.target.lerp(focus,1-Math.exp(-12*dt));}
   let zoom=this.night?(portrait?9.2:7.4)*this.zoomLevel:distance;if(this.night&&this.night.phase!=='boss')zoom=nightBoom(this.target.x,this.target.z,this.orbit,zoom,NIGHT_OBSTACLES);
   // In boss arenas the boom shortens near the edge so the camera never enters the surrounding scenery.
   if(this.night&&this.night.phase!=='explore'){for(let k=0;k<8&&Math.hypot(this.target.x+Math.sin(this.orbit)*zoom,this.target.z+Math.cos(this.orbit)*zoom)>15.5;k++)zoom*=.85;}
