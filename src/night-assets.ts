@@ -43,7 +43,7 @@ export function loadNightAssets(profile:'night'|'td'='night'):Promise<NightAsset
  const base=import.meta.env.BASE_URL+'models/';
  const request=(async()=>{
   const packNames=profile==='td'?PACKS.filter(n=>!['nature','medieval','weapons','authored-weapons'].includes(n)):PACKS;
-  const authoredNames=['ForgottenKnight','ScarletSorceress'];
+  const authoredNames=['ForgottenKnight','ScarletSorceress','LunarKnight','AstralMage','ForestArcher','ReaverKnight'];
   const headNames=['Superhero_Male_FullBody','Superhero_Female_FullBody','Hair_SimpleParted','Hair_Long','Hair_Buzzed','Hair_Beard'];
   const [characters,anims,packs,modernModels,modernAnims,modernHeads]=await Promise.all([
    Promise.all(CHARACTER_NAMES.map(n=>loadAsset(base+'characters/'+n+'.glb'))),
@@ -126,7 +126,7 @@ export class Actor{
  /** GLTFLoader sanitises node names ("handslot.r" becomes "handslotr"), so look up both spellings. */
  bone(name:string){if(this.modern){const scarlet=!!this.model.getObjectByName('mixamorigHead_05'),knight=!!this.model.getObjectByName('headx_5');name=(scarlet?{'head':'mixamorigHead_05','handslot.r':'mixamorigRightHand_034','handslot.l':'mixamorigLeftHand_010'}:knight?{'head':'headx_5','handslot.r':'handr_53','handslot.l':'handl_28'}:{'head':'Head','handslot.r':'hand_r','handslot.l':'hand_l'} as Record<string,string>)[name]||name;}return this.model.getObjectByName(name)??this.model.getObjectByName(T.PropertyBinding.sanitizeNodeName(name))!;}
  /** Attaches a prop from the item packs to a bone (e.g. 'handslot.r'). */
- hold(item:string,bone:string,transform?:(o:T.Object3D)=>void){const o=prop(this.assets,item);o.traverse(c=>{if(c instanceof T.Mesh){const m=(c.material as T.MeshStandardMaterial).clone();this.materials.push(m);c.material=m;}});transform?.(o);this.bone(bone)?.add(o);return o;}
+ hold(item:string,bone:string,transform?:(o:T.Object3D)=>void){const o=prop(this.assets,item);o.traverse(c=>{if(c instanceof T.Mesh){const m=(c.material as T.MeshStandardMaterial).clone();this.materials.push(m);c.material=m;}});transform?.(o);const socket=this.bone(bone);if(socket){this.root.updateMatrixWorld(true);const units=socket.getWorldScale(new T.Vector3()).divide(this.root.getWorldScale(new T.Vector3()));o.scale.divide(units);socket.add(o);}return o;}
  private mapped(clip:string){if(!this.modern)return clip;return MODERN_CLIPS[clip]||(/Spellcast/.test(clip)?'Spell_Simple_Shoot':/Attack/.test(clip)?'Sword_Regular_A':/Dodge/.test(clip)?'Roll':/Running/.test(clip)?'Jog_Fwd_Loop':'Idle_Loop');}
  has(clip:string){return this.clips.has(this.mapped(clip));}
  duration(clip:string){return this.clips.get(this.mapped(clip))?.duration||1;}

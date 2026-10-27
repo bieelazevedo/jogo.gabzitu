@@ -124,6 +124,12 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
   const thickets:Place[]=[],tall:Place[]=[],fernBeds:Place[]=[];
   NIGHT_WOODLAND_TREES.forEach(([cx,cz],i)=>{for(let j=0;j<14;j++){const a=j*2.4,r=1.8+hash(i*31+j)*6,x=cx+Math.sin(a)*r,z=cz+Math.cos(a)*r;if(!open(x,z))continue;(j%7===0?thickets:j%3===0?fernBeds:tall).push([x,z,a,.85+hash(i*41+j)*.5]);}});
   scatter('meadow-Bush_Large',thickets);scatter('meadow-Grass_Common_Tall',tall);scatter('meadow-Fern_1',fernBeds);
+  // Low cover stays inside arena clearings too; only tall cover needs the stricter exclusion.
+  const groundCover:Place[]=[],groundStones:Place[]=[],yardCover:Place[]=[];
+  const lowOpen=(x:number,z:number)=>PATHS.every(p=>segment(x,z,p)>2.1)&&NIGHT_OBSTACLES.every(o=>Math.hypot(o.x-x,o.z-z)>o.r+.4)&&[...NIGHT_PORTALS,...NIGHT_SPRINGS].every(p=>Math.hypot(p.x-x,p.z-z)>2.5)&&Math.hypot(x,z-27)>8&&NIGHT_TOWN_HOUSES.every(h=>Math.hypot(x-h.x,z-h.z)>4.5)&&NIGHT_HOMESTEADS.every(h=>!(x>h.x-7&&x<h.x+5&&z>h.z-4&&z<h.z+11))&&NIGHT_MONUMENTS.every(m=>Math.hypot(x-m.x,z-m.z)>2.8);
+  for(let i=0;i<2300;i++){const x=(hash(i*3.83+197)-.5)*156,z=(hash(i*7.19+321)-.5)*156;if(!lowOpen(x,z))continue;const patch=Math.sin(x*.25)+Math.cos(z*.31)+Math.sin((x+z)*.14);if(patch<-.9)continue;groundCover.push([x,z,i,.38+hash(i+90)*.45]);if(i%11===0)groundStones.push([x+.5,z-.3,i,.15+hash(i)*.18]);}
+  for(const h of NIGHT_HOMESTEADS)for(let i=0;i<70;i++){const a=i*2.399,r=10+hash(i+Math.abs(h.x))*5,x=h.x+Math.sin(a)*r,z=h.z+Math.cos(a)*r;if(lowOpen(x,z))yardCover.push([x,z,a,.65+hash(i)*.4]);}
+  scatter('meadow-Clover_1',groundCover);scatter('meadow-Pebble_Round_1',groundStones);scatter('meadow-Grass_Wide_Short',yardCover);
   // Interior ground layers connect places: clover, fern beds, fallen wood and low rocks.
   const beds=[[-12,8],[-9,-7],[13,17],[9,-14],[-35,-5],[17,-40],[35,-14],[-4,42],[24,29],[39,30]];
   const clover:Place[]=[],shortGrass:Place[]=[],leaves:Place[]=[],pebbles:Place[]=[],fallen:Place[]=[];

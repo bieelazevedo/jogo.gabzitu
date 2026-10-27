@@ -1,0 +1,4 @@
+Paladin — DJMaesen
+https://sketchfab.com/3d-models/4f1c320f2cec49dc9bf38c6aad2d8ea9
+CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+Mirror: allenai/objaverse. Changes: rig cleanup, compressed textures/geometry, canonical bone names, original clips removed and replaced with retargeted Quaternius CC0 animations.

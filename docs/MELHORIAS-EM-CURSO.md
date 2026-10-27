@@ -19,9 +19,9 @@ Novas mensagens acrescentam requisitos; não substituem os pedidos anteriores. O
 - Email: reproduzido redirecionamento inválido sem https no Site URL do Supabase. Nova consulta confirmou destino HTTPS correto após alteração do utilizador. Botão Reenviar confirmação acrescentado. Não foram enviados emails de teste nem reutilizados tokens reais.
 - Estas medidas tratam causas plausíveis e reproduzíveis de pressão de memória; não constituem confirmação de que o crash no Safari real desapareceu.
 
-## Trabalho visual local preservado, ainda por publicar
+## Trabalho visual preparado — publicação autorizada
 - Quatro trajes completos: LunarKnight (DJMaesen), AstralMage (rSquare), ForestArcher (outcast945), ReaverKnight (Angy97); CC BY 4.0, com créditos, compressão e animações Quaternius CC0 adaptadas.
-- Modelos ligados à prévia local; validação numérica de deformação. Avaliação visual/animações em combate e ajustes dos acessórios pendentes.
+- Modelos ligados ao jogo e enviados para publicação na visual-overhaul por pedido expresso do utilizador; validação numérica de deformação. Avaliação visual/animações em combate e ajustes dos acessórios pendentes.
 - Candidata necromante rejeitada por escala/exportação inconsistente; Umbra continua com o modelo anterior até encontrar substituto fiável.
 - Cobertura baixa nas clareiras e entre lugares; quintais de terra mais pequenos e mistura de relva mais irregular. Rever custo gráfico antes de publicar.
 

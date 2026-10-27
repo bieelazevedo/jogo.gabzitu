@@ -1,0 +1,4 @@
+Mage — rSquare
+https://sketchfab.com/3d-models/0015c579cfa440a7a2bd0a3f14395f05
+CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+Mirror: allenai/objaverse. Changes: rig cleanup, compressed textures/geometry, canonical bone names, original clips removed and replaced with retargeted Quaternius CC0 animations.

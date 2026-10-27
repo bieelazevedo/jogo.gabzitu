@@ -65,8 +65,9 @@ export function forestGround(root:T.Object3D,paths:number[][]){
  for(let i=0;i<positions.count;i++){const x=positions.getX(i),z=positions.getZ(i),forest=x<-8&&z>-6;
   tint.setHex(forest?0x9aada0:Math.hypot(x+24,z+27)<20?0x89838e:0xb4b19a);tint.toArray(colors,i*3);
   let distance=100;for(const [ax,az,bx,bz] of paths){const dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));distance=Math.min(distance,Math.hypot(x-ax-dx*t,z-az-dz*t));}
-  const courtyard=Math.hypot(x,z-27)<9||NIGHT_TOWN_HOUSES.some(h=>Math.hypot(x-h.x,z-h.z)<6)||NIGHT_HOMESTEADS.some(h=>Math.hypot(x-h.x,z-h.z)<11);
-  blend[i]=courtyard?0:Math.min(1,Math.max(0,(distance-2)/3))*(Math.hypot(x+24,z+27)<17?.3:1);
+  const courtyard=Math.hypot(x,z-27)<9||NIGHT_TOWN_HOUSES.some(h=>Math.hypot(x-h.x,z-h.z)<4)||NIGHT_HOMESTEADS.some(h=>Math.abs(x-h.x)<4&&z>h.z-3&&z<h.z+10);
+  const patch=.72+.28*Math.sin(x*.29)*Math.cos(z*.23);
+  blend[i]=courtyard?.12:Math.min(1,Math.max(0,(distance-1.8)/2.4))*patch*(Math.hypot(x+24,z+27)<17?.3:1);
  }
  geometry.setAttribute('color',new T.BufferAttribute(colors,3));
  geometry.setAttribute('vegetationBlend',new T.BufferAttribute(blend,1));

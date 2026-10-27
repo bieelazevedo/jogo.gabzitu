@@ -56,11 +56,11 @@ export class HeroActor{
  private lastAction=0;private lastCombo=0;private lastTime=0;private hitUntil=0;private lastHit=0;
  private pose:HeroPose;
  constructor(assets:NightAssets,classId:NightClass,parent:T.Object3D){
-  this.look=HEROES[classId];const outfit=classId==='chaos'?'ScarletSorceress':classId==='guardian'?'ForgottenKnight':classId==='witch'?'Female_Peasant':classId==='astral'?'Male_Peasant':classId==='ranger'?'Female_Ranger':'Male_Ranger';
+  this.look=HEROES[classId];const outfit=classId==='chaos'?'ScarletSorceress':classId==='guardian'?'ForgottenKnight':classId==='witch'?'Female_Peasant':classId==='astral'?'AstralMage':classId==='ranger'?'ForestArcher':classId==='blade'?'LunarKnight':'ReaverKnight';
   this.actor=new Actor(assets,this.look.model,{items:this.look.items,hide:this.look.hide,tint:this.look.tint,modern:outfit,scale:assets.modern?1.55:1});
   this.pose=new HeroPose(this.actor,classId);
-  ({tail:this.tail,geometries:this.geometries}=this.actor.modern&&!['guardian','chaos'].includes(classId)?adventurerRegalia(this.actor,assets,classId):{tail:[],geometries:[]});
-  if(this.actor.modern&&classId!=='guardian')for(const item of this.look.items){const left=/Offhand|Shield|Spellbook/.test(item);const name=({'1H_Sword':'weapon-Sword_Bronze','1H_Axe':'weapon-Axe_Bronze','1H_Axe_Offhand':'weapon-Axe_Bronze','Barbarian_Round_Shield':'weapon-Shield_Wooden','2H_Staff':'weapon-PriestessStaff','1H_Wand':'weapon-SkullStaff','Spellbook_open':'spellbook_open','2H_Crossbow':'weapon-RecurveBow'} as Record<string,string>)[item]||item;this.actor.hold(name,left?'handslot.l':'handslot.r',o=>{const authored=/Priestess|Skull|Recurve/.test(name);o.scale.setScalar(authored?1:.65);o.rotation.set(authored?0:Math.PI/2,0,left?Math.PI:0);});}
+  ({tail:this.tail,geometries:this.geometries}=this.actor.modern&&classId==='witch'?adventurerRegalia(this.actor,assets,classId):{tail:[],geometries:[]});
+  if(this.actor.modern&&!['guardian','blade','reaver'].includes(classId))for(const item of this.look.items){const left=/Offhand|Shield|Spellbook/.test(item);const name=({'1H_Sword':'weapon-Sword_Bronze','1H_Axe':'weapon-Axe_Bronze','1H_Axe_Offhand':'weapon-Axe_Bronze','Barbarian_Round_Shield':'weapon-Shield_Wooden','2H_Staff':'weapon-PriestessStaff','1H_Wand':'weapon-SkullStaff','Spellbook_open':'spellbook_open','2H_Crossbow':'weapon-RecurveBow'} as Record<string,string>)[item]||item;this.actor.hold(name,left?'handslot.l':'handslot.r',o=>{const authored=/Priestess|Skull|Recurve/.test(name);o.scale.setScalar(authored?1:.65);o.rotation.set(authored?0:Math.PI/2,0,left?Math.PI:0);});}
   if(classId==='chaos')this.chaosLook();parent.add(this.actor.root);this.actor.play('Idle');
  }
  get root(){return this.actor.root;}

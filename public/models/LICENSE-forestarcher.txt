@@ -1,0 +1,4 @@
+Hawley the Archer — outcast945
+https://sketchfab.com/3d-models/47c311cb422a47d4a825b6832297607b
+CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+Mirror: allenai/objaverse. Changes: rig cleanup, compressed textures/geometry, canonical bone names, original clips removed and replaced with retargeted Quaternius CC0 animations.

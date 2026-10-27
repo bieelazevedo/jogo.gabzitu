@@ -1,0 +1,4 @@
+Berserk Armor — Angy97
+https://sketchfab.com/3d-models/1df49f839f674e3fb7a3d3481caf0855
+CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+Mirror: allenai/objaverse. Changes: rig cleanup, compressed textures/geometry, canonical bone names, original clips removed and replaced with retargeted Quaternius CC0 animations.
