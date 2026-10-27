@@ -25,8 +25,8 @@ function roadTile(mask:number){for(const [name,edges] of ROAD_TILES)for(let rot=
 
 type Theme={grass:number;road:number;sky:number;hemi:[number,number,number];sun:[number,number];near:string[];far:string[];field:string[];buildings:string[];night:boolean};
 const THEMES:Record<'garden'|'town'|'night',Theme>={
- garden:{grass:0xcfe8b8,road:0xffffff,sky:0x9fc9d9,hemi:[0xdff2ff,0x5b6b3c,1.25],sun:[0xfff1d6,2.4],near:['rock_single_A','rock_single_C','rock_single_E','tree_single_A'],far:['trees_A_large','trees_B_large','trees_A_medium','trees_B_medium','hills_A_trees','hills_B_trees','mountain_A_grass_trees','mountain_B_grass_trees'],field:['trees_A_small','trees_B_small','tree_single_B','trees_A_medium','rock_single_B','hill_single_A'],buildings:['building_windmill_blue','building_home_A_blue','building_well_blue','building_lumbermill_blue','building_home_B_blue','building_market_blue'],night:false},
- town:{grass:0xd8e2c0,road:0xfff3e0,sky:0xbfd2d8,hemi:[0xfff2e0,0x6b5b44,1.2],sun:[0xffe4c0,2.3],near:['barrel','crate_A_big','sack','rock_single_D'],far:['building_church_blue','building_tavern_blue','building_home_A_blue','building_home_B_blue','building_blacksmith_blue','building_market_blue','trees_B_large','hills_C_trees'],field:['building_home_A_blue','building_home_B_blue','building_well_blue','tree_single_A','trees_B_small','building_tavern_blue'],buildings:['building_barracks_blue','building_archeryrange_blue','building_church_blue','building_watermill_blue'],night:false},
+ garden:{grass:0xcfe8b8,road:0xffffff,sky:0x9fc9d9,hemi:[0xdff2ff,0x5b6b3c,1.25],sun:[0xfff1d6,2.4],near:['rock_single_A','rock_single_C','rock_single_E','tree_single_A'],far:['trees_A_medium','trees_A_small','trees_A_large','hills_A_trees','hills_B_trees','tree_single_B','trees_B_small'],field:['trees_A_small','trees_B_small','tree_single_B','trees_A_medium','rock_single_B','hill_single_A'],buildings:['building_windmill_blue','building_home_A_blue','building_well_blue','building_lumbermill_blue','building_home_B_blue','building_market_blue'],night:false},
+ town:{grass:0xc4dcae,road:0xfff3e0,sky:0xbfd2d8,hemi:[0xfff2e0,0x6b5b44,1.2],sun:[0xffe4c0,2.3],near:['barrel','crate_A_big','sack','rock_single_D'],far:['building_home_A_blue','building_home_B_blue','trees_A_medium','hills_C_trees','trees_A_small','building_church_blue'],field:['building_home_A_blue','building_home_B_blue','building_well_blue','tree_single_A','tree_single_B','building_church_blue'],buildings:['building_barracks_blue','building_archeryrange_blue','building_church_blue','building_watermill_blue'],night:false},
  night:{grass:0x8d9ab8,road:0xa8acc0,sky:0x1c2840,hemi:[0x9fb8ff,0x2a2238,1.15],sun:[0xb9ccff,1.6],near:['gravestone','grave_A','pumpkin_orange_jackolantern','bone_A','rock_single_A'],far:['tree_dead_large','tree_pine_orange_medium','tree_pine_yellow_large','mountain_C_grass_trees','hills_C_trees','tree_dead_medium','trees_A_large'],field:['tree_dead_medium','tree_dead_small','grave_B','gravemarker_A','lantern_standing','tree_pine_orange_medium'],buildings:['crypt','building_destroyed','building_tower_B_red'],night:true},
 };
 /** Kenney Nature Kit undergrowth (CC0) scattered along the roads. */
@@ -35,10 +35,12 @@ const themeOf=(l:Level)=>THEMES[l.theme==='town'||l.theme==='archive'?'town':l.t
 /** Halloween Bits are modelled at character scale; the hexagon pack is about 5× smaller. */
 const BIT=.5;
 
+/** Halloween Bits props are modelled at character scale; everything else in the scene uses hex-tile scale. */
+const bitScale=(name:string)=>/^(tree_dead|tree_pine|grave|gravestone|pumpkin|bone|lantern|crypt|ribcage|skull|candle|coffin|fence|arch|shrine|post_lantern|bench|plaque)/.test(name)?BIT*(/^grave|^gravestone/.test(name)?.75:1):1;
 /** Collects static props and turns each prop part into one InstancedMesh. */
 class Batch{
  private items=new Map<string,{m:T.Matrix4;c?:T.Color}[]>();private q=new T.Quaternion();private up=new T.Vector3(0,1,0);
- add(name:string,x:number,y:number,z:number,rot=0,scale=1,color?:number){const m=new T.Matrix4().compose(new T.Vector3(x,y,z),this.q.setFromAxisAngle(this.up,rot).clone(),new T.Vector3(scale,scale,scale));let list=this.items.get(name);if(!list){list=[];this.items.set(name,list);}list.push({m,c:color===undefined?undefined:new T.Color(color)});}
+ add(name:string,x:number,y:number,z:number,rot=0,scale=1,color?:number){scale*=bitScale(name)*(/^building_(home|church|tavern|well|market|blacksmith|windmill|lumbermill|watermill|barracks|archeryrange)/.test(name)?1.3:1);const m=new T.Matrix4().compose(new T.Vector3(x,y,z),this.q.setFromAxisAngle(this.up,rot).clone(),new T.Vector3(scale,scale,scale));let list=this.items.get(name);if(!list){list=[];this.items.set(name,list);}list.push({m,c:color===undefined?undefined:new T.Color(color)});}
  build(assets:NightAssets,root:T.Object3D){const meshes:T.InstancedMesh[]=[];
   for(const [name,list] of this.items){for(const part of assets.parts(name)){const mesh=new T.InstancedMesh(part.geometry,part.material,list.length);list.forEach((it,i)=>{mesh.setMatrixAt(i,it.m.clone().multiply(part.matrix));if(it.c)mesh.setColorAt(i,it.c);});mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);}}
   return meshes;}
@@ -206,17 +208,21 @@ export class TdRenderer{
    const pick=(list:string[],k:number)=>list[Math.floor(hash(k)*list.length)];const rot=hash(c.q*7+c.r*13)*TAU;
    if(!field(c)){// Outer frame: dense woods and mountains that make the battlefield a valley.
     const edge=Math.max(Math.abs(c.x)-20.5,Math.abs(c.z)-15);if(c.near<=1)continue;
-    if(h<.9)batch.add(edge>6&&h<.4?pick(['mountain_A_grass_trees','mountain_B_grass_trees','mountain_C_grass_trees'],h*91):pick(theme.far,h*53),c.x,0,c.z,Math.floor(rot/(Math.PI/3))*Math.PI/3,1);
-    else if(h<.915&&edge<5)batch.add(pick(theme.buildings,h*17),c.x,0,c.z,Math.floor(rot/(Math.PI/3))*Math.PI/3,1);
+    // Budget: a dense tree line hugs the field; farther out only sparse single trees and the odd mountain
+    // (a phone draws the whole frame every frame, so the scenery stays under ~250k triangles).
+    const turnRot=Math.floor(rot/(Math.PI/3))*Math.PI/3;
+    if(edge<4.5){if(h<.62)batch.add(pick(theme.far,h*53),c.x,0,c.z,turnRot,1);else if(h<.68)batch.add(pick(theme.buildings,h*17),c.x,0,c.z,turnRot,1);else if(h<.85)batch.add(theme.night?'tree_dead_medium':'tree_single_A',c.x+(hash(h*3)-.5),0,c.z,rot,1.2);}
+    else if(h<.08)batch.add(pick(['mountain_A_grass_trees','mountain_B_grass_trees','mountain_C_grass_trees'],h*91),c.x,0,c.z,turnRot,1.2);
+    else if(h<.3)batch.add(theme.night?'tree_dead_small':h<.2?'tree_single_A':'tree_single_B',c.x+(hash(h*5)-.5),0,c.z+(hash(h*7)-.5),rot,1.3);
     continue;}
-   if(c.near===1){if(h<.22)batch.add(pick(theme.near,h*31),c.x+(hash(h)-.5)*.8,0,c.z+(hash(h*3)-.5)*.6,rot,theme.night&&h<.1?BIT*.8:1);
+   if(c.near===1){if(h<.22)batch.add(pick(theme.near,h*31),c.x+(hash(h)-.5)*.8,0,c.z+(hash(h*3)-.5)*.6,rot,1);
     else if(h<.5&&!theme.night)for(let k=0;k<2;k++)batch.add(pick(SMALL,h*97+k),c.x+(hash(h*5+k)-.5)*1.3,0,c.z+(hash(h*7+k)-.5)*1.1,rot+k,1.5);continue;}
    if(ponds.has(c)){batch.add('hex_water',c.x,0,c.z,0,1);batch.add(h<.5?'waterlily_A':'waterlily_B',c.x+.3,0,c.z-.2,rot,1);continue;}
    if(nearSpot(c)&&c.near<4){if(h<.35&&!theme.night)batch.add(pick(SMALL,h*41),c.x+(hash(h*9)-.5)*.9,0,c.z+(hash(h*11)-.5)*.8,rot,1.4);continue;}
-   if(h<(c.near>=3?.55:.32)){const name=pick(theme.field,h*71);batch.add(name,c.x,0,c.z,Math.floor(rot/(Math.PI/3))*Math.PI/3,theme.night&&!name.startsWith('building')&&!name.startsWith('tree_single')&&!name.startsWith('trees')&&!name.startsWith('rock')&&!name.startsWith('hill')?BIT:1);}
+   if(h<(c.near>=3?.55:.32)){const name=pick(theme.field,h*71);batch.add(name,c.x,0,c.z,Math.floor(rot/(Math.PI/3))*Math.PI/3,1);}
   }
   // Skeleton gates at the entries; the Ordem's castle guards the refuge.
-  for(const route of map.routes){const a=route[0],b=route[1]||a,ang=Math.atan2(b.x-a.x,b.z-a.z);batch.add('building_destroyed',a.x-Math.sin(ang)*1.6,0,a.z-Math.cos(ang)*1.6,ang,1.2);batch.add('gravestone',a.x+Math.cos(ang)*1.3,0,a.z-Math.sin(ang)*1.3,ang,BIT);batch.add('grave_A',a.x-Math.cos(ang)*1.3,0,a.z+Math.sin(ang)*1.3,ang+.4,BIT);batch.add('lantern_standing',a.x+Math.cos(ang)*1.1+.4,0,a.z-Math.sin(ang)*1.1+.6,0,BIT);
+  for(const route of map.routes){const a=route[0],b=route[1]||a,ang=Math.atan2(b.x-a.x,b.z-a.z);batch.add('building_destroyed',a.x-Math.sin(ang)*1.6,0,a.z-Math.cos(ang)*1.6,ang,1.2);batch.add('gravestone',a.x+Math.cos(ang)*1.3,0,a.z-Math.sin(ang)*1.3,ang);batch.add('grave_A',a.x-Math.cos(ang)*1.3,0,a.z+Math.sin(ang)*1.3,ang+.4);batch.add('lantern_standing',a.x+Math.cos(ang)*1.1+.4,0,a.z-Math.sin(ang)*1.1+.6,0);
    this.light(0x9f7bff,a.x,1.6,a.z,6);}
   const exits=[...new Set(map.routes.map(r=>r[r.length-1]))];
   for(const e of exits){batch.add('building_castle_blue',e.x+1.4,0,e.z,-Math.PI/2,1.25);batch.add('flag_blue',e.x-.6,0,e.z-1.3,0,1.4);batch.add('flag_blue',e.x-.6,0,e.z+1.3,0,1.4);this.light(0xffc070,e.x,2,e.z,7);}

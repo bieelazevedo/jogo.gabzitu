@@ -1,8 +1,10 @@
-# Créditos — Gato Nightreign
+# Créditos — Gato Nightreign e campo 3D do tower defense
 
 ## Modelos 3D (CC0, domínio público)
 - **KayKit Character Pack: Adventurers** e **Skeletons**, **Medieval Hexagon Pack**, **Halloween Bits**, **Dungeon Remastered** — Kay Lousberg (www.kaylousberg.com). Licenças em `/models/LICENSE-kaykit-*.txt`.
 - **Nature Kit** — Kenney (www.kenney.nl). Licença em `/models/LICENSE-kenney-nature-kit.txt`.
+- **Shiba Inu** (cão dos esqueletos no tower defense) — Quaternius (quaternius.com), CC0; versão comprimida em `/models/characters/Dog.glb`.
+- O tower defense usa os tiles hexagonais, edifícios e decoração do Medieval Hexagon Pack; os mapas são gerados a partir dos percursos de cada fase (`src/td-hex.ts`).
 - A variante carmesim da Carmesim é uma recoloração da textura da Rogue (KayKit), feita por `scripts/build-models.mjs`.
 
 ## Lua (domínio público)
