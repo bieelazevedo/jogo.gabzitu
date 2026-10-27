@@ -77,7 +77,7 @@ export function dressNightWorld(assets:NightAssets,root:T.Object3D):{meshes:T.In
  const segment=(x:number,z:number,[ax,az,bx,bz]:number[])=>{const dx=bx-ax,dz=bz-az,t=Math.max(0,Math.min(1,((x-ax)*dx+(z-az)*dz)/(dx*dx+dz*dz)));return Math.hypot(x-ax-t*dx,z-az-t*dz);};
  const open=(x:number,z:number)=>PATHS.every(p=>segment(x,z,p)>3)&&NIGHT_CAMPS.every(c=>Math.hypot(c.x-x,c.z-z)>5)&&[...NIGHT_PORTALS,...NIGHT_SPRINGS].every(p=>Math.hypot(p.x-x,p.z-z)>3.5)&&NIGHT_OBSTACLES.every(o=>Math.hypot(o.x-x,o.z-z)>o.r+1)&&Math.hypot(x,z-27)>9;
  const cover:Record<string,Place[]>={plant_bushDetailed:[],plant_bushLarge:[],flower_purpleA:[],flower_redA:[],flower_yellowA:[],mushroom_redGroup:[],mushroom_tanTall:[]};
- const kinds=Object.keys(cover);for(let i=0;i<520;i++){const x=(hash(i*3.1)-.5)*92,z=(hash(i*7.7+1)-.5)*92;if(!open(x,z))continue;const forest=x<-8&&z>-6,kind=kinds[Math.floor(hash(i*13.3)*kinds.length)];if(!forest&&/mushroom/.test(kind))continue;cover[kind].push([x,z,hash(i)*6.3,.8+hash(i*5)*.6]);}
+ const kinds=Object.keys(cover);for(let i=0;i<320;i++){const x=(hash(i*3.1)-.5)*92,z=(hash(i*7.7+1)-.5)*92;if(!open(x,z))continue;const forest=x<-8&&z>-6,kind=kinds[Math.floor(hash(i*13.3)*kinds.length)];if(!forest&&/mushroom/.test(kind))continue;cover[kind].push([x,z,hash(i)*6.3,.8+hash(i*5)*.6]);}
  // Ground cover reads at roughly knee height; bushes a little taller.
  const coverScale:Record<string,number>={plant_bushDetailed:2.6,plant_bushLarge:2.8,grass:2.2,flower_purpleA:2.4,flower_redA:2.4,flower_yellowA:2.4,mushroom_redGroup:3,mushroom_tanTall:3.2,rock_largeA:2.2};
  for(const [kind,places] of Object.entries(cover))scatter(kind,places,coverScale[kind]);
