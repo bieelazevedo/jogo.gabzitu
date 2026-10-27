@@ -134,6 +134,7 @@ Modo cooperativo de ação 3D para telemóvel (1–5 jogadores, vagas preenchida
 - Personagens, inimigos, chefes, edifícios, natureza e adereços são modelos 3D prontos com licença CC0 (KayKit de Kay Lousberg e Kenney Nature Kit), em `public/models` (~4 MB, compressão meshopt e texturas WebP). Gerados por `node scripts/build-models.mjs`.
 - Efeitos de magia e impacto usam o Kenney Particle Pack (CC0) em `public/fx`.
 - Ícones de habilidades: game-icons.net (CC BY 3.0), extraídos por `node scripts/build-icons.mjs` para `src/night-skill-icons.ts`.
+- Interface com Kenney Fantasy UI Borders e UI Pack RPG Expansion (CC0); lua com o mapa LRO da NASA (domínio público).
 - Créditos completos em `public/CREDITS.md` e no menu do modo.
 - Se os modelos não carregarem, o jogo volta automaticamente à geometria simples original.
 
@@ -143,10 +144,16 @@ Garra Lunar (duelista), Astral (curandeiro), Bastião (guardião), Rubro (duelis
 - Onda do caos, Levitação carmesim, Prisão de runas e passiva Caos instável (cada 4.º feitiço +40%).
 - Especial **Realidade reescrita**: zona de 10 m durante 8 s com dano contínuo; aliados lá dentro ficam invulneráveis e recuperam vida.
 
-### Controlos
-- Joystick à esquerda; **dois toques rápidos no joystick = esquiva** (na direção do arrasto). O anel do joystick acende quando há vigor para esquivar.
-- Botões de habilidade com ícone por classe; cada magia comprada no santuário ganha o seu próprio botão com recarga.
+### Controlos (telemóvel deitado)
+- **Joystick flutuante**: toca em qualquer ponto da metade esquerda; **dois toques rápidos = esquiva** (na direção do arrasto); empurrar até ao limite por um instante **corre** sozinho.
+- **Polegar direito**: Atacar no canto (segurar = ataque contínuo / feixe da Carmesim); habilidades da classe em arco à volta; magias compradas no arco exterior. Só ícones; a recarga aparece no anel.
+- **Manter premida uma habilidade** mostra o que faz, o dano/cura base e o atual (com atributos, melhorias e efeitos) e a recarga, sem a lançar.
+- **Minimapa** (fotografia aérea do próprio mundo) no canto superior esquerdo; tocar abre o mapa completo, onde se toca num portal para viajar.
+- Poção junto à barra de vida; Atributos, Equipa e Menu no canto superior direito. Ao alto aparece um aviso para rodar o telemóvel.
 - Teclado: WASD ou setas, J atacar, E poder, Espaço saltar, Z esquivar, Shift correr.
+
+### Missões
+Cada lua tem três missões opcionais durante a exploração (acampamentos, portais, relíquias, elites, esquivas perfeitas). Completar dá ouro a toda a equipa e, nas mais difíceis, pontos de atributo e uma poção. As relíquias estão marcadas no mapa com um feixe de luz dourada.
 
 ### Dificuldade
 Inimigos com sequências de golpes (comuns a partir da 2.ª lua, elites sempre), no máximo dois a atacar o mesmo herói, castigo a quem ataca sem parar, arqueiros que antecipam o movimento e acampamentos maiores nas luas seguintes. O chefe encadeia mais golpes com preparação variável. Esquiva perfeita dá energia e vigor. Medição com uma equipa de três bots: Aventura 5/5 vitórias, Normal 5/5, Caçada 2/5.
