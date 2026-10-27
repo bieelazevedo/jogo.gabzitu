@@ -15,6 +15,7 @@ import {SKILLS} from './skills';
 import './style.css';
 import './combat-ui.css';
 import './mobile-hub.css';
+import './menu-dark.css';
 import { CATS, CHAPTERS, COMMON, ENEMIES, H, LEVELS, STEP, W, waveFor } from './data';
 import { command, createState, dist, previewWave, refund, stats, step, upgradeCost } from './simulation';
 import { completed, fresh, load, persist, recordWin, starsFor, totalStars, validateSave,setSaveScope } from './persistence';
@@ -63,7 +64,7 @@ account.onUser=(user,recovery)=>{void (async()=>{if(farmStop){farmStop();farmSto
 function header() { return `<header class="site-header app-header">${button('← Menu', 'home', 'secondary')}<div class="brand"><img class="brand-emblem" src="/icon.svg" alt=""><span>Muralhas <em>&</em> Bigodes<small>A ORDEM DO NOVELO</small></span></div><span class="star-total">✦ ${totalStars(save)} <small>/ ${LEVELS.length*3}</small></span>${button('⛶', 'fullscreen', 'icon-button')}</header>`; }
 function footer() { return ''; }
 // Dev server only: ?devgame=N opens level N without an account, for layout checks on phone sizes.
-const DEV_GUEST = import.meta.env.DEV && new URLSearchParams(location.search).has('devgame');
+const DEV_GUEST = import.meta.env.DEV && ['devgame','devscreen','devfarm'].some(k=>new URLSearchParams(location.search).has(k));
 function setScreen(next: string) {if(!['account','privacy'].includes(next))registrationDraft=null;screen = next; dialog = ''; renderer?.dispose(); renderer = null; render(); }
 function render() {
     if(!account.user&&!DEV_GUEST&&!['account','privacy'].includes(screen)){screen='account';}
@@ -1054,7 +1055,7 @@ function frame(now: number) {
     requestAnimationFrame(frame);
 }
 app.innerHTML='<main class="loading-screen"><span>✦</span><h1>Muralhas & Bigodes</h1><p>A reunir a Ordem do Novelo…</p></main>';
-void artReady.then(()=>{render();requestAnimationFrame(frame);if(DEV_GUEST){chosenLevel=Number(new URLSearchParams(location.search).get('devgame'))||1;startGame();(window as unknown as {__mb:unknown}).__mb={renderer:()=>renderer,state:()=>state,spots:()=>state?LEVELS[state.levelId-1].spots:[]};}});
+void artReady.then(()=>{render();requestAnimationFrame(frame);const devQuery=new URLSearchParams(location.search);if(DEV_GUEST&&devQuery.has('devscreen'))setScreen(devQuery.get('devscreen')||'home');if(DEV_GUEST&&devQuery.has('devfarm'))void beginFarm();if(DEV_GUEST&&devQuery.has('devgame')){chosenLevel=Number(devQuery.get('devgame'))||1;startGame();}if(DEV_GUEST){(window as unknown as {__mb:unknown}).__mb={renderer:()=>renderer,state:()=>state,spots:()=>state?LEVELS[state.levelId-1].spots:[]};}});
 if (location.hash.startsWith('#sala=')&&account.user) {
     screens.navigation.coop = 'invite';
     setScreen('coop');

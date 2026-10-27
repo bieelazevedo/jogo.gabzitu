@@ -1,0 +1,80 @@
+/* Tower defense menus in the same dark, gold-trimmed style as the battle HUD and Gato Nightreign.
+   Panels and buttons use the Kenney Fantasy UI frames in public/ui (CC0). Loaded after the base sheets. */
+:root{--md-ink:#f3e7c4;--md-soft:#b9c9c3;--md-gold:#e2c98a;--md-deep:#0c1c22;--md-panel:#13282fee;--md-card:#183339}
+body:has(.app-screen),body:has(.app-header){background:radial-gradient(ellipse at 50% 0%,#24414a,#0b171d 70%)}
+.app-header{background:linear-gradient(180deg,#1d353c,#11232a)!important;border-bottom:1px solid #e2c98a33;box-shadow:0 4px 18px #0007;color:var(--md-ink)}
+.app-header .brand,.app-header .brand strong{color:var(--md-ink)!important}
+.app-header .brand small{color:var(--md-soft)!important}
+.app-header>button,.app-header .secondary,.app-header .icon-button{background:linear-gradient(160deg,#28434b,#132a31)!important;color:var(--md-ink)!important;border:1px solid #e2c98a66!important;box-shadow:0 2px 0 #071419!important}
+.app-header .star-total{background:#0d1d23!important;color:var(--md-gold)!important;border:1px solid #e2c98a55!important}
+.app-screen{background:transparent!important;color:var(--md-ink)}
+.screen-heading h1,.setup-card-heading h1,.submenu-card h2,.lesson h2{color:var(--md-ink)!important;font-family:Georgia,serif;text-shadow:0 2px 8px #0008}
+.screen-heading>span,.setup-card-heading>span,.screen-bottom>span{color:var(--md-soft)!important}
+.screen-tabs>button,.chapter-tabs>button{background:linear-gradient(160deg,#20393f,#11242a)!important;color:var(--md-soft)!important;border:1px solid #9fb5ad44!important;box-shadow:0 3px 0 #071419!important}
+.screen-tabs>.tab-active,.chapter-tabs>.tab-active{background:linear-gradient(160deg,#7a5a24,#3d2b10)!important;color:#fff1cf!important;border-color:var(--md-gold)!important}
+.chapter-tabs>button>span{color:var(--md-gold);opacity:.9}
+/* Level cards: each shows its own hex battlefield. */
+.world-board{background:radial-gradient(ellipse at 50% 30%,#1c3a40,#0c1a20)!important;border:1px solid #e2c98a44!important;box-shadow:inset 0 0 40px #0009}
+.world-board:before{display:none!important}
+.world-node{position:relative;overflow:hidden;background:linear-gradient(180deg,#0c1c22cc 0%,#0c1c2266 45%,#0c1c22ee 100%),var(--map) center/cover no-repeat,#183339!important;border:1px solid #e2c98a66!important;box-shadow:0 4px 0 #050f12,0 6px 16px #0008!important;justify-content:flex-end!important;transition:transform .15s,box-shadow .15s}
+.world-node strong{color:#fff4d6!important;text-shadow:0 1px 4px #000,0 0 10px #000c}
+.world-node small{color:var(--md-gold)!important;text-shadow:0 1px 3px #000}
+.world-node .world-number{position:absolute;top:6px;left:6px;width:30px!important;height:30px!important;font-size:14px!important;background:radial-gradient(circle at 35% 30%,#f1d79a,#a8803c)!important;box-shadow:0 2px 6px #0008}
+.world-node .stars{color:#ffd76a;text-shadow:0 1px 3px #000}
+.world-node.next-node{border-color:#ffe08a!important;box-shadow:0 0 0 2px #ffe08a88,0 0 22px #ffd36a66!important;animation:md-pulse 2.2s ease-in-out infinite}
+.world-node:not(:disabled):active{transform:translateY(2px)}
+.world-node.node-locked{filter:grayscale(.65) brightness(.78)}
+.world-node:disabled{opacity:1!important}
+@keyframes md-pulse{50%{box-shadow:0 0 0 2px #ffe08a,0 0 30px #ffd36aaa}}
+.screen-bottom{background:linear-gradient(0deg,#0b171d,#0b171d00)!important;border:0!important}
+.screen-bottom .compact,.screen-bottom button{background:linear-gradient(160deg,#28434b,#132a31)!important;color:var(--md-ink)!important;border:1px solid #e2c98a55!important}
+/* Briefing: the map fills the screen behind a framed card. */
+.setup-background{filter:saturate(1.05) brightness(.8)!important;background-size:cover!important;background-position:center!important}
+.setup-card{background:var(--md-panel)!important;color:var(--md-ink)!important;border:1px solid #e2c98a88!important;outline:1px solid #e2c98a33;outline-offset:4px;box-shadow:0 18px 50px #000a,inset 0 0 0 1px #0006!important;backdrop-filter:blur(6px)}
+.setup-card .cat-choice,.setup-card .shop-cat,.setup-cats .cat-choice{background:linear-gradient(160deg,#20393f,#11242a)!important;border:1px solid #e2c98a55!important;color:var(--md-ink)!important}
+.setup-card .cat-choice strong{color:var(--md-ink)!important}
+.setup-card .cat-choice small,.setup-hint,.setup-options label,.mission-brief p,.mission-brief span{color:var(--md-soft)!important}
+.mission-brief h3{color:var(--md-gold)!important;font-family:Georgia,serif}
+.setup-card select,.submenu-card select{background:#0d1d23!important;color:var(--md-ink)!important;border:1px solid #e2c98a66!important}
+.setup-card .primary,.setup-start .primary,.app-screen .primary{background:linear-gradient(160deg,#c9a24f,#7a5a24)!important;color:#1b1206!important;border:1px solid #ffe7a8!important;box-shadow:0 4px 0 #3d2b10,0 8px 20px #0007!important;font-weight:800}
+.setup-card button.secondary,.app-screen .secondary{background:linear-gradient(160deg,#28434b,#132a31)!important;color:var(--md-ink)!important;border:1px solid #e2c98a55!important}
+.setup-card button:not(.primary):not(.cat-choice):not(.tab-active),.setup-panel>button{color:var(--md-ink)}
+/* Settings, help and co-op cards. */
+.submenu-card,.lesson,.coop-card,.room-screen,.simple-coop{background:var(--md-panel)!important;color:var(--md-ink)!important;border:14px solid transparent!important;border-image:url('/ui/frame-panel.png') 30 / 14px stretch!important}
+.submenu-card p,.lesson p,.submenu-card label{color:var(--md-soft)!important}
+.lesson-dots>span{background:#41605a!important}.lesson-dots>.current{background:var(--md-gold)!important}
+/* Dialogs over the menus. */
+.modal{background:linear-gradient(160deg,#1d353c,#10222a)!important;color:var(--md-ink)!important;border:14px solid transparent!important;border-image:url('/ui/frame-panel.png') 30 / 14px stretch!important;box-shadow:0 20px 60px #000b!important}
+.modal h2{color:var(--md-ink)!important;font-family:Georgia,serif}.modal p{color:var(--md-soft)!important}
+@media(orientation:landscape) and (max-height:500px){
+ .app-header{height:52px!important;min-height:52px!important;padding:0 14px!important}
+ .app-screen{height:calc(100dvh - 52px)!important}
+ .screen-heading{padding:8px 18px 6px!important}.screen-heading h1{font-size:22px!important}
+ .chapter-tabs{padding:0 14px 8px!important;gap:6px!important}.chapter-tabs>button{min-height:38px!important;font-size:11px!important;padding:4px 8px!important}
+ .world-board{margin:0 10px!important;border-radius:14px}
+ .world-node strong{font-size:13px!important}
+ .screen-bottom{min-height:48px!important;padding:6px 14px!important}
+}
+
+/* Pagers and small icon buttons inside menus. */
+.app-screen button.compact,.setup-card button.compact,.setup-panel .page-button,.setup-panel button[data-action^="cat-page"]{background:linear-gradient(160deg,#28434b,#132a31)!important;color:var(--md-ink)!important;border:1px solid #e2c98a55!important;font-size:18px}
+.app-screen button:disabled{opacity:.35}
+.setup-cats .cat-choice img,.setup-card .cat-choice img{width:clamp(56px,14vh,84px)!important;height:clamp(56px,14vh,84px)!important}
+.setup-card .roster-strip img,.setup-card .lineup img{border-color:#e2c98a88!important}
+/* Co-op: one frame only (the inner card sits inside the framed screen). */
+.coop-card .simple-coop,.submenu-card .simple-coop{border:0!important;border-image:none!important;background:transparent!important}
+.app-screen input[type=text],.app-screen input:not([type]),.app-screen input[type=email],.app-screen input[type=password],.account-entry input{background:#0d1d23!important;color:var(--md-ink)!important;border:1px solid #e2c98a66!important}
+.app-screen a,.app-screen .text-button,.account-entry .text-button{color:var(--md-gold)!important}
+/* Account entry: dark card over the illustrated backdrop. */
+.account-entry .account-card,.account-entry form,.account-entry section{background:var(--md-panel)!important;color:var(--md-ink)!important;border-color:#e2c98a88!important}
+.account-entry label,.account-entry small,.account-entry p{color:var(--md-soft)!important}
+.account-entry .screen-tabs>button:not(.tab-active),.account-entry nav button:not(.tab-active){background:linear-gradient(160deg,#20393f,#11242a)!important;color:var(--md-soft)!important}
+.account-entry .tab-active,.account-entry .primary{background:linear-gradient(160deg,#c9a24f,#7a5a24)!important;color:#1b1206!important;border:1px solid #ffe7a8!important}
+.account-game-card{background:var(--md-panel)!important;color:var(--md-ink)!important;border:1px solid #e2c98a88!important;box-shadow:0 18px 50px #000a!important;backdrop-filter:blur(6px)}
+.account-game-tabs button{background:linear-gradient(160deg,#20393f,#11242a)!important;color:var(--md-soft)!important;border:1px solid #9fb5ad44!important}
+.account-game-tabs button.tab-active,.account-game-tabs button[aria-selected=true]{background:linear-gradient(160deg,#7a5a24,#3d2b10)!important;color:#fff1cf!important;border-color:var(--md-gold)!important}
+.account-fields label,.account-note,.remember,.account-game-footer{color:var(--md-soft)!important}
+.account-fields input{background:#0d1d23!important;color:var(--md-ink)!important;border:1px solid #e2c98a66!important}
+.account-buttons .primary,.account-form button[type=submit]{background:linear-gradient(160deg,#c9a24f,#7a5a24)!important;color:#1b1206!important;border:1px solid #ffe7a8!important}
+.account-buttons button:not(.primary),.account-buttons a{color:var(--md-gold)!important}
+.privacy-card{background:var(--md-panel)!important;color:var(--md-ink)!important}
