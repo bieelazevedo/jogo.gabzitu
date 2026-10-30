@@ -81,6 +81,11 @@ const CATEGORY_LABELS: Record<UpgradeCategory, string> = {
   mythic: 'Convergência dos Selos',
 };
 
+import {
+  renderAnimeGuardianBadge,
+  getAnimeGuardianSvg,
+} from './anime-portraits';
+
 // Quadrant CSS background-position for /arcana-benders.jpg (2x2 pixel-art sheet)
 const BENDER_PORTRAIT_BG_POS: Record<ArcanaClassId, string> = {
   chess: '0% 0%',     // Top-Left: Mestre da Água
@@ -113,9 +118,13 @@ export function getSkillVectorIcon(nameOrText: string): string {
   return skillIcon('beams-aura');
 }
 
-function renderBenderPortraitBadge(classId: ArcanaClassId, sizePx = 64, borderCol = '#ffd166'): string {
-  const pos = BENDER_PORTRAIT_BG_POS[classId];
-  return `<div style="width:${sizePx}px;height:${sizePx}px;min-width:${sizePx}px;min-height:${sizePx}px;aspect-ratio:1/1;border-radius:12px;border:2.5px solid ${borderCol};background-image:url('/arcana-benders.jpg');background-size:200% 200%;background-position:${pos};box-shadow:0 0 16px ${borderCol}66;flex-shrink:0;"></div>`;
+function renderBenderPortraitBadge(
+  classId: ArcanaClassId,
+  sizePx = 64,
+  borderCol = '#ffd166',
+  active = false
+): string {
+  return renderAnimeGuardianBadge(classId, sizePx, borderCol, active);
 }
 
 export function launchArcana(options: LaunchArcanaOptions): () => void {
@@ -613,7 +622,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             ${sectorLabelsHtml}
 
             <!-- Central Elemental Core -->
-            <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;border:3px solid #ffd166;background-image:url('/arcana-benders.jpg');background-size:200% 200%;background-position:${BENDER_PORTRAIT_BG_POS[classId]};image-rendering:pixelated;box-shadow:0 0 28px ${cls.palette.glow}, 0 0 50px ${cls.palette.primary};z-index:5;display:flex;align-items:flex-end;justify-content:center;">
+            <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;border:3px solid #ffd166;background-image:url('data:image/svg+xml;utf8,${encodeURIComponent(getAnimeGuardianSvg(classId))}');background-size:cover;background-position:center;box-shadow:0 0 28px ${cls.palette.glow}, 0 0 50px ${cls.palette.primary};z-index:5;display:flex;align-items:flex-end;justify-content:center;">
               <span style="font-size:9px;font-weight:900;background:#080512;color:#ffd166;padding:1px 6px;border-radius:99px;border:1px solid #ffd166;transform:translateY(8px);">NÚCLEO</span>
             </div>
 
@@ -925,31 +934,31 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                 <button
                   data-act="quick-play:${selectedClassId}"
                   class="fantasy-btn"
-                  style="flex:1;padding:14px 28px;border-radius:12px;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:16px;cursor:pointer;box-shadow:0 0 24px rgba(255,209,102,0.5);letter-spacing:1px;"
+                  style="flex:1;padding:15px 28px;border-radius:14px;border:2px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#120824;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 0 24px rgba(255,209,102,0.5);letter-spacing:1px;"
                 >
-                  ⚔ INICIAR EXPEDIÇÃO ARCANA (1 CLIQUE!)
+                  ⚔ DESPERTAR SELO PRIMORDIAL ✦
                 </button>
                 <button
                   data-act="start-training"
                   title="Treinar combos e dano contra bonecos"
-                  style="padding:14px 18px;border-radius:12px;border:1px solid #80ffdb;background:rgba(128,255,219,0.15);color:#80ffdb;font-weight:800;font-size:13px;cursor:pointer;"
+                  style="padding:14px 20px;border-radius:14px;border:1.5px solid #80ffdb;background:rgba(128,255,219,0.15);color:#80ffdb;font-weight:800;font-size:13px;cursor:pointer;"
                 >
-                  🎯 Dojo de Treino
+                  🎯 Campo de Provas
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 5-Nation Campaign Progression Roadmap Footer -->
+        <!-- 5-Realm Campaign Progression Roadmap Footer -->
         <footer style="pointer-events:auto;display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-radius:12px;background:rgba(12,7,26,0.9);border:1px solid rgba(255,209,102,0.3);font-size:11px;color:#cfc4e8;flex-wrap:wrap;gap:8px;z-index:20;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <strong style="color:#ffd166;">Campanha das 5 Nações:</strong>
-            <span>I. Polo Sul</span> →
-            <span>II. Cratera do Fogo</span> →
-            <span>III. Templo do Ar</span> →
-            <span>IV. Zaofu</span> →
-            <span>V. Mundo Espiritual</span>
+            <strong style="color:#ffd166;">Campanha dos 5 Selos de Aethra:</strong>
+            <span>I. Cume de Nerath</span> →
+            <span>II. Forja do Sol Negro</span> →
+            <span>III. Mil Sinos dos Céus</span> →
+            <span>IV. Cidadela de Durmak</span> →
+            <span>V. Fenda Sem Estrelas</span>
           </div>
           <div style="display:flex;gap:12px;align-items:center;">
             <span>✦ Essência Arcana: <strong style="color:#80ffdb;">${profile.eternalEssence}</strong></span>
@@ -1022,7 +1031,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           <!-- Left: Giant Portrait + Vertentes -->
           <div style="display:flex;flex-direction:column;gap:10px;">
             <div style="display:flex;gap:14px;align-items:center;">
-              <div style="width:128px;height:128px;border-radius:16px;border:3px solid ${cls.palette.accent};background-image:url('/arcana-benders.jpg');background-size:205% 205%;background-position:${posMap[selectedClassId]};flex-shrink:0;box-shadow:0 0 24px ${cls.palette.glow}55;"></div>
+              <div style="width:130px;height:130px;border-radius:18px;border:3px solid ${cls.palette.accent};background-image:url('data:image/svg+xml;utf8,${encodeURIComponent(getAnimeGuardianSvg(selectedClassId))}');background-size:cover;background-position:center;flex-shrink:0;box-shadow:0 0 28px ${cls.palette.glow}77;"></div>
               <div>
                 <span style="font-size:11px;color:#80ffdb;font-weight:800;text-transform:uppercase;">${cls.title}</span>
                 <h3 style="margin:2px 0 6px;font-size:24px;color:#fff;">${cls.name}</h3>

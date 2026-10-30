@@ -21,7 +21,6 @@ import {
   type CharacterName,
   type NightAssets,
 } from '../night-assets';
-import { dressNightWorld, NIGHT_PATHS } from '../night-layout';
 import { vfxTexture } from '../night-vfx-textures';
 import { ARCANA_CAMPAIGNS, ARCANA_CLASSES } from './data';
 import type {
@@ -379,7 +378,7 @@ export class ArcanaRenderer {
   // 3D Asset Library (KayKit + Quaternius + Modern GLBs)
   private assets: NightAssets | null = null;
   private assetsLoading = false;
-  private dressWorldHandle?: ReturnType<typeof dressNightWorld>;
+  private sanctuaryDispose?: () => void;
   private fallbackGroundDispose?: () => void;
   private mapSnapshotCanvas?: HTMLCanvasElement;
 
@@ -388,6 +387,10 @@ export class ArcanaRenderer {
   private propsRoot = new T.Group();
   private dynamicRoot = new T.Group();
   private vfxRoot = new T.Group();
+  private elementalVfxRoot = new T.Group();
+  private eyeGlowSprites: T.Sprite[] = [];
+  private elementalVfxSprites: { sprite: T.Sprite; offsetIdx: number }[] = [];
+  private auroraRibbons: T.Mesh[] = [];
 
   // Cached Campaign Environment State
   private builtCampaignId: CampaignId | null = null;
@@ -487,7 +490,8 @@ export class ArcanaRenderer {
       this.dirLight,
       this.dirLight.target,
       this.rimLight,
-      this.playerLight
+      this.playerLight,
+      this.elementalVfxRoot
     );
 
     this.ensureAssetsLoaded();
@@ -583,7 +587,7 @@ export class ArcanaRenderer {
   }
 
   public dispose(): void {
-    this.dressWorldHandle?.dispose();
+    this.sanctuaryDispose?.();
     this.fallbackGroundDispose?.();
     this.overlayCanvas.remove();
     if (this.webgl) {
@@ -730,8 +734,8 @@ export class ArcanaRenderer {
     this.builtAssetsReady = assetsReady;
     this.mapSnapshotCanvas = undefined;
 
-    this.dressWorldHandle?.dispose();
-    this.dressWorldHandle = undefined;
+    this.sanctuaryDispose?.();
+    this.sanctuaryDispose = undefined;
     this.fallbackGroundDispose?.();
     this.fallbackGroundDispose = undefined;
     this.worldRoot.clear();
@@ -741,7 +745,7 @@ export class ArcanaRenderer {
     const map = state.map;
     const bgCol = new T.Color(campaign.palette.bgDeep);
     this.scene.background = bgCol;
-    this.scene.fog = new T.FogExp2(bgCol.getHex(), 0.015);
+    this.scene.fog = new T.FogExp2(bgCol.getHex(), 0.012);
 
     // Update dynamic atmospheric lighting per campaign
     this.hemiLight.color.set(campaign.palette.ambientLight);
@@ -749,25 +753,11 @@ export class ArcanaRenderer {
     this.dirLight.color.set(campaign.palette.floorSecondary);
     this.rimLight.color.set(campaign.palette.accentRunes);
 
-    // Convert campaign road network into 3D paths for normal-mapped forestGround blending
     const sp3 = this.to3D(map.spawnX, map.spawnY, map.width, map.height);
     const ar3 = this.to3D(map.bossArenaCenter.x, map.bossArenaCenter.y, map.width, map.height);
-    const customPaths: number[][] = [...NIGHT_PATHS];
-    for (const poi of map.pois) {
-      const p3 = this.to3D(poi.x, poi.y, map.width, map.height);
-      customPaths.push([sp3.x, sp3.z, p3.x, p3.z]);
-      customPaths.push([p3.x, p3.z, ar3.x, ar3.z]);
-    }
 
-    if (this.assets) {
-      // 1. Populate the full instanced 3D world (forestGround PBR textures + weatheredStone + 3D trees/cottages/crypts/fences)
-      this.dressWorldHandle = dressNightWorld(this.assets, this.worldRoot);
-      // 2. Dress the active combat region around Spawn -> Shrines -> Boss Arena with dense Ravenswatch scenery
-      this.dressCombatClearing(state, campaign, sp3, ar3);
-    } else {
-      // Even while GLBs stream (~800ms), immediately use the real photo-based normal-mapped forestGround!
-      this.fallbackGroundDispose = forestGround(this.worldRoot, customPaths);
-    }
+    // Build the authentic Elemental Sanctuary (Terracotta cliffs, glowing crystals, sacred dais & aurora ribbons)
+    this.dressArcanaSanctuary(state, campaign, sp3, ar3);
 
     // 3. Boss Arena Glowing Rune Decal Ring on the floor
     const bossRingSize = map.bossArenaCenter.radius * WORLD_SCALE * 2;
@@ -879,185 +869,416 @@ export class ArcanaRenderer {
   }
 
   /**
-   * Dresses the immediate combat lanes and spawn clearing with authentic
-   * dark-fantasy biome props matching each Realm of Aethra.
+   * Builds the authentic Elemental Sanctuary:
+   * - Stepped Obsidian & Sunstone Sacred Dais at player spawn
+   * - Concentric Glowing Elemental Circles (Water, Fire, Air, Earth)
+   * - Terracotta rock canyon formations (Reference Image 1)
+   * - Iridescent prismatic crystal clusters in cyan, magenta, and gold (Reference Image 1)
+   * - Shimmering Aurora Borealis sky ribbons (Reference Images 1 & 4)
+   * - Zero cartoon clutter, zero viking heads, zero pumpkins!
    */
-  private dressCombatClearing(
-    state: ArcanaRunState,
-    campaign: CampaignDef,
+  private dressArcanaSanctuary(
+    _state: ArcanaRunState,
+    _campaign: CampaignDef,
     sp3: { x: number; z: number },
     ar3: { x: number; z: number }
   ): void {
-    if (!this.assets) return;
-    const assets = this.assets;
-    const map = state.map;
+    const geometries: T.BufferGeometry[] = [];
+    const materials: T.Material[] = [];
 
-    const placeProp = (
-      name: string,
-      x: number,
-      z: number,
-      rotY = 0,
-      scale = 1,
-      y = 0,
-      useStone = false
-    ) => {
-      const p = prop(assets, name);
-      if (!p.children.length) return;
-      p.position.set(x, y, z);
-      p.rotation.y = rotY;
-      p.scale.setScalar(scale);
-      p.traverse((c) => {
-        if (c instanceof T.Mesh) {
-          c.castShadow = !name.startsWith('path_') && !name.startsWith('floor_');
-          c.receiveShadow = true;
-          if (useStone && c.material instanceof T.MeshStandardMaterial) {
-            c.material = weatheredStone(c.material);
-          }
-        }
-      });
-      this.propsRoot.add(p);
-    };
+    // 1. Bedrock Ground Plane (Rich Terracotta & Twilight Stone)
+    const groundGeo = new T.PlaneGeometry(240, 240, 48, 48);
+    groundGeo.rotateX(-Math.PI / 2);
+    geometries.push(groundGeo);
 
-    // 1. Cobblestone Path Tiles along Spawn -> Shrines -> Boss Arena
-    const pathKeys = ['path_A', 'path_B', 'path_C', 'path_D'];
-    let stepIdx = 0;
-    const layRoad = (ax: number, az: number, bx: number, bz: number) => {
-      const dist = Math.hypot(bx - ax, bz - az);
-      const steps = Math.floor(dist / 2.1);
-      const angle = Math.atan2(bx - ax, bz - az);
-      const nx = -(bz - az) / Math.max(0.1, dist);
-      const nz = (bx - ax) / Math.max(0.1, dist);
-      for (let s = 0; s <= steps; s++) {
-        const t = s / Math.max(1, steps);
-        const cx = ax + (bx - ax) * t;
-        const cz = az + (bz - az) * t;
-        for (const side of [-0.85, 0.85]) {
-          const pk = pathKeys[stepIdx++ % pathKeys.length];
-          placeProp(
-            pk,
-            cx + nx * side,
-            cz + nz * side,
-            angle + (stepIdx % 2) * Math.PI * 0.5,
-            1.1,
-            0.01,
-            true
-          );
-        }
+    const positions = groundGeo.getAttribute('position');
+    const colors = new Float32Array(positions.count * 3);
+    const tc1 = new T.Color(0xb55232); // Warm Terracotta (matching Image 1)
+    const tc2 = new T.Color(0x8a3820); // Deep Terracotta
+    const tc3 = new T.Color(0x191024); // Deep Twilight Slate
+    const tmp = new T.Color();
+
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const z = positions.getZ(i);
+      const distFromSpawn = Math.hypot(x - sp3.x, z - sp3.z);
+      const distFromArena = Math.hypot(x - ar3.x, z - ar3.z);
+      const noise = 0.5 + 0.5 * Math.sin(x * 0.12) * Math.cos(z * 0.12);
+
+      if (distFromSpawn < 16) {
+        tmp.copy(tc1).lerp(tc2, noise * 0.45);
+      } else if (distFromArena < 24) {
+        tmp.copy(tc2).lerp(tc3, 0.45);
+      } else {
+        const t = Math.min(1, Math.max(0, (Math.hypot(x, z) - 30) / 60));
+        tmp.copy(tc1).lerp(tc3, t * 0.85);
       }
-    };
-
-    for (const poi of map.pois) {
-      const p3 = this.to3D(poi.x, poi.y, map.width, map.height);
-      layRoad(sp3.x, sp3.z, p3.x, p3.z);
+      tmp.toArray(colors, i * 3);
     }
-    layRoad(sp3.x, sp3.z, ar3.x, ar3.z);
+    groundGeo.setAttribute('color', new T.BufferAttribute(colors, 3));
 
-    // 2. Campaign-Thematic Biome Dressing Around Player Spawn
-    const sx = sp3.x;
-    const sz = sp3.z;
-    const isRunes = campaign.id === 'runes';
-    const isAsh = campaign.id === 'ash';
-    const isCloister = campaign.id === 'cloister';
-    const isHourglasses = campaign.id === 'hourglasses';
-    const isRift = campaign.id === 'rift' || campaign.id === 'infinite';
+    const groundMat = new T.MeshStandardMaterial({
+      roughness: 0.9,
+      metalness: 0.08,
+      vertexColors: true,
+    });
+    materials.push(groundMat);
 
-    const lanternColorHex = isRunes
-      ? 0x80ffdb
-      : isAsh
-      ? 0xff5400
-      : isCloister
-      ? 0xffd166
-      : isHourglasses
-      ? 0x52b788
-      : 0xc77dff;
+    const groundMesh = new T.Mesh(groundGeo, groundMat);
+    groundMesh.position.y = -0.05;
+    groundMesh.receiveShadow = true;
+    this.worldRoot.add(groundMesh);
 
-    // Ambient light pools under spawn lanterns
-    for (const [lx, lz] of [
-      [sx - 3.2, sz - 0.2],
-      [sx + 3.4, sz + 1.8],
-      [sx - 1.6, sz + 2.2],
-    ]) {
-      const glow = new T.Mesh(
-        this.unitPlane,
-        new T.MeshBasicMaterial({
-          map: fxTexture('glow'),
-          color: lanternColorHex,
+    // 2. The Sacred Elemental Dais at Player Spawn
+    const daisRoot = new T.Group();
+    daisRoot.position.set(sp3.x, 0, sp3.z);
+    this.worldRoot.add(daisRoot);
+
+    const daisMat = new T.MeshStandardMaterial({
+      color: 0x181224,
+      roughness: 0.85,
+      metalness: 0.15,
+    });
+    const daisTrimMat = new T.MeshStandardMaterial({
+      color: 0xffd166,
+      roughness: 0.45,
+      metalness: 0.65,
+    });
+    materials.push(daisMat, daisTrimMat);
+
+    const daisLowerGeo = new T.CylinderGeometry(9.2, 9.6, 0.2, 48);
+    geometries.push(daisLowerGeo);
+    const daisLower = new T.Mesh(daisLowerGeo, daisMat);
+    daisLower.position.y = 0.1;
+    daisLower.receiveShadow = true;
+    daisRoot.add(daisLower);
+
+    const daisTrimGeo = new T.TorusGeometry(9.3, 0.12, 12, 48);
+    daisTrimGeo.rotateX(Math.PI / 2);
+    geometries.push(daisTrimGeo);
+    const daisTrim = new T.Mesh(daisTrimGeo, daisTrimMat);
+    daisTrim.position.y = 0.2;
+    daisRoot.add(daisTrim);
+
+    const daisUpperGeo = new T.CylinderGeometry(6.6, 6.8, 0.14, 48);
+    geometries.push(daisUpperGeo);
+    const daisUpper = new T.Mesh(daisUpperGeo, daisMat);
+    daisUpper.position.y = 0.24;
+    daisUpper.receiveShadow = true;
+    daisRoot.add(daisUpper);
+
+    // Concentric Glowing Elemental Runic Decals
+    const runeRingOuter = new T.Mesh(
+      this.unitPlane,
+      new T.MeshBasicMaterial({
+        map: fxTexture('rune'),
+        color: 0x00f5d4,
+        transparent: true,
+        opacity: 0.65,
+        depthWrite: false,
+        blending: T.AdditiveBlending,
+      })
+    );
+    runeRingOuter.rotation.x = -Math.PI / 2;
+    runeRingOuter.position.y = 0.32;
+    runeRingOuter.scale.setScalar(8.2);
+    daisRoot.add(runeRingOuter);
+
+    const runeRingInner = new T.Mesh(
+      this.unitPlane,
+      new T.MeshBasicMaterial({
+        map: fxTexture('magic'),
+        color: 0xffd166,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+        blending: T.AdditiveBlending,
+      })
+    );
+    runeRingInner.rotation.x = -Math.PI / 2;
+    runeRingInner.position.y = 0.33;
+    runeRingInner.scale.setScalar(5.2);
+    daisRoot.add(runeRingInner);
+
+    // 4 Elemental Monolith Pillars around Dais
+    const pillarGeo = new T.CylinderGeometry(0.35, 0.55, 3.8, 6);
+    geometries.push(pillarGeo);
+    const pillarMat = new T.MeshStandardMaterial({
+      color: 0x241830,
+      roughness: 0.9,
+      metalness: 0.1,
+    });
+    materials.push(pillarMat);
+
+    const angles = [0, Math.PI / 2, Math.PI, (Math.PI * 3) / 2];
+    const elementColors = [0x00f5d4, 0xff5400, 0x80ffdb, 0xffd166];
+    angles.forEach((ang, idx) => {
+      const px = Math.sin(ang) * 7.8;
+      const pz = Math.cos(ang) * 7.8;
+      const pillar = new T.Mesh(pillarGeo, pillarMat);
+      pillar.position.set(px, 1.9, pz);
+      pillar.castShadow = true;
+      pillar.receiveShadow = true;
+      daisRoot.add(pillar);
+
+      const beacon = new T.Sprite(
+        new T.SpriteMaterial({
+          map: vfxTexture('glow'),
+          color: elementColors[idx],
           transparent: true,
-          opacity: 0.52,
+          opacity: 0.85,
           depthWrite: false,
           blending: T.AdditiveBlending,
         })
       );
-      glow.rotation.x = -Math.PI / 2;
-      glow.position.set(lx, 0.04, lz);
-      glow.scale.setScalar(3.8);
-      this.propsRoot.add(glow);
+      beacon.position.set(px, 4.2, pz);
+      beacon.scale.setScalar(1.8);
+      daisRoot.add(beacon);
+    });
+
+    // 3. Terracotta Cliffs & Rock Formations (Reference Image 1)
+    const cliffGeo = new T.CylinderGeometry(2.4, 3.6, 4.5, 7);
+    geometries.push(cliffGeo);
+    const cliffMat = new T.MeshStandardMaterial({
+      color: 0xaa4828,
+      roughness: 0.92,
+      metalness: 0.05,
+    });
+    materials.push(cliffMat);
+
+    const cliffPositions = [
+      { x: sp3.x - 14, z: sp3.z - 8, s: 1.4 },
+      { x: sp3.x + 15, z: sp3.z - 6, s: 1.6 },
+      { x: sp3.x - 12, z: sp3.z + 14, s: 1.3 },
+      { x: sp3.x + 14, z: sp3.z + 12, s: 1.5 },
+      { x: sp3.x - 18, z: sp3.z + 2, s: 1.7 },
+      { x: sp3.x + 19, z: sp3.z + 3, s: 1.8 },
+    ];
+    cliffPositions.forEach((pos, idx) => {
+      const cliff = new T.Mesh(cliffGeo, cliffMat);
+      cliff.position.set(pos.x, 2.25 * pos.s, pos.z);
+      cliff.scale.setScalar(pos.s);
+      cliff.rotation.y = idx * 1.1;
+      cliff.castShadow = true;
+      cliff.receiveShadow = true;
+      this.worldRoot.add(cliff);
+    });
+
+    // 4. Iridescent Prismatic Crystal Clusters (Reference Image 1 Foreground)
+    const crystalGeo = new T.ConeGeometry(0.35, 2.4, 6);
+    geometries.push(crystalGeo);
+    const cyanCrystalMat = new T.MeshStandardMaterial({
+      color: 0x00f5d4,
+      emissive: 0x00bbf9,
+      emissiveIntensity: 0.75,
+      roughness: 0.15,
+      metalness: 0.2,
+    });
+    const magCrystalMat = new T.MeshStandardMaterial({
+      color: 0xf72585,
+      emissive: 0x7209b7,
+      emissiveIntensity: 0.75,
+      roughness: 0.15,
+      metalness: 0.2,
+    });
+    const goldCrystalMat = new T.MeshStandardMaterial({
+      color: 0xffd166,
+      emissive: 0xf77f00,
+      emissiveIntensity: 0.75,
+      roughness: 0.15,
+      metalness: 0.2,
+    });
+    materials.push(cyanCrystalMat, magCrystalMat, goldCrystalMat);
+
+    const crystalClusters = [
+      { x: sp3.x - 8.5, z: sp3.z - 4.5, mat: cyanCrystalMat, lightCol: 0x00f5d4 },
+      { x: sp3.x + 9.2, z: sp3.z - 3.8, mat: magCrystalMat, lightCol: 0xf72585 },
+      { x: sp3.x - 7.8, z: sp3.z + 7.5, mat: goldCrystalMat, lightCol: 0xffd166 },
+      { x: sp3.x + 8.4, z: sp3.z + 6.8, mat: cyanCrystalMat, lightCol: 0x00f5d4 },
+    ];
+
+    crystalClusters.forEach((cl, cIdx) => {
+      const clusterGroup = new T.Group();
+      clusterGroup.position.set(cl.x, 0, cl.z);
+      for (let s = 0; s < 4; s++) {
+        const spike = new T.Mesh(crystalGeo, cl.mat);
+        const rotX = Math.sin(s * 1.5 + cIdx) * 0.25;
+        const rotZ = Math.cos(s * 1.5 + cIdx) * 0.25;
+        spike.rotation.set(rotX, s * 1.5, rotZ);
+        spike.scale.set(0.6 + s * 0.15, 0.7 + s * 0.2, 0.6 + s * 0.15);
+        spike.position.set((s - 1.5) * 0.25, 0.9 * spike.scale.y, (s % 2) * 0.25);
+        spike.castShadow = true;
+        clusterGroup.add(spike);
+      }
+      const cLight = new T.PointLight(cl.lightCol, 1.4, 7);
+      cLight.position.set(0, 1.2, 0);
+      clusterGroup.add(cLight);
+      this.worldRoot.add(clusterGroup);
+    });
+
+    // 5. Aurora Borealis Sky Ribbon Arches (Reference Images 1 & 4)
+    const auroraGeo = new T.PlaneGeometry(140, 22, 32, 8);
+    geometries.push(auroraGeo);
+    const auroraColors = [0x00f5d4, 0x00bbf9, 0x7209b7];
+    this.auroraRibbons = [];
+
+    auroraColors.forEach((col, aIdx) => {
+      const aMat = new T.MeshBasicMaterial({
+        map: fxTexture('magic'),
+        color: col,
+        transparent: true,
+        opacity: 0.32,
+        depthWrite: false,
+        side: T.DoubleSide,
+        blending: T.AdditiveBlending,
+      });
+      materials.push(aMat);
+      const ribbon = new T.Mesh(auroraGeo, aMat);
+      ribbon.position.set(sp3.x, 32 + aIdx * 3.5, sp3.z - 20 - aIdx * 15);
+      ribbon.rotation.x = Math.PI / 4 + aIdx * 0.1;
+      ribbon.rotation.z = (aIdx - 1) * 0.12;
+      this.worldRoot.add(ribbon);
+      this.auroraRibbons.push(ribbon);
+    });
+
+    this.sanctuaryDispose = () => {
+      geometries.forEach((g) => g.dispose());
+      materials.forEach((m) => m.dispose());
+      this.auroraRibbons = [];
+    };
+  }
+
+  private syncAvatarStateVFX(
+    p3d: T.Vector3,
+    classId: ArcanaClassId,
+    dt: number,
+    _menuHeroShowcase: boolean
+  ): void {
+    if (!this.eyeGlowSprites.length) {
+      for (let i = 0; i < 2; i++) {
+        const sp = new T.Sprite(
+          new T.SpriteMaterial({
+            map: fxTexture('flare'),
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.95,
+            depthWrite: false,
+            blending: T.AdditiveBlending,
+            toneMapped: false,
+          })
+        );
+        sp.scale.setScalar(0.08);
+        this.elementalVfxRoot.add(sp);
+        this.eyeGlowSprites.push(sp);
+      }
     }
 
-    // Biome-specific props around lane
-    if (isAsh) {
-      // Forja do Sol Negro: charred fences, braziers, dead trees & crypts
-      placeProp('fence_broken', sx - 2.6, sz - 1.2, 0.55, 1.15);
-      placeProp('fence_broken', sx + 2.2, sz + 2.4, 0.55, 1.15);
-      placeProp('candle_triple', sx - 3.2, sz - 0.2, 0.3, 1.35);
-      placeProp('candle_triple', sx + 3.4, sz + 1.8, -0.8, 1.35);
-      placeProp('candle_triple', sx - 1.6, sz + 2.2, 0, 1.45);
-      placeProp('tree_dead_large', sx - 5.2, sz - 0.8, 0.4, 1.1);
-      placeProp('crypt', sx - 4.5, sz - 1.6, 1.1, 0.48, 0, true);
-      placeProp('barrel', sx + 4.4, sz - 2.2, 0.4, 4.2);
-    } else if (isCloister) {
-      // Mil Sinos dos Céus: pristine marble columns, celestial arches & golden lanterns
-      placeProp('column', sx - 3.2, sz - 1.2, 0, 0.95, 0, true);
-      placeProp('column', sx + 3.2, sz + 1.8, 0, 0.95, 0, true);
-      placeProp('post_lantern', sx - 3.2, sz - 0.2, 0.3, 1.15);
-      placeProp('post_lantern', sx + 3.4, sz + 1.8, -0.8, 1.15);
-      placeProp('arch_gate', sx + 0.5, sz - 5.5, 0.2, 1.05, 0, true);
-      placeProp('meadow-Birch_3', sx - 5.2, sz - 0.8, 0.4, 0.42);
-      placeProp('meadow-Birch_3', sx + 4.5, sz + 2.6, 1.6, 0.38);
-    } else if (isRunes) {
-      // Cume de Nerath: frosty pillars, frosted pines, ice rune spires
-      placeProp('pillar_decorated', sx - 3.2, sz - 1.2, 0, 1.15, 0, true);
-      placeProp('pillar_decorated', sx + 3.2, sz + 1.8, 0, 1.15, 0, true);
-      placeProp('post_lantern', sx - 3.2, sz - 0.2, 0.3, 1.15);
-      placeProp('post_lantern', sx + 3.4, sz + 1.8, -0.8, 1.15);
-      placeProp('arch', sx + 0.5, sz - 5.5, 0.2, 1.05, 0, true);
-      placeProp('meadow-Pine_1', sx - 5.2, sz - 0.8, 0, 0.45);
-      placeProp('meadow-Pine_1', sx - 4.5, sz - 1.6, 1.2, 0.38);
-      placeProp('meadow-Fern_1', sx + 4.4, sz - 2.2, 0.4, 0.85);
-    } else if (isHourglasses) {
-      // Durmak: heavy iron barrels, crates, wheelbarrows & stone obelisks
-      placeProp('fence', sx - 2.6, sz - 1.2, 0.55, 1.05);
-      placeProp('pillar_decorated', sx + 2.2, sz + 2.4, 0, 1.1, 0, true);
-      placeProp('post_lantern', sx - 3.2, sz - 0.2, 0.3, 1.15);
-      placeProp('post_lantern', sx + 3.4, sz + 1.8, -0.8, 1.15);
-      placeProp('barrel', sx + 4.4, sz - 2.2, 0.4, 4.2);
-      placeProp('barrel', sx + 5.1, sz - 1.8, 1.2, 4.0);
-      placeProp('crate_A_big', sx + 4.8, sz - 2.9, 0.2, 4.2);
-      placeProp('wheelbarrow', sx + 3.4, sz - 2.6, 2.1, 4.5);
+    const heroY = this.playerHero?.actor?.root.position.y || 0;
+    const eyeY = 1.62 + heroY;
+    const eyeDist = 0.065;
+    const pulse = 0.075 + Math.sin(this.elapsedTime * 6) * 0.015;
+    this.eyeGlowSprites[0].position.set(p3d.x - eyeDist, eyeY, p3d.z + 0.22);
+    this.eyeGlowSprites[0].scale.setScalar(pulse);
+    this.eyeGlowSprites[1].position.set(p3d.x + eyeDist, eyeY, p3d.z + 0.22);
+    this.eyeGlowSprites[1].scale.setScalar(pulse);
+
+    this.syncHeroElementalVfx(p3d, classId, dt);
+  }
+
+  private syncHeroElementalVfx(
+    p3d: T.Vector3,
+    classId: ArcanaClassId,
+    _dt: number
+  ): void {
+    if (!this.elementalVfxSprites.length) {
+      for (let i = 0; i < 28; i++) {
+        const sp = new T.Sprite(
+          new T.SpriteMaterial({
+            map: vfxTexture('glow'),
+            color: 0x00f5d4,
+            transparent: true,
+            opacity: 0.85,
+            depthWrite: false,
+            blending: T.AdditiveBlending,
+            toneMapped: false,
+          })
+        );
+        this.elementalVfxRoot.add(sp);
+        this.elementalVfxSprites.push({ sprite: sp, offsetIdx: i });
+      }
+    }
+
+    const heroY = this.playerHero?.actor?.root.position.y || 0;
+    const t = this.elapsedTime;
+
+    if (classId === 'chess') {
+      // Nerys — Water Twin: Swirling dynamic luminous aqua ribbons & floating water motes (Image 3)
+      for (const item of this.elementalVfxSprites) {
+        const i = item.offsetIdx;
+        const ang = t * 2.8 + (i * Math.PI * 2) / 28;
+        const r = 0.9 + Math.sin(t * 1.8 + i) * 0.22;
+        const py = heroY + ((t * 1.2 + i * 0.08) % 2.4);
+        item.sprite.position.set(
+          p3d.x + Math.cos(ang) * r,
+          py,
+          p3d.z + Math.sin(ang) * r
+        );
+        const mat = item.sprite.material as T.SpriteMaterial;
+        mat.color.setHex(i % 3 === 0 ? 0xffffff : i % 2 === 0 ? 0x00f5d4 : 0x00bbf9);
+        mat.map = vfxTexture(i % 4 === 0 ? 'spark' : i % 2 === 0 ? 'twirl' : 'glow');
+        item.sprite.scale.setScalar(0.28 + Math.sin(t * 3 + i) * 0.1);
+      }
+    } else if (classId === 'chaos') {
+      // Iskra — Fire Twin: Roaring double-helix flame vortex & rising embers (Image 3)
+      for (const item of this.elementalVfxSprites) {
+        const i = item.offsetIdx;
+        const dir = i % 2 === 0 ? 1 : -1;
+        const ang = dir * t * 3.4 + (i * Math.PI * 2) / 14;
+        const r = 0.82 + Math.sin(t * 2.2 + i) * 0.18;
+        const py = heroY + ((t * 1.6 + i * 0.09) % 2.5);
+        item.sprite.position.set(
+          p3d.x + Math.cos(ang) * r,
+          py,
+          p3d.z + Math.sin(ang) * r
+        );
+        const mat = item.sprite.material as T.SpriteMaterial;
+        mat.color.setHex(i % 3 === 0 ? 0xffd166 : i % 2 === 0 ? 0xff5400 : 0xd00000);
+        mat.map = vfxTexture(i % 2 === 0 ? 'fire' : 'spark');
+        item.sprite.scale.setScalar(0.35 + Math.sin(t * 4 + i) * 0.12);
+      }
+    } else if (classId === 'chrono') {
+      // Kael — Wind Guardian: Translucent white & teal cyclone tornado under feet (Image 3)
+      for (const item of this.elementalVfxSprites) {
+        const i = item.offsetIdx;
+        const ang = t * 4.2 + (i * Math.PI * 2) / 28;
+        const r = 0.4 + (i / 28) * 1.1;
+        const py = heroY + (i / 28) * 2.2;
+        item.sprite.position.set(
+          p3d.x + Math.cos(ang) * r,
+          py,
+          p3d.z + Math.sin(ang) * r
+        );
+        const mat = item.sprite.material as T.SpriteMaterial;
+        mat.color.setHex(i % 2 === 0 ? 0x80ffdb : 0xffffff);
+        mat.map = vfxTexture('twirl');
+        item.sprite.scale.setScalar(0.32 + Math.sin(t * 3.5 + i) * 0.1);
+      }
     } else {
-      // Fenda Sem Estrelas (O Oco): dark void spires, crypts & purple beacons
-      placeProp('tree_dead_large', sx - 5.2, sz - 0.8, 0.5, 1.25);
-      placeProp('crypt', sx + 4.4, sz - 2.2, 0.4, 0.45, 0, true);
-      placeProp('pillar_decorated', sx - 3.2, sz - 1.2, 0.4, 1.25, 0, true);
-      placeProp('post_lantern', sx - 3.2, sz - 0.2, 0.3, 1.15);
-      placeProp('post_lantern', sx + 3.4, sz + 1.8, -0.8, 1.15);
-    }
-
-    // Foliage perimeter tufts around spawn
-    for (let i = 0; i < 48; i++) {
-      const angle = i * 2.39996;
-      const dist = 3.2 + (i % 7) * 2.2;
-      const gx = sx + Math.cos(angle) * dist;
-      const gz = sz + Math.sin(angle) * dist;
-      const kind = isAsh
-        ? 'fence_broken'
-        : isRunes
-        ? 'meadow-Fern_1'
-        : isCloister
-        ? 'meadow-Clover_1'
-        : 'meadow-Grass_Common_Tall';
-      if (!isAsh || i % 6 === 0) {
-        placeProp(kind, gx, gz, i * 1.1, 0.65 + (i % 4) * 0.18);
+      // Borak — Earth Guardian: Floating rock boulders & iridescent crystals orbiting (Image 1 & 3)
+      for (const item of this.elementalVfxSprites) {
+        const i = item.offsetIdx;
+        const ang = t * 1.4 + (i * Math.PI * 2) / 28;
+        const r = 1.35 + Math.sin(t * 1.1 + i) * 0.25;
+        const py = heroY + 0.5 + Math.sin(t * 2.5 + i * 0.8) * 0.6;
+        item.sprite.position.set(
+          p3d.x + Math.cos(ang) * r,
+          py,
+          p3d.z + Math.sin(ang) * r
+        );
+        const mat = item.sprite.material as T.SpriteMaterial;
+        mat.color.setHex(i % 3 === 0 ? 0xf72585 : i % 2 === 0 ? 0x00f5d4 : 0xffd166);
+        mat.map = vfxTexture(i % 2 === 0 ? 'flare' : 'spark');
+        item.sprite.scale.setScalar(0.38 + Math.sin(t * 2 + i) * 0.1);
       }
     }
   }
@@ -1112,13 +1333,17 @@ export class ArcanaRenderer {
       g.add(mesh);
     }
 
-    const accentProp = campaignId === 'ash' ? 'candle_triple' : seed % 2 === 0 ? 'meadow-Fern_1' : 'post_lantern';
-    const accent = prop(this.assets, accentProp);
-    if (accent.children.length > 0) {
-      accent.position.set(radius3D * 0.75, 0, radius3D * 0.45);
-      accent.scale.setScalar(accentProp === 'candle_triple' ? 1.1 : 0.75);
-      g.add(accent);
-    }
+    const crystalGeo = new T.ConeGeometry(0.24, 1.35, 6);
+    const crystalMat = new T.MeshStandardMaterial({
+      color: 0x00f5d4,
+      emissive: 0x00bbf9,
+      emissiveIntensity: 0.65,
+      roughness: 0.18,
+    });
+    const crystalMesh = new T.Mesh(crystalGeo, crystalMat);
+    crystalMesh.position.set(radius3D * 0.75, 0.68, radius3D * 0.45);
+    crystalMesh.rotation.z = 0.22;
+    g.add(crystalMesh);
 
     return g;
   }
@@ -1133,22 +1358,8 @@ export class ArcanaRenderer {
 
     let choices: string[];
     let lanternHex: number;
-    if (campaign.id === 'runes') {
-      choices = ['meadow-Pine_1', 'meadow-Rock_Large', 'post_lantern', 'meadow-Fern_1', 'pillar_decorated'];
-      lanternHex = 0x80ffdb;
-    } else if (campaign.id === 'ash') {
-      choices = ['tree_dead_large', 'crypt', 'candle_triple', 'fence_broken', 'barrel'];
-      lanternHex = 0xff5400;
-    } else if (campaign.id === 'cloister') {
-      choices = ['meadow-Birch_3', 'column', 'post_lantern', 'meadow-Clover_1', 'arch'];
-      lanternHex = 0xffd166;
-    } else if (campaign.id === 'hourglasses') {
-      choices = ['barrel', 'crate_A_big', 'wheelbarrow', 'pillar_decorated', 'meadow-Rock_Large', 'post_lantern'];
-      lanternHex = 0x52b788;
-    } else {
-      choices = ['tree_dead_large', 'crypt', 'pillar_decorated', 'arch_gate', 'post_lantern'];
-      lanternHex = 0xc77dff;
-    }
+    choices = ['column', 'pillar_decorated', 'arch', 'arch_gate'];
+    lanternHex = campaign.id === 'ash' ? 0xff5400 : campaign.id === 'cloister' ? 0xffd166 : 0x00f5d4;
 
     const pick = choices[seed % choices.length];
     const model = prop(this.assets, pick);
@@ -2228,7 +2439,6 @@ export class ArcanaRenderer {
     const campaign = this.getCampaignDef(state);
 
     this.ensureBiomeBuilt(state, campaign);
-    this.dressWorldHandle?.update(this.elapsedTime);
 
     this.playerHero = this.getOrCreateHero3D(this.playerHero, state.player.classId);
     this.updateHero3D(
@@ -2270,20 +2480,47 @@ export class ArcanaRenderer {
       }
     }
 
-    this.syncEnemies3D(state, safeDt);
-    this.syncBoss3D(state, campaign, safeDt);
-    this.syncProjectilesAndConstructs3D(state, safeDt);
-    this.updateSoftParticles(safeDt);
-    this.updateWeatherParticles(campaign, this.camTargetX, this.camTargetZ, safeDt);
-
     const p3d = this.playerHero.root.position;
+
     if (menuHeroShowcase) {
-      // Close-up Hero Turntable Camera on the right side of the menu screen
-      this.camTargetX = p3d.x - 1.35;
+      // In Hero Selection Menu: Hide enemies & bosses so the Hero is framed in peace!
+      for (const [, en] of this.enemyInstances) {
+        en.root.visible = false;
+      }
+      if (this.bossInstance) {
+        this.bossInstance.root.visible = false;
+      }
+
+      // Floating Transcendence Stance (Matching Reference Image 3)
+      if (this.playerHero.actor) {
+        this.playerHero.actor.root.position.y = 0.28 + Math.sin(this.elapsedTime * 2.2) * 0.08;
+        this.playerHero.actor.root.rotation.y = Math.sin(this.elapsedTime * 0.65) * 0.38;
+      }
+
+      // Avatar State Glowing White Eyes & Swirling Elemental VFX (Images 3 & 4)
+      this.syncAvatarStateVFX(p3d, state.player.classId, safeDt, true);
+
+      // Camera Framing with ample headroom — full hero visible from head to boots
+      this.camTargetX = p3d.x - 0.7;
       this.camTargetZ = p3d.z;
-      this.camera.position.set(p3d.x - 1.05, 2.35, p3d.z + 4.35);
-      this.camera.lookAt(p3d.x - 1.25, 1.22, p3d.z);
+      this.camera.position.set(p3d.x - 0.65, 1.45, p3d.z + 4.85);
+      this.camera.lookAt(p3d.x - 0.75, 1.08, p3d.z);
+
+      // Key light & rim light tuned for cel-shaded anime brilliance
+      this.playerLight.position.set(p3d.x - 0.8, 2.2, p3d.z + 2.4);
+      this.playerLight.intensity = 3.6;
+      this.playerLight.color.setHex(0xfffaed);
+
+      const cfg = HERO_3D_CONFIG[state.player.classId];
+      this.rimLight.position.set(p3d.x + 1.8, 2.5, p3d.z - 2.8);
+      this.rimLight.intensity = 5.2;
+      this.rimLight.color.setHex(cfg.handGlowHex);
     } else {
+      this.syncEnemies3D(state, safeDt);
+      this.syncBoss3D(state, campaign, safeDt);
+      this.syncProjectilesAndConstructs3D(state, safeDt);
+      this.syncAvatarStateVFX(p3d, state.player.classId, safeDt, false);
+
       // Ravenswatch Intimate Isometric 3D Camera (Closer framing so models, weapons & textures shine!)
       const leadX = state.player.facingX * 0.65;
       const leadZ = state.player.facingY * 0.65;
@@ -2309,14 +2546,25 @@ export class ArcanaRenderer {
         this.camTargetZ + camDistZ + shakeZ
       );
       this.camera.lookAt(this.camTargetX, 1.05, this.camTargetZ);
+
+      this.playerLight.position.set(p3d.x, 3.2, p3d.z);
+      this.playerLight.color.set(ARCANA_CLASSES[state.player.classId].palette.glow);
+      this.playerLight.intensity = 2.8;
     }
+
+    this.updateSoftParticles(safeDt);
+    this.updateWeatherParticles(campaign, this.camTargetX, this.camTargetZ, safeDt);
 
     // Keep Directional Shadow Camera centered on the player
     this.dirLight.position.set(p3d.x - 14, 24, p3d.z + 14);
     this.dirLight.target.position.set(p3d.x, 0, p3d.z);
 
-    this.playerLight.position.set(p3d.x, 3.2, p3d.z);
-    this.playerLight.color.set(ARCANA_CLASSES[state.player.classId].palette.glow);
+    // Gently animate celestial Aurora ribbons in sky
+    if (this.auroraRibbons.length > 0) {
+      this.auroraRibbons.forEach((ribbon, idx) => {
+        ribbon.rotation.z = (idx - 1) * 0.12 + Math.sin(this.elapsedTime * 0.4 + idx) * 0.04;
+      });
+    }
 
     if (this.webgl) {
       this.webgl.render(this.scene, this.camera);

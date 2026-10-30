@@ -1163,16 +1163,21 @@
 }
 
 .arcana-root .fantasy-btn {
-  border-style: solid;
-  border-width: 10px;
-  border-image-source: url('/ui/frame-button.png');
-  border-image-slice: 14 fill;
-  border-image-repeat: repeat;
-  transition: filter 0.15s, transform 0.15s;
+  border: 2px solid #ffd166;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.95), rgba(247, 127, 0, 0.95));
+  color: #120824;
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), 0 0 24px rgba(255, 209, 102, 0.45);
+  transition: filter 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 .arcana-root .fantasy-btn:hover {
-  filter: brightness(1.2) drop-shadow(0 0 10px #ffd166);
-  transform: translateY(-2px);
+  filter: brightness(1.15);
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.8), 0 0 36px rgba(255, 209, 102, 0.75);
+  transform: translateY(-2px) scale(1.01);
 }
 
 /* Ravenswatch Angled Health Bar */
