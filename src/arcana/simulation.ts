@@ -653,31 +653,38 @@ function firePlayerPrimary(state: ArcanaRunState, originX: number, originY: numb
 
   for (let i = 0; i < count; i++) {
     const ang = startAngle + i * spreadStep;
-    const speed = player.classId === 'chrono' ? 610 : player.classId === 'rune' ? 560 : 510;
+    // Enhanced Long-Range Survivor Speeds & Extended Lifespans (reach 1200 - 1800+ px!)
+    const speed = player.classId === 'chrono' ? 780 : player.classId === 'rune' ? 680 : 640;
     let kind: ActiveProjectile['kind'] = 'pawn_lance';
     let element: ElementalTag = cls.primaryAttack.tag;
     let color = cls.palette.glow;
-    let radius = 10 * player.computed.areaScale;
+    let radius = 12 * player.computed.areaScale;
     let dmg = player.computed.damage;
-    let pierce = player.computed.pierce;
+    let pierce = player.computed.pierce + 1; // +1 base pierce for survivor horde clearing
 
     if (player.classId === 'chess') {
       kind = isChessQueenEvo ? 'queen_beam' : 'water_whip';
       color = isChessQueenEvo ? '#ffd166' : '#00f5d4';
+      pierce += 2; // Liquid whip slices through crowds
+      radius *= 1.3;
       if (isChessQueenEvo) {
-        dmg = Math.round(dmg * 1.3);
-        radius *= 1.25;
+        dmg = Math.round(dmg * 1.35);
+        radius *= 1.35;
+        pierce += 4;
       }
     } else if (player.classId === 'chrono') {
-      // Kael's Celestial Fan Gust
+      // Kael's Celestial Fan Gust (Huge sweeping long-range aerodynamic wave)
       kind = 'fan_gale';
       color = '#70e000';
-      radius *= 1.35; // Wide sweeping fan arc
-      pierce += 1;
+      radius *= 1.6; // Wide sweeping fan arc
+      pierce += 4; // Cleaves through entire lines of enemies
+      dmg = Math.round(dmg * 1.15);
     } else if (player.classId === 'chaos') {
-      // Iskra's Martial Solar Fist
+      // Iskra's Martial Solar Fist (Roaring fiery blast)
       kind = isChaosOmni || isChaosWildcard ? 'chaos_prism' : 'solar_fist';
       element = chaosElem;
+      pierce += 2;
+      radius *= 1.35;
       color =
         chaosElem === 'fire'
           ? '#ff6b35'
@@ -687,16 +694,17 @@ function firePlayerPrimary(state: ArcanaRunState, originX: number, originY: numb
               ? '#ffbe0b'
               : '#c77dff';
       if (isChaosWildcard) {
-        dmg = Math.round(dmg * 1.65);
-        pierce += 4;
-        radius *= 1.35;
+        dmg = Math.round(dmg * 1.75);
+        pierce += 6;
+        radius *= 1.5;
       }
     } else if (player.classId === 'rune') {
-      // Borak's Terracotta Kinetic Rock Block
+      // Borak's Terracotta Kinetic Rock Block (Heavy crushing block with extreme mass)
       kind = 'terracotta_block';
       color = '#ffd166';
-      dmg = Math.round(dmg * 1.25); // Heavy earth impact
-      radius *= 1.4;
+      dmg = Math.round(dmg * 1.45); // Heavy earth impact
+      radius *= 1.65;
+      pierce += 5; // Crushes through multiple rows of enemies
     }
 
     state.projectiles.push({
@@ -712,11 +720,11 @@ function firePlayerPrimary(state: ArcanaRunState, originX: number, originY: numb
       damage: dmg,
       pierceLeft: pierce,
       bouncesLeft: player.computed.bounce + (isChronoBoomerang ? 1 : 0),
-      life: 1.35,
-      maxLife: 1.35,
-      homingStrength: player.classId === 'rune' ? 1.8 : 0.6,
+      life: 2.6, // High range: travels 1600 - 2000px across the entire arena!
+      maxLife: 2.6,
+      homingStrength: player.classId === 'rune' ? 1.4 : 0.4,
       splitOnHit: hasSpecialFlag(player, 'split_on_hit') || isChessQueenEvo,
-      explodeRadius: isChaosOmni ? 85 * player.computed.areaScale : undefined,
+      explodeRadius: isChaosOmni || kind === 'solar_fist' ? 75 * player.computed.areaScale : undefined,
       hitEntityIds: new Set(),
       color,
     });
@@ -730,8 +738,9 @@ function firePlayerPrimary(state: ArcanaRunState, originX: number, originY: numb
 
 function triggerClassSpecial(state: ArcanaRunState, baseAngle: number): void {
   const { player } = state;
-  const targetX = player.x + Math.cos(baseAngle) * 210;
-  const targetY = player.y + Math.sin(baseAngle) * 210;
+  // Survivor Long-Range Reach: from 210 to 450px so skills strike deep into encroaching swarms!
+  const targetX = player.x + Math.cos(baseAngle) * 450;
+  const targetY = player.y + Math.sin(baseAngle) * 450;
 
   if (player.classId === 'chess') {
     // Gambito Real: cycles Knight (L-impact), Bishop (X beams), Rook (orthogonal shockwave)
@@ -766,14 +775,14 @@ function triggerClassSpecial(state: ArcanaRunState, baseAngle: number): void {
           element: 'spectral',
           x: targetX,
           y: targetY,
-          vx: Math.cos(da) * 560,
-          vy: Math.sin(da) * 560,
-          radius: 14 * player.computed.areaScale,
-          damage: Math.round(player.computed.damage * 1.6),
-          pierceLeft: 6,
+          vx: Math.cos(da) * 740,
+          vy: Math.sin(da) * 740,
+          radius: 16 * player.computed.areaScale,
+          damage: Math.round(player.computed.damage * 1.8),
+          pierceLeft: 12,
           bouncesLeft: 1,
-          life: 1.1,
-          maxLife: 1.1,
+          life: 2.2,
+          maxLife: 2.2,
           homingStrength: 0,
           hitEntityIds: new Set(),
           color: '#ffd166',
@@ -789,14 +798,14 @@ function triggerClassSpecial(state: ArcanaRunState, baseAngle: number): void {
           element: 'spectral',
           x: targetX,
           y: targetY,
-          vx: Math.cos(oa) * 520,
-          vy: Math.sin(oa) * 520,
-          radius: 18 * player.computed.areaScale,
-          damage: Math.round(player.computed.damage * 1.75),
-          pierceLeft: 8,
+          vx: Math.cos(oa) * 720,
+          vy: Math.sin(oa) * 720,
+          radius: 20 * player.computed.areaScale,
+          damage: Math.round(player.computed.damage * 1.9),
+          pierceLeft: 14,
           bouncesLeft: 0,
-          life: 1.0,
-          maxLife: 1.0,
+          life: 2.2,
+          maxLife: 2.2,
           homingStrength: 0,
           hitEntityIds: new Set(),
           color: '#7de2ff',
@@ -832,27 +841,49 @@ function triggerClassSpecial(state: ArcanaRunState, baseAngle: number): void {
       }
     }
   } else if (player.classId === 'chrono') {
-    // Eco do Passado: spawns temporal clone(s) that repeat primary barrages
+    // Voo do Bastão Planador & Múltiplos Tornados Devastadores (Limpeza em Massa de Hordas)
     const twin = hasSpecialFlag(player, 'chrono_twin_echoes') || player.specializationId === 'chrono_echoes';
-    const count = twin ? 2 : 1;
-    for (let i = 0; i < count; i++) {
-      const offsetAng = baseAngle + (i === 0 ? -0.6 : 0.6);
-      state.constructs.push({
-        id: nextUid('echo'),
-        ownerClass: 'chrono',
-        kind: 'chrono_echo',
-        x: player.x + Math.cos(offsetAng) * 75,
-        y: player.y + Math.sin(offsetAng) * 75,
-        vx: 0,
-        vy: 0,
-        radius: 28,
-        life: 5.0,
-        maxLife: 5.0,
-        attackTimer: 0.15,
-        attackInterval: player.computed.attackInterval * 0.9,
-        damage: player.computed.damage,
+    const tornadoCount = twin ? 6 : 4;
+    for (let i = 0; i < tornadoCount; i++) {
+      const spread = (i - (tornadoCount - 1) * 0.5) * 0.25;
+      const tAng = baseAngle + spread;
+      state.projectiles.push({
+        id: nextUid('tor'),
+        owner: 'player',
+        kind: 'fan_gale',
+        element: 'temporal',
+        x: player.x + Math.cos(tAng) * 35,
+        y: player.y + Math.sin(tAng) * 35,
+        vx: Math.cos(tAng) * 620,
+        vy: Math.sin(tAng) * 620,
+        radius: 34 * player.computed.areaScale,
+        damage: Math.round(player.computed.damage * 1.85),
+        pierceLeft: 25, // Shreds through massive horde swarms!
+        bouncesLeft: 1,
+        life: 3.4,
+        maxLife: 3.4,
+        homingStrength: 0.5,
+        hitEntityIds: new Set(),
+        color: '#80ffdb',
       });
     }
+
+    // Also spawn a gliding wind echo that follows and spams gale slashes
+    state.constructs.push({
+      id: nextUid('echo'),
+      ownerClass: 'chrono',
+      kind: 'chrono_echo',
+      x: player.x + Math.cos(baseAngle) * 55,
+      y: player.y + Math.sin(baseAngle) * 55,
+      vx: 0,
+      vy: 0,
+      radius: 32,
+      life: 5.5,
+      maxLife: 5.5,
+      attackTimer: 0.1,
+      attackInterval: player.computed.attackInterval * 0.65,
+      damage: player.computed.damage,
+    });
     player.chronoSequenceStacks = Math.min(8, player.chronoSequenceStacks + 2);
     recomputePlayerStats(player);
   } else if (player.classId === 'chaos') {
@@ -884,15 +915,15 @@ function triggerClassSpecial(state: ArcanaRunState, baseAngle: number): void {
           element: pick.elem,
           x: targetX,
           y: targetY,
-          vx: Math.cos(a) * 440,
-          vy: Math.sin(a) * 440,
-          radius: 13 * player.computed.areaScale,
-          damage: Math.round(player.computed.damage * 1.45),
-          pierceLeft: 3,
-          bouncesLeft: 1,
-          life: 1.05,
-          maxLife: 1.05,
-          homingStrength: 1.2,
+          vx: Math.cos(a) * 620,
+          vy: Math.sin(a) * 620,
+          radius: 15 * player.computed.areaScale,
+          damage: Math.round(player.computed.damage * 1.65),
+          pierceLeft: 6,
+          bouncesLeft: 2,
+          life: 2.2,
+          maxLife: 2.2,
+          homingStrength: 1.5,
           hitEntityIds: new Set(),
           color: pick.color,
         });
@@ -1407,21 +1438,27 @@ export function stepArcanaSimulation(
     }
   }
 
-  // 1. Mobility / Dash handling
-  if (input.mobilityPressed && player.mobilityCooldown <= 0 && player.dashTimer <= 0) {
-    player.mobilityCooldown = player.mobilityMaxCooldown;
-    player.dashTimer = 0.24;
-    player.iframeTimer = 0.34;
-    const moveLen = Math.hypot(input.moveX, input.moveY);
-    player.dashDirX = moveLen > 0.1 ? input.moveX / moveLen : player.facingX;
-    player.dashDirY = moveLen > 0.1 ? input.moveY / moveLen : player.facingY;
-    player.animState = 'dash';
-    callbacks?.onSfx?.('dash');
+  // 1. Mobility / Dash handling with 0.35s Input Buffer
+  if (input.mobilityPressed) {
+    player.mobilityBufferTimer = 0.35;
+  }
+  if (player.mobilityBufferTimer && player.mobilityBufferTimer > 0) {
+    player.mobilityBufferTimer -= dt;
+    if (player.mobilityCooldown <= 0 && player.dashTimer <= 0) {
+      player.mobilityBufferTimer = 0;
+      player.mobilityCooldown = player.mobilityMaxCooldown;
+      player.dashTimer = 0.24;
+      player.iframeTimer = 0.34;
+      const moveLen = Math.hypot(input.moveX, input.moveY);
+      player.dashDirX = moveLen > 0.1 ? input.moveX / moveLen : player.facingX;
+      player.dashDirY = moveLen > 0.1 ? input.moveY / moveLen : player.facingY;
+      player.animState = 'dash';
+      callbacks?.onSfx?.('dash');
 
-    if (state.tutorial.active && !state.tutorial.completedDodge) {
-      state.tutorial.completedDodge = true;
-      if (state.tutorial.stepIndex === 2) state.tutorial.stepIndex = 3;
-    }
+      if (state.tutorial.active && !state.tutorial.completedDodge) {
+        state.tutorial.completedDodge = true;
+        if (state.tutorial.stepIndex === 2) state.tutorial.stepIndex = 3;
+      }
 
     // Class-specific mobility effects
     if (player.classId === 'chess' && hasSpecialFlag(player, 'chess_rook_on_dash')) {
@@ -1480,6 +1517,7 @@ export function stepArcanaSimulation(
           dealPlayerAreaDamage(state, c.x, c.y, 110, Math.round(player.computed.damage * 1.5), 'runic');
         }
       }
+    }
     }
   }
 
@@ -1589,26 +1627,51 @@ export function stepArcanaSimulation(
     }
   }
 
-  if (input.specialPressed && player.specialCooldown <= 0) {
-    player.specialCooldown = player.specialMaxCooldown;
-    player.animState = 'cast';
-    player.facingX = Math.cos(aimAngle);
-    player.facingY = Math.sin(aimAngle);
-    triggerClassSpecial(state, aimAngle);
-    if (hasSpecialFlag(player, 'mythic_double_special')) {
-      triggerClassSpecial(state, aimAngle + 0.22);
-    }
-    callbacks?.onSfx?.('special');
+  // Special skill with 0.35s Input Buffer & auto-target
+  if (input.specialPressed) {
+    player.specialBufferTimer = 0.35;
+  }
+  if (player.specialBufferTimer && player.specialBufferTimer > 0) {
+    player.specialBufferTimer -= dt;
+    if (player.specialCooldown <= 0) {
+      player.specialBufferTimer = 0;
+      player.specialCooldown = player.specialMaxCooldown;
+      player.animState = 'cast';
 
-    if (state.tutorial.active && !state.tutorial.completedAttack) {
-      state.tutorial.completedAttack = true;
-      if (state.tutorial.stepIndex === 1) state.tutorial.stepIndex = 2;
+      // Auto-target nearest enemy if not manually aiming with mouse cursor
+      if (!input.isAiming) {
+        const target = findNearestTarget(state, player.x, player.y, 700);
+        if (target) {
+          aimAngle = Math.atan2(target.y - player.y, target.x - player.x);
+        }
+      }
+
+      player.facingX = Math.cos(aimAngle);
+      player.facingY = Math.sin(aimAngle);
+      triggerClassSpecial(state, aimAngle);
+      if (hasSpecialFlag(player, 'mythic_double_special')) {
+        triggerClassSpecial(state, aimAngle + 0.22);
+      }
+      callbacks?.onSfx?.('special');
+
+      if (state.tutorial.active && !state.tutorial.completedAttack) {
+        state.tutorial.completedAttack = true;
+        if (state.tutorial.stepIndex === 1) state.tutorial.stepIndex = 2;
+      }
     }
   }
 
-  if (input.ultimatePressed && player.ultimateCharge >= player.ultimateMaxCharge) {
-    triggerClassUltimate(state);
-    callbacks?.onSfx?.('ultimate');
+  // Ultimate skill with 0.35s Input Buffer
+  if (input.ultimatePressed) {
+    player.ultimateBufferTimer = 0.35;
+  }
+  if (player.ultimateBufferTimer && player.ultimateBufferTimer > 0) {
+    player.ultimateBufferTimer -= dt;
+    if (player.ultimateCharge >= player.ultimateMaxCharge) {
+      player.ultimateBufferTimer = 0;
+      triggerClassUltimate(state);
+      callbacks?.onSfx?.('ultimate');
+    }
   }
 
   // 4. Interactive POIs & Secret Areas check
@@ -1691,15 +1754,15 @@ export function stepArcanaSimulation(
           element: 'temporal',
           x: c.x,
           y: c.y,
-          vx: Math.cos(ang) * 560,
-          vy: Math.sin(ang) * 560,
-          radius: 9,
-          damage: Math.round(c.damage * 0.75),
-          pierceLeft: player.computed.pierce,
-          bouncesLeft: 0,
-          life: 1.1,
-          maxLife: 1.1,
-          homingStrength: 0.8,
+          vx: Math.cos(ang) * 750,
+          vy: Math.sin(ang) * 750,
+          radius: 12,
+          damage: Math.round(c.damage * 0.9),
+          pierceLeft: player.computed.pierce + 2,
+          bouncesLeft: 1,
+          life: 2.2,
+          maxLife: 2.2,
+          homingStrength: 0.9,
           hitEntityIds: new Set(),
           color: '#00f5d4',
         });
@@ -2107,13 +2170,17 @@ export function stepArcanaSimulation(
       callbacks?.onDiscovery?.('boss', campaignDef.boss.id);
     }
 
-    // Periodic wave spawning
-    const desiredEnemies = state.phase === 'A_ARRIVAL' ? 6 : state.phase === 'B_EXPLORATION' ? 11 : 16;
-    if (state.enemies.length < desiredEnemies && Math.random() < dt * 2.2) {
+    // Periodic wave spawning — True High-Density Survivor Swarms (30 to 80+ enemies!)
+    const desiredEnemies = state.phase === 'A_ARRIVAL' ? 24 : state.phase === 'B_EXPLORATION' ? 50 : 85;
+    if (state.enemies.length < desiredEnemies && Math.random() < dt * 4.2) {
       const pool = campaignDef.enemyPool;
-      const pick = pool[Math.floor(Math.random() * pool.length)];
-      const isElite = pick === 'colossus_elite' || (state.phase === 'C_ESCALATION' && Math.random() < 0.16);
-      spawnEnemyNearPlayer(state, pick, isElite, 430 + Math.random() * 140);
+      const swarmCount = state.phase === 'C_ESCALATION' ? 3 : 2;
+      for (let s = 0; s < swarmCount; s++) {
+        if (state.enemies.length >= desiredEnemies) break;
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        const isElite = pick === 'colossus_elite' || (state.phase === 'C_ESCALATION' && Math.random() < 0.14);
+        spawnEnemyNearPlayer(state, pick, isElite, 420 + Math.random() * 160);
+      }
     }
   } else if (state.isTutorial && state.enemies.length < 2 && state.tutorial.stepIndex < 6) {
     spawnEnemyNearPlayer(state, 'patroller', false, 300);

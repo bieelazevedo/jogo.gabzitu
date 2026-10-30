@@ -463,6 +463,9 @@ export interface PlayerRuntimeState {
   dashTimer: number;
   dashDirX: number;
   dashDirY: number;
+  specialBufferTimer?: number;
+  mobilityBufferTimer?: number;
+  ultimateBufferTimer?: number;
   animState: EntityAnimState;
   animTime: number;
   hitFlashTimer: number;

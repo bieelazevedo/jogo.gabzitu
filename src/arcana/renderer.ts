@@ -78,20 +78,19 @@ const HERO_3D_CONFIG: Record<ArcanaClassId, ElementalHero3DConfig> = {
     castClip: 'Spellcast_Long',
     ultClip: 'Spellcast_Summon',
   },
-  // Guardião da Tempestade (Kael — Voo, Vácuo & Tempestade Cortante) -> LunarKnight + Wind Bronze Sword
+  // Guardião do Vento (Kael — Monge Nômade com Bastão Planador & Tornados) -> LunarKnight + 2H Glider Staff
   chrono: {
     fallbackChar: 'Rogue_Hooded',
     modernModel: 'LunarKnight',
-    weaponProp: '1H_Sword',
-    authoredWeapon: 'weapon-Sword_Bronze',
-    offhandProp: 'Knife_Offhand',
+    weaponProp: '2H_Staff',
+    authoredWeapon: 'weapon-PriestessStaff',
     handGlowHex: 0x80ffdb,
     handCoreHex: 0xffffff,
     auraHex: 0x72efdd,
     slashClips: [
-      '1H_Melee_Attack_Slice_Diagonal',
-      '1H_Melee_Attack_Slice_Horizontal',
       '2H_Melee_Attack_Spin',
+      '1H_Melee_Attack_Slice_Horizontal',
+      '2H_Melee_Attack_Slice',
     ],
     castClip: '2H_Melee_Attack_Spin',
     ultClip: 'Spellcast_Raise',
@@ -1634,16 +1633,39 @@ export class ArcanaRenderer {
 
     inst.lastAnimState = p.animState;
 
-    inst.auraDisc.rotation.z = this.elapsedTime * 0.85;
-    inst.subAuraDisc.rotation.z = -this.elapsedTime * 1.4;
-    const subPulse =
-      'chessCoordinationStacks' in p &&
-      (p.chessCoordinationStacks >= 6 ||
-        p.chaosInstability >= 50 ||
-        p.chronoSequenceStacks >= 4)
-        ? 3.8
-        : 2.9;
-    inst.subAuraDisc.scale.setScalar(subPulse + Math.sin(this.elapsedTime * 5) * 0.22);
+    inst.auraDisc.rotation.z = this.elapsedTime * 0.95;
+    inst.subAuraDisc.rotation.z = -this.elapsedTime * 1.5;
+    const isAwakened =
+      ('chessCoordinationStacks' in p && p.chessCoordinationStacks >= 6) ||
+      ('chaosInstability' in p && p.chaosInstability >= 50) ||
+      ('chronoSequenceStacks' in p && p.chronoSequenceStacks >= 3) ||
+      ('runeActiveSymbols' in p && p.runeActiveSymbols.length >= 2) ||
+      p.animState === 'cast';
+
+    const subPulse = isAwakened ? 4.2 : 2.9;
+    inst.subAuraDisc.scale.setScalar(subPulse + Math.sin(this.elapsedTime * 5.5) * 0.28);
+
+    // Dynamic Awakening Particle Emitters around Heroes
+    if (isAwakened && Math.random() < dt * 6.5) {
+      const cfg = HERO_3D_CONFIG[p.classId];
+      const partType =
+        p.classId === 'chrono' ? 'spark' :
+        p.classId === 'rune' ? 'glow' :
+        p.classId === 'chaos' ? 'fire' : 'star';
+      const offX = (Math.random() - 0.5) * 1.6;
+      const offZ = (Math.random() - 0.5) * 1.6;
+      this.spawnSoftParticle(
+        partType,
+        inst.root.position.x + offX,
+        0.4 + Math.random() * 1.4,
+        inst.root.position.z + offZ,
+        cfg.handGlowHex,
+        0.85,
+        0.15,
+        0.35,
+        new T.Vector3(inst.root.position.x + offX * 1.5, 2.2, inst.root.position.z + offZ * 1.5)
+      );
+    }
 
     // Update Elemental Hand Emitters attached to the 3D Hand Bones
     inst.root.updateMatrixWorld(true);
@@ -2006,49 +2028,214 @@ export class ArcanaRenderer {
 
       if (!grp) {
         grp = new T.Group();
-        const outer = new T.Sprite(
-          new T.SpriteMaterial({
-            map: vfxTexture(proj.element === 'fire' ? 'fire' : 'glow'),
-            color: pCol,
-            transparent: true,
-            opacity: 0.92,
-            depthWrite: false,
-            blending: T.AdditiveBlending,
-            toneMapped: false,
-          })
-        );
-        outer.scale.setScalar(r3d * 2.4);
 
-        const core = new T.Sprite(
-          new T.SpriteMaterial({
-            map: vfxTexture('flare'),
-            color: cCol,
-            transparent: true,
-            opacity: 0.98,
-            depthWrite: false,
-            blending: T.AdditiveBlending,
-            toneMapped: false,
-          })
-        );
-        core.scale.setScalar(r3d * 1.15);
+        if (proj.kind === 'terracotta_block') {
+          // Borak's Stratified Terracotta Kinetic Rock Block (Real 3D tumbling monolith!)
+          const blockGeo = new T.BoxGeometry(r3d * 1.8, r3d * 1.4, r3d * 2.0);
+          const blockMat = new T.MeshStandardMaterial({
+            color: 0xb55232, // Terracotta rich clay
+            roughness: 0.75,
+            metalness: 0.15,
+            emissive: 0xffbe0b,
+            emissiveIntensity: 0.35,
+          });
+          const blockMesh = new T.Mesh(blockGeo, blockMat);
+          blockMesh.name = 'terra_block';
 
-        const wake = new T.Mesh(
-          this.unitPlane,
-          new T.MeshBasicMaterial({
-            map: vfxTexture('trace'),
-            color: pCol,
-            transparent: true,
-            opacity: 0.78,
-            depthWrite: false,
-            side: T.DoubleSide,
-            blending: T.AdditiveBlending,
-            toneMapped: false,
-          })
-        );
-        wake.rotation.x = -Math.PI / 2;
-        wake.scale.set(r3d * 1.2, r3d * 3.4, 1);
+          const glowAura = new T.Sprite(
+            new T.SpriteMaterial({
+              map: vfxTexture('glow'),
+              color: 0xffbe0b,
+              transparent: true,
+              opacity: 0.65,
+              blending: T.AdditiveBlending,
+            })
+          );
+          glowAura.scale.setScalar(r3d * 3.2);
 
-        grp.add(outer, core, wake);
+          const dustWake = new T.Mesh(
+            this.unitPlane,
+            new T.MeshBasicMaterial({
+              map: vfxTexture('trace'),
+              color: 0xd4a373,
+              transparent: true,
+              opacity: 0.55,
+              side: T.DoubleSide,
+              blending: T.NormalBlending,
+            })
+          );
+          dustWake.rotation.x = -Math.PI / 2;
+          dustWake.scale.set(r3d * 1.8, r3d * 3.8, 1);
+
+          grp.add(blockMesh, glowAura, dustWake);
+        } else if (proj.kind === 'fan_gale') {
+          // Kael's Celestial Fan Gust (Sweeping wide aerodynamic wind crescent)
+          const outer = new T.Sprite(
+            new T.SpriteMaterial({
+              map: vfxTexture('glow'),
+              color: 0x80ffdb,
+              transparent: true,
+              opacity: 0.95,
+              depthWrite: false,
+              blending: T.AdditiveBlending,
+            })
+          );
+          outer.scale.set(r3d * 4.6, r3d * 2.2, 1);
+
+          const bladeSlash = new T.Mesh(
+            this.unitPlane,
+            new T.MeshBasicMaterial({
+              map: vfxTexture('slash'),
+              color: 0xffffff,
+              transparent: true,
+              opacity: 0.95,
+              side: T.DoubleSide,
+              blending: T.AdditiveBlending,
+            })
+          );
+          bladeSlash.rotation.x = -Math.PI / 2;
+          bladeSlash.scale.set(r3d * 4.8, r3d * 2.4, 1);
+
+          const galeWake = new T.Mesh(
+            this.unitPlane,
+            new T.MeshBasicMaterial({
+              map: vfxTexture('trace'),
+              color: 0x52b788,
+              transparent: true,
+              opacity: 0.72,
+              side: T.DoubleSide,
+              blending: T.AdditiveBlending,
+            })
+          );
+          galeWake.rotation.x = -Math.PI / 2;
+          galeWake.scale.set(r3d * 3.4, r3d * 5.2, 1);
+
+          grp.add(outer, bladeSlash, galeWake);
+        } else if (proj.kind === 'water_whip') {
+          // Nerys' Liquid Water Whip with Frost Mist
+          const outer = new T.Sprite(
+            new T.SpriteMaterial({
+              map: vfxTexture('glow'),
+              color: 0x00bbf9,
+              transparent: true,
+              opacity: 0.95,
+              blending: T.AdditiveBlending,
+            })
+          );
+          outer.scale.set(r3d * 2.2, r3d * 4.2, 1);
+
+          const core = new T.Sprite(
+            new T.SpriteMaterial({
+              map: vfxTexture('flare'),
+              color: 0xe0fbfc,
+              transparent: true,
+              opacity: 0.98,
+              blending: T.AdditiveBlending,
+            })
+          );
+          core.scale.set(r3d * 1.2, r3d * 2.8, 1);
+
+          const splashWake = new T.Mesh(
+            this.unitPlane,
+            new T.MeshBasicMaterial({
+              map: vfxTexture('trace'),
+              color: 0x00f5d4,
+              transparent: true,
+              opacity: 0.85,
+              side: T.DoubleSide,
+              blending: T.AdditiveBlending,
+            })
+          );
+          splashWake.rotation.x = -Math.PI / 2;
+          splashWake.scale.set(r3d * 1.5, r3d * 4.8, 1);
+
+          grp.add(outer, core, splashWake);
+        } else if (proj.kind === 'solar_fist') {
+          // Iskra's Blazing Solar Fist with Roaring Corona
+          const outer = new T.Sprite(
+            new T.SpriteMaterial({
+              map: vfxTexture('fire'),
+              color: 0xff5400,
+              transparent: true,
+              opacity: 0.96,
+              blending: T.AdditiveBlending,
+            })
+          );
+          outer.scale.setScalar(r3d * 3.6);
+
+          const core = new T.Sprite(
+            new T.SpriteMaterial({
+              map: vfxTexture('flare'),
+              color: 0xffd166,
+              transparent: true,
+              opacity: 1.0,
+              blending: T.AdditiveBlending,
+            })
+          );
+          core.scale.setScalar(r3d * 1.8);
+
+          const flameWake = new T.Mesh(
+            this.unitPlane,
+            new T.MeshBasicMaterial({
+              map: vfxTexture('trace'),
+              color: 0xff0054,
+              transparent: true,
+              opacity: 0.85,
+              side: T.DoubleSide,
+              blending: T.AdditiveBlending,
+            })
+          );
+          flameWake.rotation.x = -Math.PI / 2;
+          flameWake.scale.set(r3d * 1.8, r3d * 4.2, 1);
+
+          grp.add(outer, core, flameWake);
+        } else {
+          // Generic elemental projectile
+          const outer = new T.Sprite(
+            new T.SpriteMaterial({
+              map: vfxTexture(proj.element === 'fire' ? 'fire' : 'glow'),
+              color: pCol,
+              transparent: true,
+              opacity: 0.92,
+              depthWrite: false,
+              blending: T.AdditiveBlending,
+              toneMapped: false,
+            })
+          );
+          outer.scale.setScalar(r3d * 2.4);
+
+          const core = new T.Sprite(
+            new T.SpriteMaterial({
+              map: vfxTexture('flare'),
+              color: cCol,
+              transparent: true,
+              opacity: 0.98,
+              depthWrite: false,
+              blending: T.AdditiveBlending,
+              toneMapped: false,
+            })
+          );
+          core.scale.setScalar(r3d * 1.15);
+
+          const wake = new T.Mesh(
+            this.unitPlane,
+            new T.MeshBasicMaterial({
+              map: vfxTexture('trace'),
+              color: pCol,
+              transparent: true,
+              opacity: 0.78,
+              depthWrite: false,
+              side: T.DoubleSide,
+              blending: T.AdditiveBlending,
+              toneMapped: false,
+            })
+          );
+          wake.rotation.x = -Math.PI / 2;
+          wake.scale.set(r3d * 1.2, r3d * 3.4, 1);
+
+          grp.add(outer, core, wake);
+        }
+
         this.vfxRoot.add(grp);
         this.projectileMeshes.set(proj.id, grp);
       }
@@ -2059,23 +2246,33 @@ export class ArcanaRenderer {
       if (wakeMesh) {
         wakeMesh.rotation.z = -Math.atan2(proj.vx, proj.vy);
       }
+      const blockMesh = grp.getObjectByName('terra_block');
+      if (blockMesh) {
+        blockMesh.rotation.x += dt * 8.5;
+        blockMesh.rotation.y += dt * 5.5;
+        blockMesh.rotation.z += dt * 3.2;
+      }
 
       if (emitTrail) {
         const tex =
-          proj.element === 'fire'
-            ? 'fire'
-            : proj.element === 'lightning'
+          proj.kind === 'fan_gale'
             ? 'spark'
-            : proj.element === 'frost'
-            ? 'star'
-            : 'glow';
+            : proj.kind === 'water_whip'
+              ? 'star'
+              : proj.kind === 'solar_fist' || proj.element === 'fire'
+                ? 'fire'
+                : proj.element === 'lightning'
+                  ? 'spark'
+                  : proj.element === 'frost'
+                    ? 'star'
+                    : 'glow';
         this.spawnSoftParticle(
           tex,
           pos.x,
           1.05,
           pos.z,
           pCol,
-          r3d * 1.1,
+          r3d * 1.3,
           0.1,
           0.26,
           new T.Vector3(pos.x, 1.35, pos.z)

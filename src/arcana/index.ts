@@ -16,6 +16,7 @@ import {
 } from './data';
 import { ArcanaAudio } from './audio';
 import { ArcanaCoopSession } from './coop';
+import { ArcanaVoiceChat } from './voice';
 import { ArcanaRenderer } from './renderer';
 import {
   advanceToNextCampaign,
@@ -100,6 +101,9 @@ export function getSkillVectorIcon(nameOrText: string): string {
   if (t.includes('sangue') || t.includes('blood') || t.includes('vampiro') || t.includes('drenar')) return skillIcon('bloody-sword');
   if (t.includes('cura') || t.includes('vital') || t.includes('vida') || t.includes('regenera')) return skillIcon('heart-plus');
   if (t.includes('água') || t.includes('mar') || t.includes('onda') || t.includes('turbilhão')) return skillIcon('magic-swirl');
+  if (t.includes('bastão') || t.includes('planador') || t.includes('staff') || t.includes('glider')) return skillIcon('spinning-sword');
+  if (t.includes('leque') || t.includes('fan') || t.includes('tessen')) return skillIcon('arrow-flights');
+  if (t.includes('terracota') || t.includes('chute') || t.includes('bloco') || t.includes('soco')) return skillIcon('vibrating-shield');
   if (t.includes('vento') || t.includes('ar') || t.includes('tornado') || t.includes('ciclone')) return skillIcon('tornado');
   if (t.includes('voo') || t.includes('flecha') || t.includes('velocidade') || t.includes('impulso')) return skillIcon('arrow-flights');
   if (t.includes('som') || t.includes('vácuo') || t.includes('eco') || t.includes('ressonância')) return skillIcon('ringed-beam');
@@ -134,6 +138,9 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
 
   const coop = new ArcanaCoopSession();
   coop.localName = options.name || 'Guardião';
+  const voice = new ArcanaVoiceChat();
+  voice.localUserName = options.name || 'Guardião';
+  voice.subscribe(() => renderUi());
 
   // Isolated root container
   const root = document.createElement('div');
@@ -807,8 +814,8 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           <div style="display:flex;align-items:center;gap:12px;background:rgba(10,6,22,0.85);padding:8px 16px;border-radius:14px;border:1.5px solid rgba(255,209,102,0.4);backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(0,0,0,0.6);">
             <div style="width:32px;height:32px;color:#ffd166;">${skillIcon('crown')}</div>
             <div>
-              <div style="font-size:10px;letter-spacing:2px;color:#80ffdb;text-transform:uppercase;font-weight:800;">DARK-FANTASY ROGUELITE · ESTILO RAVENSWATCH</div>
-              <div style="font-size:19px;font-weight:900;color:#ffd166;letter-spacing:1px;">ASCENSÃO ARCANA</div>
+              <div style="font-size:10px;letter-spacing:2px;color:#80ffdb;text-transform:uppercase;font-weight:800;">ROGUELITE DE HORDAS MULTIELEMENTAR</div>
+              <div style="font-size:22px;font-weight:900;color:#ffd166;letter-spacing:1px;text-shadow:0 0 16px rgba(255,209,102,0.6);">SURVIVOR ELEMENTAL</div>
             </div>
           </div>
 
@@ -1118,44 +1125,114 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
     if (currentScreen === 'coop_lobby') {
       const wrap = document.createElement('div');
       wrap.style.cssText =
-        'position:absolute;inset:0;background:rgba(8,4,20,0.94);padding:24px;pointer-events:auto;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+        'position:absolute;inset:0;background:rgba(8,4,20,0.94);padding:20px;pointer-events:auto;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;';
       wrap.innerHTML = `
-        <div style="max-width:620px;width:100%;background:rgba(20,12,42,0.95);border:1px solid rgba(125,226,255,0.35);border-radius:16px;padding:22px;">
+        <div style="max-width:680px;width:100%;background:linear-gradient(165deg,rgba(24,14,48,0.97),rgba(10,6,24,0.98));border:1.5px solid rgba(125,226,255,0.4);border-radius:18px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,0.85);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <div>
-              <span style="font-size:11px;color:#7de2ff;letter-spacing:2px;">COOPERATIVO ONLINE DE 2 GUARDIÕES</span>
-              <h2 style="margin:2px 0 0;color:#ffd166;">Pacto dos Guardiões</h2>
+              <span style="font-size:11px;color:#7de2ff;letter-spacing:2px;font-weight:900;">COOPERATIVO ONLINE COM CHAT DE VOZ</span>
+              <h2 style="margin:2px 0 0;color:#ffd166;font-size:24px;">Pacto dos Guardiões</h2>
             </div>
-            <button data-act="back-menu" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#fff;cursor:pointer;">← Voltar</button>
+            <button data-act="back-menu" style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.06);color:#fff;font-weight:700;cursor:pointer;">← Voltar</button>
           </div>
-          <p style="font-size:13px;color:#cfc4e8;line-height:1.5;margin-bottom:16px;">
-            Combina vertentes em dupla com outro jogador (via código de sala sincronizado) ou invoca um <strong>Guardião Aliado de IA</strong> que conjura técnicas em sinergia contigo!
+          <p style="font-size:13px;color:#cfc4e8;line-height:1.5;margin-bottom:18px;">
+            Cria uma sala, partilha o código com um amigo para jogarem juntos em tempo real com <strong>Chat de Voz Integrado</strong> e sinergia de magias!
           </p>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-            <div style="padding:14px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(125,226,255,0.2);">
-              <h4 style="margin:0 0 8px;color:#80ffdb;">Criar Sala Cooperativa</h4>
-              <button data-act="coop-create" style="width:100%;padding:10px;border-radius:8px;border:1px solid #00f5d4;background:rgba(0,245,212,0.2);color:#fff;font-weight:700;cursor:pointer;">
-                Gerar Código de Sala
+          <!-- Room Creation & Join Grid -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+            <!-- Create Room -->
+            <div style="padding:16px;border-radius:14px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(0,245,212,0.3);">
+              <h4 style="margin:0 0 8px;color:#80ffdb;font-size:14px;">Criar Nova Sala</h4>
+              <button data-act="coop-create" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #00f5d4;background:linear-gradient(135deg,#00f5d4,#00bbf9);color:#06101e;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 0 16px rgba(0,245,212,0.3);">
+                ✨ Gerar Código de Sala
               </button>
               ${
                 coop.roomCode
-                  ? `<div style="margin-top:10px;padding:8px;border-radius:8px;background:#120824;text-align:center;font-size:18px;font-weight:900;color:#ffd166;letter-spacing:2px;">${coop.roomCode}</div>`
+                  ? `
+                  <div style="margin-top:12px;padding:10px;border-radius:10px;background:#100622;border:1px solid rgba(255,209,102,0.4);text-align:center;">
+                    <div style="font-size:10px;color:#80ffdb;font-weight:800;letter-spacing:1px;margin-bottom:2px;">CÓDIGO DA TUA SALA:</div>
+                    <div style="font-size:22px;font-weight:900;color:#ffd166;letter-spacing:3px;">${coop.roomCode}</div>
+                    <button data-act="copy-room-code" style="margin-top:6px;padding:5px 12px;border-radius:6px;border:1px solid #ffd166;background:rgba(255,209,102,0.18);color:#ffd166;font-size:11px;font-weight:800;cursor:pointer;">
+                      📋 Copiar Código
+                    </button>
+                  </div>
+                  `
                   : ''
               }
             </div>
 
-            <div style="padding:14px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,209,102,0.2);">
-              <h4 style="margin:0 0 8px;color:#ffd166;">Entrar numa Sala</h4>
-              <input id="arcana-room-input" placeholder="Ex: ARC-742" value="${coop.roomCode || ''}" style="width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:#0d071c;color:#fff;margin-bottom:8px;font-weight:700;" />
-              <button data-act="coop-join" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ffd166;background:rgba(255,209,102,0.2);color:#ffd166;font-weight:700;cursor:pointer;">
-                Conectar à Sala
+            <!-- Join Room -->
+            <div style="padding:16px;border-radius:14px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,209,102,0.3);">
+              <h4 style="margin:0 0 8px;color:#ffd166;font-size:14px;">Entrar Numa Sala</h4>
+              <input id="arcana-room-input" placeholder="Ex: ARC-742" value="${coop.roomCode || ''}" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:#0d071c;color:#fff;margin-bottom:10px;font-weight:800;font-size:14px;" />
+              <button data-act="coop-join" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:13px;cursor:pointer;">
+                🚀 Conectar e Jogar
               </button>
             </div>
           </div>
 
-          <button data-act="coop-start-ai" style="width:100%;padding:14px;border-radius:12px;border:2px solid #00bbf9;background:linear-gradient(135deg,rgba(0,187,249,0.28),rgba(58,20,88,0.92));color:#fff;font-weight:800;font-size:15px;cursor:pointer;">
-            ⚡ Iniciar Aventura Cooperativa Agora (Com Guardião Aliado)
+          <!-- Integrated Voice Chat Panel -->
+          <div style="padding:16px;border-radius:14px;background:rgba(14,9,30,0.85);border:1.5px solid ${voice.isInVoice ? '#00f5d4' : 'rgba(255,255,255,0.15)'};margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:18px;">${voice.isInVoice ? (voice.isMicMuted ? '🔇' : '🎙️') : '🎧'}</span>
+                <div>
+                  <div style="font-size:13px;font-weight:900;color:${voice.isInVoice ? '#80ffdb' : '#aaa'};">
+                    ${voice.isInVoice ? 'Chat de Voz Ativo na Sala' : 'Chat de Voz Desconectado'}
+                  </div>
+                  <div style="font-size:10px;color:#8a809f;">Comunicação em tempo real entre jogadores</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;">
+                ${
+                  voice.isInVoice
+                    ? `
+                    <button data-act="voice-toggle-mic" style="padding:6px 12px;border-radius:8px;border:1px solid ${voice.isMicMuted ? '#ff4d6d' : '#00f5d4'};background:${voice.isMicMuted ? 'rgba(255,77,109,0.2)' : 'rgba(0,245,212,0.2)'};color:#fff;font-size:11px;font-weight:800;cursor:pointer;">
+                      ${voice.isMicMuted ? '🔇 Desmutar Microfone' : '🎙️ Mutar Microfone'}
+                    </button>
+                    <button data-act="voice-leave" style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#ff99ac;font-size:11px;font-weight:800;cursor:pointer;">
+                      📞 Sair da Voz
+                    </button>
+                    `
+                    : `
+                    <button data-act="voice-join" style="padding:7px 14px;border-radius:8px;border:1.5px solid #00f5d4;background:rgba(0,245,212,0.2);color:#80ffdb;font-size:11px;font-weight:900;cursor:pointer;">
+                      🎙️ Ligar Microfone / Entrar na Voz
+                    </button>
+                    `
+                }
+              </div>
+            </div>
+
+            <!-- Voice Participants List with VU Speaking Meter & Individual Mute Button -->
+            ${
+              voice.isInVoice
+                ? `
+                <div style="display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
+                  ${voice.getParticipants().map(p => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.03);font-size:11px;">
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.isSpeaking ? '#00f5d4' : '#5a526d'};box-shadow:${p.isSpeaking ? '0 0 8px #00f5d4' : 'none'};"></span>
+                        <span style="font-weight:800;color:#fff;">${p.name}</span>
+                        <span style="font-size:10px;color:${p.micMuted ? '#ff4d6d' : '#80ffdb'};">${p.micMuted ? '(Microfone Mudo)' : '(A Falar)'}</span>
+                      </div>
+                      ${
+                        !p.isSelf
+                          ? `<button data-act="voice-mute-peer:${p.id}" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:${p.isMuted ? '#ffd166' : '#aaa'};font-size:10px;font-weight:800;cursor:pointer;">
+                              ${p.isMuted ? '🔊 Desmutar Jogador' : '🔇 Mutar para Mim'}
+                            </button>`
+                          : ''
+                      }
+                    </div>
+                  `).join('')}
+                </div>
+                `
+                : ''
+            }
+          </div>
+
+          <button data-act="coop-start-ai" style="width:100%;padding:14px;border-radius:12px;border:2px solid #00bbf9;background:linear-gradient(135deg,rgba(0,187,249,0.3),rgba(58,20,88,0.95));color:#fff;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 0 24px rgba(0,187,249,0.35);">
+            ⚡ Iniciar Partida Cooperativa Agora
           </button>
         </div>
       `;
@@ -1601,12 +1678,16 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         const draftModal = document.createElement('div');
         draftModal.className = 'arcana-modal';
         draftModal.style.cssText =
-          'position:absolute;inset:0;background:rgba(6,3,16,0.88);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;pointer-events:auto;z-index:10010;overflow-y:auto;';
+          'position:absolute;inset:0;background:rgba(6,3,16,0.92);backdrop-filter:blur(12px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;pointer-events:auto;z-index:10010;overflow-y:auto;';
         draftModal.innerHTML = `
-          <div style="max-width:860px;width:100%;text-align:center;">
-            <div style="font-size:11px;letter-spacing:3px;color:#00f5d4;text-transform:uppercase;">DESPERTAR DO ÉTER · NÍVEL ${p.level}</div>
-            <h2 style="margin:4px 0 14px;font-size:24px;color:#ffd166;">Escolhe uma Nova Técnica ou Vertente</h2>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:14px;margin-bottom:14px;">
+          <div style="max-width:920px;width:100%;text-align:center;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;letter-spacing:3px;color:#00f5d4;text-transform:uppercase;font-weight:900;">
+              <span>☯</span> DESPERTAR DO ÉTER · NÍVEL ${p.level} <span>☯</span>
+            </div>
+            <h2 style="margin:4px 0 16px;font-size:26px;font-weight:900;color:#ffd166;text-shadow:0 0 16px rgba(255,209,102,0.6);">
+              Escolhe um Selo Sagrado ou Fusão Elemental
+            </h2>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:18px;">
               ${st.currentUpgradeChoices
                 .map(card => {
                   const curStacks = p.upgrades[card.id] || 0;
@@ -1620,20 +1701,44 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                       : card.rarity === 'rare'
                       ? '#4ea8de'
                       : '#8d99ae';
+                  
+                  // Compute evolution stars
+                  const stars = Array.from({ length: Math.min(5, card.maxStacks) }, (_, i) => 
+                    i <= curStacks ? '★' : '☆'
+                  ).join(' ');
+
+                  const kanjiHeader = 
+                    card.tags.includes('fire') && card.tags.includes('temporal') ? '炎 · 風' :
+                    card.tags.includes('frost') && card.tags.includes('runic') ? '水 · 土' :
+                    card.tags.includes('frost') && card.tags.includes('temporal') ? '氷 · 嵐' :
+                    card.tags.includes('fire') && card.tags.includes('runic') ? '火 · 地' :
+                    card.category === 'mythic' ? '四大元素' :
+                    card.tags.includes('temporal') ? '風' :
+                    card.tags.includes('frost') ? '水' :
+                    card.tags.includes('fire') ? '火' : '土';
+
                   return `
-                    <button data-act="pick-upgrade:${card.id}" style="padding:16px;border-radius:14px;border:2px solid ${borderCol};background:linear-gradient(165deg,rgba(32,20,58,0.96),rgba(12,8,26,0.98));color:#fff;text-align:left;cursor:pointer;box-shadow:0 0 24px ${borderCol}44;display:flex;flex-direction:column;justify-content:space-between;">
+                    <button data-act="pick-upgrade:${card.id}" style="position:relative;padding:18px;border-radius:18px;border:2.5px solid ${borderCol};background:radial-gradient(circle at 50% 25%,rgba(38,20,54,0.98),rgba(12,6,22,0.98));color:#fff;text-align:left;cursor:pointer;box-shadow:0 0 28px ${borderCol}44, inset 0 0 16px rgba(0,0,0,0.85);display:flex;flex-direction:column;justify-content:space-between;transition:transform 0.15s,box-shadow 0.15s;">
+                      <!-- Oriental Ofuda Top Seal Banner -->
+                      <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:2px 14px;border-radius:99px;background:#140822;border:1.5px solid ${borderCol};font-size:11px;font-weight:900;color:${borderCol};letter-spacing:2px;box-shadow:0 0 12px ${borderCol}66;">
+                        ${kanjiHeader}
+                      </div>
+
                       <div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                          <span style="font-size:28px;">${card.icon}</span>
-                          <span style="font-size:10px;padding:3px 8px;border-radius:99px;background:${borderCol}28;color:${borderCol};font-weight:800;text-transform:uppercase;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;margin-bottom:10px;">
+                          <span style="font-size:32px;filter:drop-shadow(0 0 8px ${borderCol});">${card.icon}</span>
+                          <span style="font-size:10px;padding:3px 10px;border-radius:99px;background:${borderCol}28;border:1px solid ${borderCol}66;color:${borderCol};font-weight:900;text-transform:uppercase;">
                             ${RARITY_LABELS[card.rarity]}
                           </span>
                         </div>
-                        <div style="font-size:11px;color:#80ffdb;margin-bottom:2px;">${CATEGORY_LABELS[card.category]} · Grau ${curStacks + 1}/${card.maxStacks}</div>
-                        <h3 style="margin:0 0 8px;font-size:17px;color:#fff;">${card.name}</h3>
-                        <p style="font-size:13px;color:#e2dbf0;line-height:1.4;margin:0 0 10px;">${card.shortDesc}</p>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                          <span style="font-size:11px;color:#80ffdb;font-weight:800;">${CATEGORY_LABELS[card.category]}</span>
+                          <span style="font-size:12px;color:#ffd166;letter-spacing:1.5px;">${stars}</span>
+                        </div>
+                        <h3 style="margin:0 0 8px;font-size:17px;font-weight:900;color:#fff;line-height:1.2;">${card.name}</h3>
+                        <p style="font-size:13px;color:#e2dbf0;line-height:1.45;margin:0 0 12px;">${card.shortDesc}</p>
                       </div>
-                      <div style="padding-top:8px;border-top:1px solid rgba(255,255,255,0.1);font-size:11px;color:#ffd166;font-style:italic;">
+                      <div style="padding-top:10px;border-top:1px dashed rgba(255,255,255,0.15);font-size:11px;color:#ffd166;font-style:italic;line-height:1.35;">
                         ✦ ${card.behaviorTransformation}
                       </div>
                     </button>
@@ -1641,8 +1746,8 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                 })
                 .join('')}
             </div>
-            <button data-act="toggle-inrun-tree" style="padding:9px 18px;border-radius:99px;border:1.5px solid #ffd166;background:rgba(255,209,102,0.16);color:#ffd166;font-weight:800;cursor:pointer;">
-              🕸️ Abrir Teia de Habilidades & Alocar Centelhas de Éter
+            <button data-act="toggle-inrun-tree" style="padding:10px 22px;border-radius:99px;border:1.5px solid #ffd166;background:rgba(255,209,102,0.16);color:#ffd166;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 0 16px rgba(255,209,102,0.3);">
+              🕸️ Teia Astral de Habilidades & Vertentes
             </button>
           </div>
         `;
@@ -1890,6 +1995,20 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         selectedClassId = val as ArcanaClassId;
         currentScreen = 'class_select';
         renderUi();
+      } else if (key === 'copy-room-code') {
+        if (coop.roomCode) {
+          navigator.clipboard?.writeText(coop.roomCode);
+          alert('Código da Sala copiado: ' + coop.roomCode);
+        }
+      } else if (key === 'voice-join') {
+        const codeToJoin = coop.roomCode || 'ARC-777';
+        voice.joinVoice(codeToJoin, options.name || 'Guardião');
+      } else if (key === 'voice-leave') {
+        voice.leaveVoice();
+      } else if (key === 'voice-toggle-mic') {
+        voice.toggleMuteSelf();
+      } else if (key === 'voice-mute-peer') {
+        voice.toggleMutePeer(val);
       } else if (key === 'open-coop') {
         currentScreen = 'coop_lobby';
         renderUi();
@@ -1947,10 +2066,13 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         renderUi();
       } else if (key === 'hud-dash') {
         input.mobilityPressed = true;
+        if (runState) runState.player.mobilityBufferTimer = 0.35;
       } else if (key === 'hud-special') {
         input.specialPressed = true;
+        if (runState) runState.player.specialBufferTimer = 0.35;
       } else if (key === 'hud-ult') {
         input.ultimatePressed = true;
+        if (runState) runState.player.ultimateBufferTimer = 0.35;
       } else if (key === 'hud-primary') {
         input.primaryHeld = true;
       } else if (key === 'hud-auto') {
@@ -1985,19 +2107,31 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
     for (const btn of uiLayer.querySelectorAll<HTMLElement>('[data-act]')) {
       const act = btn.dataset.act!;
       if (act.startsWith('hud-')) {
-        // Fast instant dual-touch trigger for mobile (doesn't wait for pointer release)
+        // Fast instant dual-touch trigger for mobile (instant response, no delay)
         btn.addEventListener('pointerdown', e => {
           e.stopPropagation();
+          e.preventDefault();
           executeAction(act);
-        }, { passive: true });
+          btn.style.transform = 'scale(0.88)';
+          btn.style.filter = 'brightness(1.5)';
+        });
+
+        const resetVisual = () => {
+          btn.style.transform = '';
+          btn.style.filter = '';
+        };
+        btn.addEventListener('pointerup', resetVisual);
+        btn.addEventListener('pointercancel', resetVisual);
+        btn.addEventListener('pointerleave', resetVisual);
 
         if (act === 'hud-primary') {
           const releasePrimary = (e: Event) => {
             e.stopPropagation();
             input.primaryHeld = false;
           };
-          btn.addEventListener('pointerup', releasePrimary, { passive: true });
-          btn.addEventListener('pointercancel', releasePrimary, { passive: true });
+          btn.addEventListener('pointerup', releasePrimary);
+          btn.addEventListener('pointercancel', releasePrimary);
+          btn.addEventListener('pointerleave', releasePrimary);
         }
       } else {
         btn.onclick = e => {
