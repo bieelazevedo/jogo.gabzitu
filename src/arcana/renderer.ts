@@ -23,6 +23,7 @@ import {
 } from '../night-assets';
 import { vfxTexture } from '../night-vfx-textures';
 import { ARCANA_CAMPAIGNS, ARCANA_CLASSES } from './data';
+import { renderCelShadedGuardian } from './anime-character-renderer';
 import type {
   ActiveBoss,
   ActiveEnemy,
@@ -1594,6 +1595,7 @@ export class ArcanaRenderer {
     }
 
     if (inst.actor) {
+      inst.actor.root.visible = false;
       inst.actor.root.rotation.y = turnAngle(inst.actor.root.rotation.y, targetYaw, dt * 18);
 
       const cfg = HERO_3D_CONFIG[p.classId];
@@ -2787,14 +2789,15 @@ export class ArcanaRenderer {
         shakeZ = (Math.random() - 0.5) * mag;
       }
 
-      const camDistY = 8.8 * this.camZoom;
-      const camDistZ = 8.2 * this.camZoom;
+      // Classic Horde Survivor Top-Down Perspective ("Tela de Cima" / Bird's Eye View)
+      const camDistY = 16.8 * this.camZoom;
+      const camDistZ = 8.5 * this.camZoom;
       this.camera.position.set(
         this.camTargetX + shakeX,
         camDistY,
         this.camTargetZ + camDistZ + shakeZ
       );
-      this.camera.lookAt(this.camTargetX, 1.05, this.camTargetZ);
+      this.camera.lookAt(this.camTargetX, 0.35, this.camTargetZ);
 
       this.playerLight.position.set(p3d.x, 3.2, p3d.z);
       this.playerLight.color.set(ARCANA_CLASSES[state.player.classId].palette.glow);
@@ -2899,6 +2902,21 @@ export class ArcanaRenderer {
     ctx.clearRect(0, 0, this.width, this.height);
 
     if (!showHudOverlay) {
+      // Menu Hero Showcase: Render Large Cel-Shaded Guardian in the Center-Right of Screen
+      const charX = this.width * (this.width > 768 ? 0.65 : 0.5);
+      const charY = this.height * 0.48;
+      renderCelShadedGuardian(
+        ctx,
+        state.player.classId,
+        charX,
+        charY,
+        1.55,
+        1,
+        state.player.animTime,
+        'idle',
+        true,
+        'normal'
+      );
       ctx.restore();
       return;
     }
@@ -2916,6 +2934,24 @@ export class ArcanaRenderer {
     vig.addColorStop(1, 'rgba(2,2,6,0.82)');
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, this.width, this.height);
+
+    // 1. Draw Authentic Cel-Shaded Anime Player Model (Kael/Kyoshi, Nerys, Iskra, Borak)
+    const pProjChar = this.projectToScreen(state.player.x, state.player.y, 0, mapW, mapH);
+    if (pProjChar.visible) {
+      const stance = state.player.classId === 'chrono' && (state.player.upgrades['upgrade_chrono_1'] || 0) > 0 ? 'kyoshi' : 'normal';
+      renderCelShadedGuardian(
+        ctx,
+        state.player.classId,
+        pProjChar.x,
+        pProjChar.y,
+        0.84,
+        state.player.facingX,
+        state.player.animTime,
+        state.player.animState,
+        state.player.ultimateCharge >= state.player.ultimateMaxCharge,
+        stance
+      );
+    }
 
     // Overhead Health Bar for Player (Ravenswatch Emerald Green Bar)
     const pProj = this.projectToScreen(state.player.x, state.player.y, 2.55, mapW, mapH);
@@ -2938,6 +2974,21 @@ export class ArcanaRenderer {
       : (state.coopPartner ? [state.coopPartner] : []);
 
     for (const ally of renderAllies) {
+      const aProjChar = this.projectToScreen(ally.x, ally.y, 0, mapW, mapH);
+      if (aProjChar.visible) {
+        renderCelShadedGuardian(
+          ctx,
+          ally.classId,
+          aProjChar.x,
+          aProjChar.y,
+          0.78,
+          ally.facingX,
+          state.elapsedCampaignSec,
+          ally.animState,
+          false,
+          'normal'
+        );
+      }
       const aProj = this.projectToScreen(
         ally.x,
         ally.y,

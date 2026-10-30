@@ -829,11 +829,11 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                   </button>`
                 : ''
             }
+            <button data-act="open-coop" style="padding:9px 14px;border-radius:10px;border:1.5px solid #00f5d4;background:rgba(0,245,212,0.18);color:#80ffdb;font-weight:900;font-size:12px;cursor:pointer;">
+              👥 Co-op (5 Jogadores)
+            </button>
             <button data-act="open-skill-tree" style="padding:9px 16px;border-radius:10px;border:1.5px solid #ffd166;background:rgba(255,209,102,0.18);color:#ffd166;font-weight:800;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;">
               <span style="width:16px;height:16px;display:inline-block;color:#ffd166;">${skillIcon('beams-aura')}</span> Teia de Vertentes
-            </button>
-            <button data-act="open-coop" style="padding:9px 14px;border-radius:10px;border:1px solid rgba(125,226,255,0.35);background:rgba(20,14,38,0.88);color:#7de2ff;font-weight:800;font-size:12px;cursor:pointer;">
-              👥 Co-op (2J)
             </button>
             <button data-act="open-grimoire" style="padding:9px 14px;border-radius:10px;border:1px solid rgba(199,125,255,0.35);background:rgba(20,14,38,0.88);color:#e0aaff;font-weight:800;font-size:12px;cursor:pointer;">
               📖 Grimório
@@ -851,55 +851,43 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         </header>
 
         <!-- Main Body: Split-Stage Lobby -->
-        <div style="display:flex;gap:24px;flex:1;align-items:stretch;margin:14px 0;position:relative;overflow:hidden;">
-          <!-- Left Column: 4 Elemental Bender Cards (Zero distortion, 1:1 square portraits) -->
-          <div style="pointer-events:auto;width:380px;max-width:40vw;display:flex;flex-direction:column;gap:10px;z-index:20;overflow-y:auto;padding-right:6px;">
-            <div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:#80ffdb;text-transform:uppercase;">
-              ESCOLHE O TEU GUARDIÃO PRIMORDIAL:
+        <div style="display:flex;gap:20px;flex:1;align-items:stretch;margin:10px 0;position:relative;overflow:hidden;">
+          <!-- Left Column: 4 Clean Elemental Bender Cards -->
+          <div style="pointer-events:auto;width:340px;max-width:38vw;display:flex;flex-direction:column;gap:8px;z-index:20;overflow-y:auto;padding-right:6px;">
+            <div style="font-size:10px;font-weight:900;letter-spacing:1.5px;color:#80ffdb;text-transform:uppercase;">
+              ESCOLHE O TEU GUARDIÃO:
             </div>
-            ${(['chess', 'chaos', 'chrono', 'rune'] as ArcanaClassId[])
+            ${(['chrono', 'chess', 'chaos', 'rune'] as ArcanaClassId[])
               .map(id => {
                 const c = ARCANA_CLASSES[id];
                 const active = id === selectedClassId;
+                const emojiMap: Record<ArcanaClassId, string> = { chrono: '🌪️', chess: '🌊', chaos: '🔥', rune: '🥊' };
+                const subtitleMap: Record<ArcanaClassId, string> = {
+                  chrono: 'Avatar Vento & Bastão Planador',
+                  chess: 'Mestra da Maré & Dança do Gelo',
+                  chaos: 'Fúria Solar & Artes de Magma',
+                  rune: 'Bastião Telúrico & Basalto',
+                };
                 return `
                   <div
                     data-act="pick-class:${id}"
-                    style="border-radius:16px;border:${active ? '2.5px solid #ffd166' : `1.5px solid ${c.palette.glow}44`};background:${
+                    style="border-radius:14px;border:${active ? '2.5px solid #ffd166' : `1.5px solid ${c.palette.glow}44`};background:${
                       active
-                        ? 'linear-gradient(135deg,rgba(38,22,68,0.96),rgba(18,10,36,0.98))'
+                        ? 'linear-gradient(135deg,rgba(42,24,78,0.98),rgba(18,10,38,0.99))'
                         : 'rgba(14,8,28,0.88)'
-                    };padding:10px;display:flex;gap:12px;align-items:center;cursor:pointer;box-shadow:${
+                    };padding:10px 12px;display:flex;gap:12px;align-items:center;cursor:pointer;box-shadow:${
                       active
-                        ? `0 0 24px ${c.palette.glow}66, inset 0 0 16px rgba(255,209,102,0.25)`
-                        : '0 6px 18px rgba(0,0,0,0.6)'
-                    };transition:transform 0.15s,box-shadow 0.15s,border-color 0.15s;transform:${
+                        ? `0 0 20px ${c.palette.glow}66, inset 0 0 14px rgba(255,209,102,0.2)`
+                        : '0 4px 14px rgba(0,0,0,0.6)'
+                    };transition:all 0.15s;transform:${
                       active ? 'scale(1.02)' : 'scale(1)'
                     };"
                   >
-                    <!-- Exact 1:1 Square Portrait Medallion -->
-                    ${renderBenderPortraitBadge(id, 74, active ? '#ffd166' : c.palette.glow)}
+                    <div style="font-size:28px;">${emojiMap[id]}</div>
                     <div style="flex:1;min-width:0;">
-                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-                        <span style="font-size:15px;font-weight:900;color:${active ? '#ffd166' : '#fff'};">${c.name}</span>
-                        <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:${c.palette.glow}22;border:1px solid ${c.palette.glow}66;color:${c.palette.accent};font-weight:800;">
-                          ${c.title}
-                        </span>
-                      </div>
-                      <div style="font-size:11px;color:#cfc4e8;margin-bottom:6px;display:flex;gap:8px;">
-                        <span>♥ ${c.baseStats.maxHp} HP</span>
-                        <span>⚔ ${c.baseStats.baseDamage} Dano</span>
-                      </div>
-                      <!-- 3 Vertentes Vector Badges -->
-                      <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                        ${c.specializations
-                          .map(
-                            sp => `
-                            <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid ${c.palette.glow}33;font-size:10px;font-weight:700;color:#e2dbf0;">
-                              <span style="width:12px;height:12px;display:inline-block;color:${c.palette.accent};">${getSkillVectorIcon(sp.name)}</span>
-                              ${sp.name.replace('Vertente da ', '').replace('Vertente do ', '').replace('Vertente de ', '')}
-                            </span>`
-                          )
-                          .join('')}
+                      <div style="font-size:15px;font-weight:900;color:${active ? '#ffd166' : '#fff'};">${c.name.split(' (')[0]}</div>
+                      <div style="font-size:10px;color:#80ffdb;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        ${subtitleMap[id]}
                       </div>
                     </div>
                   </div>
@@ -982,119 +970,86 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       return;
     }
 
-    // 3. CLASS DETAILS, DOJO & SUB-BENDING PREVIEW
+    // 3. CLEAN & INTUITIVE HERO SELECTION SCREEN
     if (currentScreen === 'class_select') {
       const cls = ARCANA_CLASSES[selectedClassId];
-      const posMap: Record<ArcanaClassId, string> = {
-        chess: '0% 0%',
-        rune: '100% 0%',
-        chaos: '0% 100%',
-        chrono: '100% 100%',
-      };
       const modal = document.createElement('div');
       modal.style.cssText =
-        'position:absolute;inset:0;background:rgba(8,4,20,0.94);display:flex;flex-direction:column;padding:max(14px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));pointer-events:auto;overflow-y:auto;gap:12px;';
+        'position:absolute;inset:0;background:rgba(8,4,20,0.92);display:flex;align-items:center;justify-content:center;padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));pointer-events:auto;overflow-y:auto;';
       modal.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <div>
-            <div style="font-size:11px;letter-spacing:2px;color:#7de2ff;">DETALHES DO GUARDIÃO & CAMPO DE PROVAS</div>
-            <h2 style="margin:0;font-size:22px;color:#ffd166;">Escolhe o Teu Elemento</h2>
+        <div style="max-width:820px;width:95vw;display:flex;flex-direction:column;gap:12px;background:linear-gradient(165deg,rgba(22,12,42,0.98),rgba(10,6,22,0.99));border:1.5px solid rgba(255,209,102,0.45);border-radius:24px;padding:20px;box-shadow:0 16px 48px rgba(0,0,0,0.88);max-height:92vh;overflow-y:auto;">
+          <!-- Top Bar: Title & Back -->
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <span style="font-size:11px;color:#80ffdb;letter-spacing:2px;font-weight:900;">ESCOLHE O TEU ELEMENTO</span>
+              <h2 style="margin:2px 0 0;font-size:22px;color:#ffd166;">Guardiões do Survivor Elemental</h2>
+            </div>
+            <button data-act="back-menu" style="padding:8px 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.06);color:#fff;font-weight:800;cursor:pointer;">← Voltar</button>
           </div>
-          <div style="display:flex;gap:8px;">
-            <button data-act="open-skill-tree" style="padding:8px 14px;border-radius:8px;border:1px solid #ffd166;background:rgba(255,209,102,0.18);color:#ffd166;font-weight:800;cursor:pointer;">
-              🕸️ Ver Teia de Habilidades
-            </button>
-            <button data-act="back-menu" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(20,14,36,0.9);color:#fff;cursor:pointer;">
-              ← Voltar
-            </button>
-          </div>
-        </div>
 
-        <!-- 4 Visual Element Switcher Tabs -->
-        <div style="display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:10px;overflow-x:auto;">
-          ${(['chess', 'chrono', 'chaos', 'rune'] as ArcanaClassId[])
-            .map(id => {
+          <!-- 4 Guardian Selection Cards (Clean, Direct & Clear) -->
+          <div style="display:grid;grid-template-columns:repeat(4, minmax(110px, 1fr));gap:10px;">
+            ${(['chrono', 'chess', 'chaos', 'rune'] as ArcanaClassId[]).map(id => {
               const c = ARCANA_CLASSES[id];
               const active = id === selectedClassId;
+              const emojiMap: Record<ArcanaClassId, string> = { chrono: '🌪️', chess: '🌊', chaos: '🔥', rune: '🥊' };
+              const elemMap: Record<ArcanaClassId, string> = { chrono: 'Vento & Bastão', chess: 'Água & Gelo', chaos: 'Fogo & Magma', rune: 'Terra & Basalto' };
               return `
-                <button data-act="pick-class:${id}" style="padding:10px;border-radius:14px;border:2.5px solid ${
-                  active ? '#ffd166' : 'rgba(255,255,255,0.15)'
-                };background:${
-                  active
-                    ? 'linear-gradient(160deg,rgba(45,28,88,0.96),rgba(14,9,32,0.98))'
-                    : 'rgba(16,10,32,0.85)'
-                };color:#fff;text-align:left;cursor:pointer;display:flex;align-items:center;gap:10px;">
-                  ${renderBenderPortraitBadge(id, 54, active ? '#ffd166' : c.palette.primary)}
-                  <div>
-                    <div style="font-size:14px;font-weight:900;color:${active ? '#ffd166' : '#fff'};">${c.name}</div>
-                    <div style="font-size:10px;color:#80ffdb;font-weight:700;">${c.specializations.map(s => s.icon).join(' ')} 3 Vertentes</div>
-                  </div>
+                <button data-act="pick-class:${id}" style="padding:10px;border-radius:14px;border:${active ? '2.5px solid #ffd166' : '1.5px solid rgba(255,255,255,0.15)'};background:${active ? 'linear-gradient(145deg,rgba(48,28,88,0.98),rgba(20,12,42,0.98))' : 'rgba(16,10,32,0.85)'};color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:${active ? '0 0 20px rgba(255,209,102,0.45)' : 'none'};transition:all 0.15s;">
+                  <div style="font-size:28px;">${emojiMap[id]}</div>
+                  <div style="font-size:14px;font-weight:900;color:${active ? '#ffd166' : '#fff'};">${c.name.split(' (')[0]}</div>
+                  <div style="font-size:10px;color:#80ffdb;font-weight:700;">${elemMap[id]}</div>
                 </button>
               `;
-            })
-            .join('')}
-        </div>
+            }).join('')}
+          </div>
 
-        <!-- Visual Showcase of Selected Bender -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;background:rgba(18,12,38,0.92);border:1.5px solid ${cls.palette.glow}66;border-radius:16px;padding:16px;">
-          <!-- Left: Giant Portrait + Vertentes -->
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <div style="display:flex;gap:14px;align-items:center;">
-              <div style="width:130px;height:130px;border-radius:18px;border:3px solid ${cls.palette.accent};background-image:url('data:image/svg+xml;utf8,${encodeURIComponent(getAnimeGuardianSvg(selectedClassId))}');background-size:cover;background-position:center;flex-shrink:0;box-shadow:0 0 28px ${cls.palette.glow}77;"></div>
+          <!-- Selected Guardian Spotlight -->
+          <div style="padding:14px 16px;border-radius:16px;background:rgba(255,255,255,0.03);border:1.5px solid ${cls.palette.glow}44;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <div>
-                <span style="font-size:11px;color:#80ffdb;font-weight:800;text-transform:uppercase;">${cls.title}</span>
-                <h3 style="margin:2px 0 6px;font-size:24px;color:#fff;">${cls.name}</h3>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;font-weight:800;">
-                  <span style="padding:4px 8px;border-radius:6px;background:rgba(255,107,139,0.16);color:#ff6b8b;">♥ ${cls.baseStats.maxHp} HP</span>
-                  <span style="padding:4px 8px;border-radius:6px;background:rgba(255,209,102,0.16);color:#ffd166;">⚔ ${cls.baseStats.baseDamage} Dano</span>
-                  <span style="padding:4px 8px;border-radius:6px;background:rgba(125,226,255,0.16);color:#7de2ff;">⚡ ${cls.baseStats.moveSpeed} Vel</span>
-                </div>
+                <span style="font-size:11px;color:#80ffdb;font-weight:800;letter-spacing:1px;">${cls.title}</span>
+                <h3 style="margin:2px 0 0;font-size:22px;color:#fff;">${cls.name}</h3>
+              </div>
+              <div style="display:flex;gap:8px;font-size:12px;font-weight:800;">
+                <span style="padding:4px 10px;border-radius:8px;background:rgba(255,107,139,0.18);color:#ff6b8b;">♥ ${cls.baseStats.maxHp} HP</span>
+                <span style="padding:4px 10px;border-radius:8px;background:rgba(255,209,102,0.18);color:#ffd166;">⚔ ${cls.baseStats.baseDamage} Dano</span>
+                <span style="padding:4px 10px;border-radius:8px;background:rgba(125,226,255,0.18);color:#7de2ff;">⚡ Velocidade ${cls.baseStats.moveSpeed}</span>
               </div>
             </div>
 
-            <div style="font-size:12px;font-weight:800;color:#ffd166;">3 Vertentes Ancestrais Desbloqueáveis:</div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-              ${cls.specializations
-                .map(
-                  sp => `
-                  <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid ${cls.palette.glow}44;text-align:center;">
-                    <div style="font-size:24px;margin-bottom:4px;">${sp.icon}</div>
-                    <div style="font-size:11px;font-weight:900;color:#fff;">${sp.name.replace('Vertente da ', '').replace('Vertente do ', '').replace('Vertente de ', '')}</div>
-                    <div style="font-size:10px;color:#80ffdb;">${sp.subtitle}</div>
-                  </div>`
-                )
-                .join('')}
+            <!-- 3 Core Martial Skills (Clean & Direct) -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:8px;">
+              <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border-left:3px solid #7de2ff;">
+                <div style="font-size:10px;color:#7de2ff;font-weight:800;">ATAQUE PRIMÁRIO</div>
+                <div style="font-size:13px;font-weight:900;color:#fff;margin:2px 0;">${cls.primaryAttack.name}</div>
+                <div style="font-size:11px;color:#cfc4e8;">${cls.primaryAttack.description.split('.')[0]}.</div>
+              </div>
+              <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border-left:3px solid #ffd166;">
+                <div style="font-size:10px;color:#ffd166;font-weight:800;">HABILIDADE ESPECIAL</div>
+                <div style="font-size:13px;font-weight:900;color:#fff;margin:2px 0;">${cls.specialSkill.name}</div>
+                <div style="font-size:11px;color:#cfc4e8;">${cls.specialSkill.description.split('.')[0]}.</div>
+              </div>
+              <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border-left:3px solid #ff4ecd;">
+                <div style="font-size:10px;color:#ff99d8;font-weight:800;">DESPERTAR SUPREMO</div>
+                <div style="font-size:13px;font-weight:900;color:#fff;margin:2px 0;">${cls.ultimateSkill.name}</div>
+                <div style="font-size:11px;color:#cfc4e8;">${cls.ultimateSkill.description.split('.')[0]}.</div>
+              </div>
             </div>
           </div>
 
-          <!-- Right: 5 Visual Skill Cards -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border-left:3px solid #7de2ff;">
-              <div style="font-size:12px;font-weight:900;color:#7de2ff;">${cls.primaryAttack.icon} ${cls.primaryAttack.name}</div>
-              <div style="font-size:11px;color:#cfc4e8;margin-top:2px;">${cls.primaryAttack.description}</div>
-            </div>
-            <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border-left:3px solid #ffd166;">
-              <div style="font-size:12px;font-weight:900;color:#ffd166;">${cls.specialSkill.icon} [E] ${cls.specialSkill.name}</div>
-              <div style="font-size:11px;color:#cfc4e8;margin-top:2px;">${cls.specialSkill.description}</div>
-            </div>
-            <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border-left:3px solid #80ffdb;">
-              <div style="font-size:12px;font-weight:900;color:#80ffdb;">${cls.mobilitySkill.icon} [Espaço] ${cls.mobilitySkill.name}</div>
-              <div style="font-size:11px;color:#cfc4e8;margin-top:2px;">${cls.mobilitySkill.description}</div>
-            </div>
-            <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border-left:3px solid #ff4ecd;">
-              <div style="font-size:12px;font-weight:900;color:#ff99d8;">${cls.ultimateSkill.icon} [R] ${cls.ultimateSkill.name}</div>
-              <div style="font-size:11px;color:#cfc4e8;margin-top:2px;">${cls.ultimateSkill.description}</div>
-            </div>
+          <!-- Big Clear Action Buttons -->
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:2px;">
+            <button data-act="launch-campaign" style="flex:2;min-width:200px;padding:14px;border-radius:12px;border:2px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:16px;cursor:pointer;box-shadow:0 0 24px rgba(255,209,102,0.5);letter-spacing:1px;">
+              ⚔ INICIAR JORNADA COM ${cls.name.split(' (')[0].toUpperCase()}
+            </button>
+            <button data-act="open-coop" style="flex:1;min-width:160px;padding:14px;border-radius:12px;border:1.5px solid #00f5d4;background:rgba(0,245,212,0.2);color:#80ffdb;font-weight:900;font-size:13px;cursor:pointer;">
+              👥 Cooperativo (5 Jogadores)
+            </button>
+            <button data-act="start-training" style="padding:14px 18px;border-radius:12px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.06);color:#fff;font-weight:800;font-size:13px;cursor:pointer;">
+              🎯 Campo de Provas
+            </button>
           </div>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:auto;">
-          <button data-act="start-training" style="padding:12px 20px;border-radius:12px;border:1px solid #7de2ff;background:rgba(125,226,255,0.16);color:#7de2ff;font-weight:800;font-size:14px;cursor:pointer;">
-            🎯 Testar no Dojo de Treino
-          </button>
-          <button data-act="launch-campaign" style="padding:14px 28px;border-radius:12px;border:2px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 0 25px rgba(255,209,102,0.45);">
-            ⚔ JOGAR COM ${cls.name.toUpperCase()} ✦
-          </button>
         </div>
       `;
       uiLayer.appendChild(modal);
