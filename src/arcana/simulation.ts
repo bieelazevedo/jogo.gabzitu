@@ -1476,7 +1476,14 @@ export function stepArcanaSimulation(
     }
   }
 
-  // 2. Player Movement & Obstacle Sliding
+  // 2. Player Movement & Smooth Acceleration / Obstacle Sliding
+  const isPerformingCast =
+    player.specialCooldown > player.specialMaxCooldown - 0.38 &&
+    player.specialMaxCooldown - player.specialCooldown > 0;
+  const isPerformingAttack =
+    player.primaryTimer > Math.max(0.05, player.computed.attackInterval - 0.26) &&
+    player.computed.attackInterval - player.primaryTimer > 0;
+
   if (player.dashTimer > 0) {
     player.dashTimer -= dt;
     const dashSpeed = player.computed.moveSpeed * 2.85;
@@ -1484,8 +1491,9 @@ export function stepArcanaSimulation(
     player.vy = player.dashDirY * dashSpeed;
     player.x += player.vx * dt;
     player.y += player.vy * dt;
+    player.animState = 'dash';
     if (player.dashTimer <= 0 && player.classId === 'chess') {
-      // Knight's Leap landing crush
+      // Surf na Onda landing impact
       dealPlayerAreaDamage(
         state,
         player.x,
@@ -1500,25 +1508,39 @@ export function stepArcanaSimulation(
     }
   } else {
     const moveMag = Math.hypot(input.moveX, input.moveY);
+    const accelLerp = Math.min(1, dt * 18);
     if (moveMag > 0.05) {
       const nx = input.moveX / Math.max(1, moveMag);
       const ny = input.moveY / Math.max(1, moveMag);
-      player.vx = nx * player.computed.moveSpeed;
-      player.vy = ny * player.computed.moveSpeed;
+      const targetVx = nx * player.computed.moveSpeed;
+      const targetVy = ny * player.computed.moveSpeed;
+      player.vx += (targetVx - player.vx) * accelLerp;
+      player.vy += (targetVy - player.vy) * accelLerp;
       player.x += player.vx * dt;
       player.y += player.vy * dt;
-      player.facingX = nx;
-      player.facingY = ny;
-      player.animState = 'walk';
+      player.facingX += (nx - player.facingX) * Math.min(1, dt * 16);
+      player.facingY += (ny - player.facingY) * Math.min(1, dt * 16);
+      if (!isPerformingCast && !isPerformingAttack) {
+        player.animState = 'walk';
+      }
 
       if (state.tutorial.active && !state.tutorial.completedMove) {
         state.tutorial.completedMove = true;
         if (state.tutorial.stepIndex === 0) state.tutorial.stepIndex = 1;
       }
     } else {
-      player.vx = 0;
-      player.vy = 0;
-      player.animState = 'idle';
+      player.vx *= Math.max(0, 1 - dt * 16);
+      player.vy *= Math.max(0, 1 - dt * 16);
+      if (Math.hypot(player.vx, player.vy) < 4) {
+        player.vx = 0;
+        player.vy = 0;
+      } else {
+        player.x += player.vx * dt;
+        player.y += player.vy * dt;
+      }
+      if (!isPerformingCast && !isPerformingAttack) {
+        player.animState = 'idle';
+      }
     }
   }
 
@@ -1548,6 +1570,9 @@ export function stepArcanaSimulation(
   if (wantsPrimary && player.primaryTimer <= 0) {
     player.primaryTimer = player.computed.attackInterval;
     player.animState = 'attack';
+    // Turn smoothly toward aim angle when striking
+    player.facingX = Math.cos(aimAngle);
+    player.facingY = Math.sin(aimAngle);
     firePlayerPrimary(state, player.x, player.y, aimAngle);
     callbacks?.onSfx?.('attack');
 
@@ -1560,6 +1585,8 @@ export function stepArcanaSimulation(
   if (input.specialPressed && player.specialCooldown <= 0) {
     player.specialCooldown = player.specialMaxCooldown;
     player.animState = 'cast';
+    player.facingX = Math.cos(aimAngle);
+    player.facingY = Math.sin(aimAngle);
     triggerClassSpecial(state, aimAngle);
     if (hasSpecialFlag(player, 'mythic_double_special')) {
       triggerClassSpecial(state, aimAngle + 0.22);
@@ -1850,6 +1877,16 @@ export function stepArcanaSimulation(
       if (enm.isElite) state.elitesDefeated++;
       callbacks?.onDiscovery?.('enemy', enm.archetypeId);
 
+      // Active combat advances the Campaign Stage Progress toward the Boss!
+      if (
+        !state.isTrainingArena &&
+        !state.isTutorial &&
+        state.phase !== 'E_BOSS' &&
+        state.phase !== 'F_CONCLUSION'
+      ) {
+        state.elapsedCampaignSec += enm.isElite ? 6.0 : 1.5;
+      }
+
       if (hasSpecialFlag(player, 'void_implosion_on_kill')) {
         dealPlayerAreaDamage(state, enm.x, enm.y, 110, Math.round(player.computed.damage * 0.85), 'void');
       }
@@ -2019,20 +2056,41 @@ export function stepArcanaSimulation(
     }
   }
 
-  // 9. Update Campaign Phases & Enemy Spawner
+    // 9. Update Campaign Phases & Enemy Spawner
   const campaignDef = getCampaignDef(state.campaignId);
   if (!state.isTrainingArena && !state.isTutorial && state.phase !== 'E_BOSS' && state.phase !== 'F_CONCLUSION') {
     const progress = state.elapsedCampaignSec / campaignDef.prepDurationSec;
-    if (progress < 0.2) state.phase = 'A_ARRIVAL';
-    else if (progress < 0.65) state.phase = 'B_EXPLORATION';
-    else if (progress < 0.88) state.phase = 'C_ESCALATION';
-    else if (progress < 1.0) {
+    if (progress < 0.22) {
+      state.phase = 'A_ARRIVAL';
+    } else if (progress < 0.62) {
+      if (state.phase === 'A_ARRIVAL') {
+        state.phase = 'B_EXPLORATION';
+        state.statusBanner = {
+          text: `Etapa 2/4 — Exploração de ${campaignDef.name}`,
+          subtext: 'Explora os Santuários Espirituais e derrota patrulhas para atrair o Guardião.',
+          timer: 3.4,
+          color: campaignDef.palette.accentRunes,
+        };
+      } else {
+        state.phase = 'B_EXPLORATION';
+      }
+    } else if (progress < 0.86) {
+      if (state.phase !== 'C_ESCALATION') {
+        state.phase = 'C_ESCALATION';
+        state.statusBanner = {
+          text: 'Etapa 3/4 — Invasão de Elite!',
+          subtext: 'Comandantes de Elite surgem no campo! Derrota-os para ganhar Relíquias.',
+          timer: 3.5,
+          color: '#ffd166',
+        };
+      }
+    } else if (progress < 1.0) {
       if (state.phase !== 'D_OMEN') {
         state.phase = 'D_OMEN';
         state.statusBanner = {
-          text: 'Presságio Astral',
-          subtext: `${campaignDef.boss.name} aproxima-se...`,
-          timer: 3.5,
+          text: 'Etapa 4/4 — Presságio do Mestre Guardião!',
+          subtext: `${campaignDef.boss.name} está prestes a despertar no Coliseu Central!`,
+          timer: 3.8,
           color: campaignDef.boss.palette.danger,
         };
       }

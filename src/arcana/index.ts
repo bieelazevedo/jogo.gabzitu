@@ -1,5 +1,5 @@
 // ============================================================================
-// ASCENSÃO ARCANA — Main Mode Controller, UI/HUD & Skill Tree (GDD v1.0)
+// ASCENSÃO ARCANA — Main Mode Controller, Powers UX & Constellation Skill Web
 // ============================================================================
 
 import './arcana.css';
@@ -9,7 +9,9 @@ import {
   ARCANA_ENEMIES,
   ARCANA_UPGRADES,
   ASCENSION_MODIFIERS,
+  SKILL_WEB_NODES,
   TUTORIAL_STEPS,
+  type SkillWebNodeDef,
 } from './data';
 import { ArcanaAudio } from './audio';
 import { ArcanaCoopSession } from './coop';
@@ -64,19 +66,32 @@ const RARITY_LABELS: Record<UpgradeRarity, string> = {
   common: 'Comum',
   rare: 'Raro',
   epic: 'Épico',
-  legendary: 'Evolução Lendária',
-  mythic: 'Mítico Primordial',
+  legendary: 'Sub-dobra Lendária',
+  mythic: 'Estado Avatar Mítico',
 };
 
 const CATEGORY_LABELS: Record<UpgradeCategory, string> = {
-  fundamental: 'Fundamental',
-  modifier: 'Modificador de Forma',
+  fundamental: 'Arte Marcial Base',
+  modifier: 'Forma de Dobra',
   elemental: 'Sinergia Elemental',
-  class: 'Domínio de Classe',
-  relic: 'Relíquia Ancestral',
-  evolution: 'Evolução Superior',
-  mythic: 'Decreto Mítico',
+  class: 'Técnica de Sub-dobra',
+  relic: 'Relíquia Espiritual',
+  evolution: 'Sub-dobra Suprema',
+  mythic: 'Convergência Avatar',
 };
+
+// Quadrant CSS background-position for /arcana-benders.jpg (2x2 pixel-art sheet)
+const BENDER_PORTRAIT_BG_POS: Record<ArcanaClassId, string> = {
+  chess: '0% 0%',     // Top-Left: Mestre da Água
+  rune: '100% 0%',    // Top-Right: Mestre da Terra
+  chaos: '0% 100%',   // Bottom-Left: Mestre do Fogo
+  chrono: '100% 100%', // Bottom-Right: Mestre do Ar
+};
+
+function renderBenderPortraitBadge(classId: ArcanaClassId, sizePx = 56, borderCol = '#ffd166'): string {
+  const pos = BENDER_PORTRAIT_BG_POS[classId];
+  return `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:12px;border:2px solid ${borderCol};background-image:url('/arcana-benders.jpg');background-size:200% 200%;background-position:${pos};image-rendering:pixelated;box-shadow:0 0 14px ${borderCol}55;flex-shrink:0;"></div>`;
+}
 
 export function launchArcana(options: LaunchArcanaOptions): () => void {
   const profile: ArcanaPersistentProfile = loadArcanaProfile();
@@ -84,9 +99,9 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   audio.applySettings(profile.settings);
 
   const coop = new ArcanaCoopSession();
-  coop.localName = options.name || 'Arcanista';
+  coop.localName = options.name || 'Dominador';
 
-  // Create isolated root container
+  // Isolated root container
   const root = document.createElement('div');
   root.className = 'arcana-root';
   Object.assign(root.style, {
@@ -102,7 +117,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   });
   document.body.appendChild(root);
 
-  // Canvas for 2.5D Renderer (used both as live menu backdrop & gameplay viewport)
   const canvas = document.createElement('canvas');
   canvas.className = 'arcana-canvas';
   Object.assign(canvas.style, {
@@ -129,6 +143,9 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
 
   let currentScreen: ArcanaScreen = profile.seenIntroAnimation ? 'menu' : 'intro';
   let selectedClassId: ArcanaClassId = 'chess';
+  let selectedWebNodeId: string | null = null;
+  let unlockedWebNodes = new Set<string>(profile.discoveredUpgrades);
+  let spentChiPointsInRun = 0;
   let selectedAscension = Math.min(profile.highestAscensionUnlocked, 0);
   let grimoireTab: 'classes' | 'upgrades' | 'enemies' | 'bosses' | 'biomes' = 'classes';
   let runState: ArcanaRunState | null = null;
@@ -145,7 +162,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   let rafId = 0;
   let lastFrameTime = performance.now();
 
-  // Input state
   const input: ArcanaInputState = {
     moveX: 0,
     moveY: 0,
@@ -164,7 +180,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   let joyMoveVec = { x: 0, y: 0 };
   let joyAimVec = { x: 0, y: 0, active: false };
 
-  // Lifecycle auto-save for Safari / Mobile Chrome
   const unbindLifecycle = bindLifecycleAutoSave(
     () => (currentScreen === 'playing' && runState && !runState.isTrainingArena ? runState : null),
     () => profile,
@@ -186,7 +201,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   window.addEventListener('resize', handleResize);
   handleResize();
 
-  // Keyboard & Mouse bindings
   function onKeyDown(e: KeyboardEvent) {
     if ((e.target as HTMLElement)?.matches('input,textarea,select')) return;
     unlockAudioOnce();
@@ -302,6 +316,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
     isPaused = false;
     showInRunSkillTree = false;
     showSpecChoiceModal = false;
+    spentChiPointsInRun = 0;
 
     const checkpoint = opts.resumeCheckpoint ? profile.savedCheckpoint : null;
     const cls = checkpoint ? checkpoint.classId : selectedClassId;
@@ -344,132 +359,340 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   }
 
   // ============================================================================
-  // UI Rendering (Menus, Modals, Skill Tree, Grimório & HUD)
+  // TRUE RADIAL CONSTELLATION SKILL WEB ("TEIA DE HABILIDADES & SUB-DOBRAS")
   // ============================================================================
+
+  function getNodeCoordsPct(node: SkillWebNodeDef): { x: number; y: number } {
+    const rad = (node.angleDeg * Math.PI) / 180;
+    const scaledR = node.radiusPct * 0.46;
+    return {
+      x: 50 + Math.cos(rad) * scaledR,
+      y: 50 + Math.sin(rad) * scaledR,
+    };
+  }
+
+  function isWebNodeUnlocked(node: SkillWebNodeDef, classId: ArcanaClassId): boolean {
+    if (unlockedWebNodes.has(node.id)) return true;
+    const cls = ARCANA_CLASSES[classId];
+    const specId = cls.specializations[node.branchIndex]?.id;
+    if (runState && runState.player.classId === classId) {
+      if (node.upgradeId && (runState.player.upgrades[node.upgradeId] || 0) > 0) return true;
+      if (
+        specId &&
+        runState.player.specializationId === specId &&
+        ((node.tier === 1 && runState.player.level >= 2) ||
+          (node.tier === 2 && runState.player.level >= 5) ||
+          (node.tier === 3 && runState.player.level >= 8))
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function canUnlockWebNode(node: SkillWebNodeDef, allNodes: SkillWebNodeDef[], classId: ArcanaClassId): boolean {
+    if (isWebNodeUnlocked(node, classId)) return false;
+    if (node.tier === 1) return true; // Tier 1 connects directly to the Central Elemental Core
+    for (const other of allNodes) {
+      if (
+        (other.connectsTo.includes(node.id) || node.connectsTo.includes(other.id)) &&
+        isWebNodeUnlocked(other, classId)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   function renderSkillTreeContent(classId: ArcanaClassId, interactiveInRun = false): string {
     const cls = ARCANA_CLASSES[classId];
-    const activeSpecId = runState?.player.specializationId || null;
-    const playerLevel = runState?.player.level || 1;
-    const acquiredUpgrades = runState?.player.upgrades || {};
+    const nodes = SKILL_WEB_NODES.filter(n => n.classId === classId);
+    const nodeMap = new Map<string, SkillWebNodeDef>();
+    for (const n of nodes) nodeMap.set(n.id, n);
 
-    const classUpgrades = ARCANA_UPGRADES.filter(
-      u => u.classRestriction === classId || u.category === 'mythic'
-    );
+    const selectedNode =
+      (selectedWebNodeId && nodeMap.get(selectedWebNodeId)) || nodes[0] || null;
+    if (selectedNode) selectedWebNodeId = selectedNode.id;
+
+    const playerLevel = runState?.player.level || 1;
+    const availableChiPoints = runState
+      ? Math.max(0, playerLevel - spentChiPointsInRun)
+      : Math.max(1, Math.floor(profile.eternalEssence / 15) + 2);
+
+    // Build SVG Constellation Lines (Core -> Tier 1 + Node -> Node connections)
+    const svgLines: string[] = [];
+    const drawnPairs = new Set<string>();
+
+    for (const n of nodes) {
+      const p1 = getNodeCoordsPct(n);
+      const n1Unlocked = isWebNodeUnlocked(n, classId);
+
+      // Connect Tier 1 nodes to the Central Elemental Core (50%, 50%)
+      if (n.tier === 1) {
+        const stroke = n1Unlocked ? cls.palette.glow : 'rgba(125,226,255,0.28)';
+        const width = n1Unlocked ? '3' : '1.8';
+        svgLines.push(
+          `<line x1="50%" y1="50%" x2="${p1.x.toFixed(2)}%" y2="${p1.y.toFixed(2)}%" stroke="${stroke}" stroke-width="${width}" ${
+            n1Unlocked ? 'stroke-dasharray="6 4"' : ''
+          } />`
+        );
+      }
+
+      for (const targetId of n.connectsTo) {
+        const pairKey = [n.id, targetId].sort().join('--');
+        if (drawnPairs.has(pairKey)) continue;
+        drawnPairs.add(pairKey);
+
+        const target = nodeMap.get(targetId);
+        if (!target) continue;
+        const p2 = getNodeCoordsPct(target);
+        const n2Unlocked = isWebNodeUnlocked(target, classId);
+        const bothUnlocked = n1Unlocked && n2Unlocked;
+        const oneUnlocked = n1Unlocked || n2Unlocked;
+
+        const stroke = bothUnlocked
+          ? '#ffd166'
+          : oneUnlocked
+          ? cls.palette.glow
+          : 'rgba(160, 148, 210, 0.24)';
+        const width = bothUnlocked ? '3.2' : oneUnlocked ? '2.2' : '1.4';
+        svgLines.push(
+          `<line x1="${p1.x.toFixed(2)}%" y1="${p1.y.toFixed(2)}%" x2="${p2.x.toFixed(2)}%" y2="${p2.y.toFixed(2)}%" stroke="${stroke}" stroke-width="${width}" ${
+            oneUnlocked && !bothUnlocked ? 'stroke-dasharray="5 5"' : ''
+          } />`
+        );
+      }
+    }
+
+    // Sub-bending branch sector labels around outer perimeter
+    const sectorAngles = [270, 30, 150];
+    const sectorLabelsHtml = cls.specializations
+      .map((spec, idx) => {
+        const angRad = ((sectorAngles[idx] ?? 0) * Math.PI) / 180;
+        const lx = 50 + Math.cos(angRad) * 45;
+        const ly = 50 + Math.sin(angRad) * 45;
+        const isSpecActive = runState?.player.specializationId === spec.id;
+        return `
+          <div style="position:absolute;left:${lx.toFixed(1)}%;top:${ly.toFixed(1)}%;transform:translate(-50%,-50%);padding:3px 10px;border-radius:99px;background:rgba(10,6,24,0.92);border:1px solid ${
+            isSpecActive ? '#ffd166' : cls.palette.glow
+          };font-size:10px;font-weight:800;color:${
+            isSpecActive ? '#ffd166' : '#80ffdb'
+          };white-space:nowrap;pointer-events:none;box-shadow:0 0 12px rgba(0,0,0,0.8);">
+            ${spec.icon} ${spec.name}
+          </div>
+        `;
+      })
+      .join('');
+
+    // Render each Constellation Node button
+    const nodesHtml = nodes
+      .map((n: SkillWebNodeDef) => {
+        const pos = getNodeCoordsPct(n);
+        const unlocked = isWebNodeUnlocked(n, classId);
+        const unlockable = canUnlockWebNode(n, nodes, classId);
+        const isSelected = selectedNode?.id === n.id;
+
+        const size = n.tier === 4 ? 54 : n.tier === 3 ? 46 : n.tier === 2 ? 42 : 38;
+        const borderCol = unlocked
+          ? '#ffd166'
+          : unlockable
+          ? cls.palette.glow
+          : 'rgba(255,255,255,0.22)';
+        const bg = unlocked
+          ? `radial-gradient(circle, ${cls.palette.primary}, #160c2e)`
+          : unlockable
+          ? 'radial-gradient(circle, rgba(45,32,84,0.95), rgba(14,9,28,0.98))'
+          : 'rgba(12, 8, 24, 0.9)';
+        const borderRadius = n.tier === 4 ? '12px' : '50%';
+        const transform =
+          n.tier === 4
+            ? `translate(-50%,-50%) rotate(45deg) scale(${isSelected ? 1.15 : 1})`
+            : `translate(-50%,-50%) scale(${isSelected ? 1.16 : 1})`;
+        const innerTransform = n.tier === 4 ? 'rotate(-45deg)' : 'none';
+
+        return `
+          <button
+            data-act="web-node:${n.id}"
+            title="${n.name} (${n.subBendingName})"
+            style="pointer-events:auto;position:absolute;left:${pos.x.toFixed(2)}%;top:${pos.y.toFixed(2)}%;width:${size}px;height:${size}px;border-radius:${borderRadius};border:${
+              isSelected ? '3px' : '2px'
+            } solid ${borderCol};background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transform:${transform};transition:transform 0.16s,box-shadow 0.16s;box-shadow:${
+              unlocked
+                ? `0 0 20px ${cls.palette.glow}, inset 0 0 10px #ffd166`
+                : isSelected
+                ? `0 0 18px ${cls.palette.glow}`
+                : '0 4px 10px rgba(0,0,0,0.65)'
+            };z-index:4;"
+          >
+            <span style="transform:${innerTransform};font-size:${
+              n.tier === 4 ? '21px' : '17px'
+            };filter:${unlocked ? 'drop-shadow(0 0 6px #fff)' : 'none'};">${n.icon}</span>
+          </button>
+        `;
+      })
+      .join('');
+
+    // Selected Node Details & Action Button
+    const selUnlocked = selectedNode ? isWebNodeUnlocked(selectedNode, classId) : false;
+    const selCanUnlock = selectedNode ? canUnlockWebNode(selectedNode, nodes, classId) : false;
 
     return `
-      <div style="display:flex;flex-direction:column;gap:16px;">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <!-- Header & Element Selector -->
         <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid rgba(125,226,255,0.22);padding-bottom:10px;">
-          <div>
-            <span style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#7de2ff;">ÁRVORE DE HABILIDADES & EVOLUÇÕES</span>
-            <h3 style="margin:2px 0 0;font-size:20px;color:#ffd166;">${cls.name} — ${cls.title}</h3>
+          <div style="display:flex;align-items:center;gap:12px;">
+            ${renderBenderPortraitBadge(classId, 52, cls.palette.accent)}
+            <div>
+              <span style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#80ffdb;">TEIA DE HABILIDADES & SUB-DOBRAS ELEMENTAIS</span>
+              <h3 style="margin:2px 0 0;font-size:20px;color:#ffd166;">${cls.name} — ${cls.title}</h3>
+            </div>
           </div>
-          ${
-            !interactiveInRun
-              ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">
-                  ${(['chess', 'chrono', 'chaos', 'rune'] as ArcanaClassId[])
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="padding:6px 12px;border-radius:99px;background:rgba(0,245,212,0.15);border:1px solid #00f5d4;font-size:12px;font-weight:800;color:#80ffdb;">
+              ✦ Pontos de Chi / Dobra: ${availableChiPoints}
+            </span>
+            ${
+              !interactiveInRun
+                ? (['chess', 'chrono', 'chaos', 'rune'] as ArcanaClassId[])
                     .map(
                       id => `
                       <button data-act="tree-class:${id}" style="pointer-events:auto;padding:6px 12px;border-radius:8px;border:1px solid ${
                         id === classId ? '#ffd166' : 'rgba(255,255,255,0.2)'
                       };background:${
-                        id === classId ? 'rgba(255,209,102,0.2)' : 'rgba(15,10,30,0.8)'
+                        id === classId ? 'rgba(255,209,102,0.22)' : 'rgba(15,10,30,0.85)'
                       };color:#fff;cursor:pointer;font-weight:700;font-size:12px;">
                         ${ARCANA_CLASSES[id].primaryAttack.icon} ${ARCANA_CLASSES[id].name}
                       </button>`
                     )
-                    .join('')}
-                </div>`
-              : `<div style="font-size:13px;color:#80ffdb;font-weight:700;">Nível Atual: ${playerLevel} · Essência Eterna: ✦ ${profile.eternalEssence}</div>`
-          }
+                    .join('')
+                : ''
+            }
+          </div>
         </div>
 
-        <!-- 3 Specialization Branches with Progressive Nodes -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
-          ${cls.specializations
-            .map(spec => {
-              const isChosen = activeSpecId === spec.id;
-              return `
-                <div style="background:linear-gradient(160deg,rgba(32,20,58,0.92),rgba(14,9,28,0.95));border:2px solid ${
-                  isChosen ? '#ffd166' : 'rgba(125,226,255,0.25)'
-                };border-radius:12px;padding:14px;box-shadow:${
-                  isChosen ? '0 0 22px rgba(255,209,102,0.3)' : 'none'
-                };">
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-                    <span style="font-size:24px;">${spec.icon}</span>
-                    <span style="font-size:10px;padding:3px 8px;border-radius:99px;background:${
-                      isChosen ? '#ffd166' : 'rgba(125,226,255,0.15)'
-                    };color:${isChosen ? '#120824' : '#7de2ff'};font-weight:800;">
-                      ${isChosen ? 'RAMO ATIVO' : 'RAMO DE CLASSE'}
+        <!-- Main Constellation Web Canvas + Node Inspector Sidebar -->
+        <div style="display:grid;grid-template-columns:minmax(310px, 1.35fr) minmax(270px, 0.85fr);gap:16px;align-items:stretch;">
+          <!-- Interactive Radial Constellation Web -->
+          <div style="position:relative;width:100%;aspect-ratio:1/1;max-height:560px;margin:0 auto;border-radius:20px;background:radial-gradient(circle at 50% 50%, rgba(28, 18, 62, 0.95) 0%, rgba(9, 5, 22, 0.98) 72%, #04020a 100%);border:1px solid ${cls.palette.glow}55;box-shadow:inset 0 0 60px rgba(0,0,0,0.85), 0 0 28px rgba(0,0,0,0.6);overflow:hidden;">
+            <!-- Concentric Orbital Rings & Constellation Lines SVG -->
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+              <circle cx="50" cy="50" r="16" fill="none" stroke="rgba(125,226,255,0.12)" stroke-width="0.3" stroke-dasharray="1.5 1.5" />
+              <circle cx="50" cy="50" r="28" fill="none" stroke="rgba(125,226,255,0.12)" stroke-width="0.3" stroke-dasharray="1.5 1.5" />
+              <circle cx="50" cy="50" r="39" fill="none" stroke="rgba(255,209,102,0.14)" stroke-width="0.35" />
+              ${svgLines.join('')}
+            </svg>
+
+            <!-- Sub-Bending Sector Badges -->
+            ${sectorLabelsHtml}
+
+            <!-- Central Elemental Core -->
+            <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;border:3px solid #ffd166;background-image:url('/arcana-benders.jpg');background-size:200% 200%;background-position:${BENDER_PORTRAIT_BG_POS[classId]};image-rendering:pixelated;box-shadow:0 0 28px ${cls.palette.glow}, 0 0 50px ${cls.palette.primary};z-index:5;display:flex;align-items:flex-end;justify-content:center;">
+              <span style="font-size:9px;font-weight:900;background:#080512;color:#ffd166;padding:1px 6px;border-radius:99px;border:1px solid #ffd166;transform:translateY(8px);">NÚCLEO</span>
+            </div>
+
+            <!-- Interactive Constellation Nodes -->
+            ${nodesHtml}
+          </div>
+
+          <!-- Right Sidebar: Selected Constellation Node Inspector & Sub-Bending Overview -->
+          <div style="display:flex;flex-direction:column;justify-content:space-between;gap:12px;background:rgba(16,10,34,0.92);border:1px solid rgba(125,226,255,0.28);border-radius:16px;padding:16px;">
+            ${
+              selectedNode
+                ? `
+                <div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:99px;background:rgba(125,226,255,0.15);color:#80ffdb;letter-spacing:1px;text-transform:uppercase;">
+                      ${selectedNode.subBendingName} · Grau ${selectedNode.tier}
+                    </span>
+                    <span style="font-size:11px;font-weight:800;color:${
+                      selUnlocked ? '#00f5d4' : selCanUnlock ? '#ffd166' : '#9d8ec4'
+                    };">
+                      ${selUnlocked ? '✦ NÓ DESBLOQUEADO' : selCanUnlock ? '🔓 DISPONÍVEL' : '🔒 REQUER NÓ ANTERIOR'}
                     </span>
                   </div>
-                  <h4 style="margin:0;font-size:16px;color:#fff;">${spec.name}</h4>
-                  <div style="font-size:11px;color:#ffd166;margin-bottom:6px;">${spec.subtitle}</div>
-                  <p style="font-size:12px;color:#cfc4e8;line-height:1.4;margin:0 0 12px;">${spec.description}</p>
-                  <div style="display:flex;flex-direction:column;gap:8px;">
-                    ${spec.keyNodes
-                      .map((nodeName, idx) => {
-                        const reqLv = idx === 0 ? 2 : idx === 1 ? 5 : 8;
-                        const unlocked = isChosen && playerLevel >= reqLv;
-                        return `
-                          <div style="display:flex;align-items:center;gap:8px;padding:6px 9px;border-radius:8px;background:${
-                            unlocked ? 'rgba(0,245,212,0.16)' : 'rgba(255,255,255,0.05)'
-                          };border:1px solid ${
-                            unlocked ? '#00f5d4' : 'rgba(255,255,255,0.1)'
-                          };">
-                            <span style="width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:${
-                              unlocked ? '#00f5d4' : '#2b2240'
-                            };color:${unlocked ? '#09141a' : '#9d8ec4'};">${idx + 1}</span>
-                            <div style="flex:1;">
-                              <div style="font-size:12px;font-weight:700;color:${unlocked ? '#80ffdb' : '#e2dbf0'};">${nodeName}</div>
-                              <div style="font-size:10px;color:#9d8ec4;">Desbloqueia no Nível ${reqLv}</div>
-                            </div>
-                            <span>${unlocked ? '✦' : '🔒'}</span>
-                          </div>
-                        `;
-                      })
-                      .join('')}
-                  </div>
-                </div>
-              `;
-            })
-            .join('')}
-        </div>
 
-        <!-- Class Upgrades, Legendary Evolutions & Mythic Nodes -->
-        <div>
-          <h4 style="margin:0 0 8px;font-size:14px;color:#7de2ff;letter-spacing:1px;text-transform:uppercase;">
-            Habilidades, Evoluções Lendárias & Míticos que Desbloqueiam ao Subir de Nível
-          </h4>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
-            ${classUpgrades
-              .map(u => {
-                const stacks = acquiredUpgrades[u.id] || 0;
-                const discovered = profile.discoveredUpgrades.includes(u.id) || stacks > 0;
-                const borderCol =
-                  u.rarity === 'mythic'
-                    ? '#ff007f'
-                    : u.rarity === 'legendary'
-                    ? '#ffd166'
-                    : u.rarity === 'epic'
-                    ? '#c77dff'
-                    : '#4ea8de';
-                return `
-                  <div style="padding:10px;border-radius:10px;background:rgba(18,12,34,0.9);border:1px solid ${borderCol};opacity:${
-                    discovered ? '1' : '0.82'
-                  };">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                      <span style="font-size:18px;">${u.icon}</span>
-                      <span style="font-size:10px;font-weight:800;color:${borderCol};text-transform:uppercase;">
-                        ${RARITY_LABELS[u.rarity]} ${stacks > 0 ? `· Nv.${stacks}/${u.maxStacks}` : ''}
-                      </span>
+                  <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+                    <div style="width:48px;height:48px;border-radius:12px;border:2px solid #ffd166;background:rgba(255,209,102,0.15);display:flex;align-items:center;justify-content:center;font-size:26px;">
+                      ${selectedNode.icon}
                     </div>
-                    <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:3px;">${u.name}</div>
-                    <div style="font-size:11px;color:#cfc4e8;line-height:1.35;">${u.shortDesc}</div>
+                    <div>
+                      <h4 style="margin:0;font-size:18px;color:#fff;">${selectedNode.name}</h4>
+                      <div style="font-size:12px;color:#ffd166;font-weight:700;">✦ ${selectedNode.visualEffectDesc}</div>
+                    </div>
                   </div>
-                `;
-              })
-              .join('')}
+
+                  <p style="font-size:13px;color:#e2dbf0;line-height:1.5;margin:0 0 12px;padding:10px;border-radius:10px;background:rgba(255,255,255,0.04);border-left:3px solid ${cls.palette.glow};">
+                    ${selectedNode.description}
+                  </p>
+
+                  <div style="font-size:11px;color:#b8add4;margin-bottom:12px;">
+                    <strong>Ligações na Teia:</strong> Conecta com ${selectedNode.connectsTo.length} nós de sub-dobra adjacentes.
+                  </div>
+
+                  <button
+                    data-act="unlock-web-node:${selectedNode.id}"
+                    ${selUnlocked || (!selCanUnlock && availableChiPoints <= 0) ? 'disabled' : ''}
+                    style="width:100%;padding:12px 16px;border-radius:12px;border:2px solid ${
+                      selUnlocked
+                        ? '#00f5d4'
+                        : selCanUnlock && availableChiPoints > 0
+                        ? '#ffd166'
+                        : 'rgba(255,255,255,0.15)'
+                    };background:${
+                      selUnlocked
+                        ? 'rgba(0,245,212,0.18)'
+                        : selCanUnlock && availableChiPoints > 0
+                        ? 'linear-gradient(135deg,#ffd166,#f77f00)'
+                        : 'rgba(255,255,255,0.06)'
+                    };color:${
+                      selUnlocked
+                        ? '#80ffdb'
+                        : selCanUnlock && availableChiPoints > 0
+                        ? '#140926'
+                        : '#8a829e'
+                    };font-weight:900;font-size:13px;cursor:${
+                      selUnlocked || !(selCanUnlock && availableChiPoints > 0) ? 'default' : 'pointer'
+                    };"
+                  >
+                    ${
+                      selUnlocked
+                        ? '✓ Sub-dobra Ativa no Personagem'
+                        : selCanUnlock && availableChiPoints > 0
+                        ? `⚡ Desbloquear Nó na Teia (1 Ponto de Chi)`
+                        : !selCanUnlock
+                        ? 'Desbloqueia um Nó Conectado Primeiro'
+                        : 'Sobe de Nível para Ganhar +Pontos de Chi'
+                    }
+                  </button>
+                </div>
+              `
+                : ''
+            }
+
+            <!-- 3 Sub-Bending Artery Summary -->
+            <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
+              <div style="font-size:11px;font-weight:800;color:#7de2ff;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">
+                3 Artérias de Sub-Dobra de ${cls.name}:
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                ${cls.specializations
+                  .map(
+                    spec => `
+                    <div style="padding:7px 10px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid ${
+                      runState?.player.specializationId === spec.id
+                        ? '#ffd166'
+                        : 'rgba(255,255,255,0.08)'
+                    };display:flex;align-items:center;gap:8px;">
+                      <span style="font-size:18px;">${spec.icon}</span>
+                      <div style="flex:1;">
+                        <div style="font-size:12px;font-weight:800;color:#fff;">${spec.name}</div>
+                        <div style="font-size:10px;color:#b8add4;">${spec.subtitle}</div>
+                      </div>
+                    </div>`
+                  )
+                  .join('')}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -479,7 +702,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   function renderUi() {
     uiLayer.innerHTML = '';
 
-    // Portrait orientation helper on mobile
     const isPortraitMobile = window.innerHeight > window.innerWidth && window.innerWidth < 820;
     if (isPortraitMobile && !portraitDismissed) {
       const rot = document.createElement('div');
@@ -498,7 +720,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       uiLayer.appendChild(rot);
     }
 
-    // 1. OPENING ANIMATED FISSURE SCENE (GDD 3.2)
+    // 1. OPENING ANIMATED ELEMENTAL CONVERGENCE SCENE
     if (currentScreen === 'intro') {
       const intro = document.createElement('div');
       intro.className = 'arcana-intro-scene';
@@ -506,24 +728,25 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         'position:absolute;inset:0;background:radial-gradient(circle at center,#1d0f3d 0%,#05020d 75%);display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:auto;text-align:center;padding:24px;';
       intro.innerHTML = `
         <div style="position:relative;width:180px;height:180px;display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
-          <div style="position:absolute;inset:0;border-radius:50%;border:2px dashed #7de2ff;animation:spin 9s linear infinite;opacity:0.65;"></div>
-          <div style="position:absolute;inset:22px;border-radius:50%;border:2px solid #f15bb5;animation:spin 5s linear infinite reverse;opacity:0.8;"></div>
-          <div style="width:28px;height:110px;border-radius:50%;background:linear-gradient(180deg,#80ffdb,#f15bb5,#ffd166);box-shadow:0 0 48px #7de2ff,0 0 90px #f15bb5;transform:rotate(18deg);"></div>
-          <span style="position:absolute;top:-10px;left:25%;font-size:20px;color:#ffd166;">ᚠ</span>
-          <span style="position:absolute;bottom:0;right:20%;font-size:20px;color:#80ffdb;">♛</span>
-          <span style="position:absolute;top:35%;right:-8px;font-size:20px;color:#f15bb5;">⏳</span>
+          <div style="position:absolute;inset:0;border-radius:50%;border:2px dashed #00bbf9;animation:spin 9s linear infinite;opacity:0.75;"></div>
+          <div style="position:absolute;inset:22px;border-radius:50%;border:2px solid #ff5400;animation:spin 5s linear infinite reverse;opacity:0.85;"></div>
+          <div style="width:32px;height:115px;border-radius:50%;background:linear-gradient(180deg,#00bbf9,#80ffdb,#ff5400,#52b788);box-shadow:0 0 48px #00bbf9,0 0 90px #ff5400;transform:rotate(18deg);"></div>
+          <span style="position:absolute;top:-10px;left:25%;font-size:22px;">🌊</span>
+          <span style="position:absolute;bottom:0;right:20%;font-size:22px;">🔥</span>
+          <span style="position:absolute;top:35%;right:-8px;font-size:22px;">🌪️</span>
+          <span style="position:absolute;bottom:25%;left:-8px;font-size:22px;">🪨</span>
         </div>
-        <div style="font-size:12px;letter-spacing:4px;text-transform:uppercase;color:#7de2ff;margin-bottom:6px;">
-          A FISSURA PRIMORDIAL DESPERTA
+        <div style="font-size:12px;letter-spacing:4px;text-transform:uppercase;color:#80ffdb;margin-bottom:6px;">
+          A CONVERGÊNCIA DOS QUATRO ELEMENTOS
         </div>
-        <h1 style="margin:0 0 10px;font-size:clamp(30px,5vw,52px);background:linear-gradient(90deg,#ffd166,#ffffff,#7de2ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 32px rgba(125,226,255,0.4);">
+        <h1 style="margin:0 0 10px;font-size:clamp(30px,5vw,52px);background:linear-gradient(90deg,#00bbf9,#ffffff,#ffd166,#ff5400);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 32px rgba(125,226,255,0.4);">
           ASCENSÃO ARCANA
         </h1>
-        <p style="max-width:480px;color:#cfc4e8;font-size:14px;line-height:1.5;margin:0 0 24px;">
-          Domina as regras da própria magia através de cinco campanhas místicas.
+        <p style="max-width:520px;color:#cfc4e8;font-size:14px;line-height:1.5;margin:0 0 24px;">
+          Domina Água, Ar, Fogo e Terra — e desperta Sub-dobras Lendárias (Sangue, Gelo, Voo, Vácuo, Relâmpago, Combustão, Metal e Lava).
         </p>
         <button data-act="skip-intro" style="padding:12px 28px;border-radius:99px;border:1px solid #ffd166;background:linear-gradient(135deg,#3d1e6d,#1b0d36);color:#ffd166;font-weight:800;font-size:14px;letter-spacing:1px;cursor:pointer;box-shadow:0 0 24px rgba(255,209,102,0.3);">
-          ENTRAR NO SANTUÁRIO ✦
+          DESPERTAR OS ELEMENTOS ✦
         </button>
       `;
       uiLayer.appendChild(intro);
@@ -534,110 +757,162 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       return;
     }
 
-    // 2. MAIN MENU (GDD 3.3)
+    // 2. MAIN MENU — VISUAL-FIRST, PHOTO-RICH & ZERO CLUTTER
     if (currentScreen === 'menu') {
       const hasSave = !!profile.savedCheckpoint;
       const savedClass = hasSave ? ARCANA_CLASSES[profile.savedCheckpoint!.classId] : null;
       const menu = document.createElement('div');
       menu.style.cssText =
-        'position:absolute;inset:0;background:radial-gradient(circle at 70% 40%,rgba(16,8,38,0.45),rgba(7,3,18,0.88));display:flex;flex-direction:column;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));pointer-events:auto;overflow-y:auto;';
+        'position:absolute;inset:0;background:radial-gradient(circle at 50% 25%,rgba(22,12,48,0.68),rgba(6,3,16,0.94));display:flex;flex-direction:column;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));pointer-events:auto;overflow-y:auto;gap:12px;';
       menu.innerHTML = `
         <header style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:24px;filter:drop-shadow(0 0 10px #7de2ff);">✧</span>
+            <span style="font-size:26px;filter:drop-shadow(0 0 12px #00bbf9);">🌊🌪️🔥🪨</span>
             <div>
-              <div style="font-size:10px;letter-spacing:3px;color:#7de2ff;text-transform:uppercase;">PLATAFORMA GABZITU · NOVO MODO</div>
-              <div style="font-size:15px;font-weight:800;color:#ffd166;">ASCENSÃO ARCANA · v1.0</div>
+              <div style="font-size:10px;letter-spacing:2.5px;color:#80ffdb;text-transform:uppercase;font-weight:800;">DOMINAÇÃO DOS 4 ELEMENTOS & SUB-DOBRAS</div>
+              <div style="font-size:18px;font-weight:900;color:#ffd166;">ASCENSÃO ARCANA</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span style="padding:6px 12px;border-radius:99px;background:rgba(125,226,255,0.12);border:1px solid rgba(125,226,255,0.3);font-size:12px;color:#80ffdb;">
-              ✦ Essência Eterna: <strong>${profile.eternalEssence}</strong> · Vitórias: <strong>${profile.totalVictories}</strong>
-            </span>
-            <button data-act="exit-platform" style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(20,14,36,0.85);color:#e2dbf0;font-weight:700;font-size:12px;cursor:pointer;">
-              ← Voltar à Plataforma
+
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            ${
+              hasSave
+                ? `<button data-act="continue-run" style="padding:8px 14px;border-radius:10px;border:2px solid #00f5d4;background:rgba(0,245,212,0.22);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">
+                    ▶ Continuar (${savedClass?.name} · Fase ${profile.savedCheckpoint!.campaignIndex + 1}/5)
+                  </button>`
+                : ''
+            }
+            <button data-act="open-skill-tree" style="padding:8px 14px;border-radius:10px;border:1.5px solid #ffd166;background:rgba(255,209,102,0.18);color:#ffd166;font-weight:800;font-size:12px;cursor:pointer;">
+              🕸️ Teia de Habilidades
+            </button>
+            <button data-act="open-coop" style="padding:8px 12px;border-radius:10px;border:1px solid rgba(125,226,255,0.35);background:rgba(20,14,38,0.88);color:#7de2ff;font-weight:800;font-size:12px;cursor:pointer;">
+              👥 Co-op (2J)
+            </button>
+            <button data-act="open-grimoire" style="padding:8px 12px;border-radius:10px;border:1px solid rgba(199,125,255,0.35);background:rgba(20,14,38,0.88);color:#e0aaff;font-weight:800;font-size:12px;cursor:pointer;">
+              📖 Grimório
+            </button>
+            <button data-act="open-ascensions" style="padding:8px 12px;border-radius:10px;border:1px solid rgba(255,190,11,0.35);background:rgba(20,14,38,0.88);color:#ffbe0b;font-weight:800;font-size:12px;cursor:pointer;">
+              🔥 Ascensão ${selectedAscension}
+            </button>
+            <button data-act="open-settings" style="padding:8px 11px;border-radius:10px;border:1px solid rgba(255,255,255,0.22);background:rgba(20,14,38,0.88);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">
+              ⚙
+            </button>
+            <button data-act="exit-platform" style="padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.22);background:rgba(20,14,36,0.85);color:#e2dbf0;font-weight:700;font-size:12px;cursor:pointer;">
+              ← Sair
             </button>
           </div>
         </header>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:24px;align-items:center;margin:auto 0;padding:12px 0;">
-          <div>
-            <div style="display:inline-block;padding:4px 12px;border-radius:99px;background:rgba(241,91,181,0.18);border:1px solid #f15bb5;color:#ff99d8;font-size:11px;font-weight:700;letter-spacing:1.5px;margin-bottom:10px;">
-              ROGUELITE DE AÇÃO & FANTASIA ARCANA 2.5D
-            </div>
-            <h1 style="margin:0 0 10px;font-size:clamp(28px,4.5vw,48px);line-height:1.08;color:#ffffff;text-shadow:0 0 28px rgba(125,226,255,0.45);">
-              Ascensão <span style="color:#ffd166;">Arcana</span>
+        <!-- HERO PICKER RIGHT ON THE START SCREEN: 4 Big Visual Elemental Cards -->
+        <div style="margin:auto 0;">
+          <div style="text-align:center;margin-bottom:12px;">
+            <span style="display:inline-block;padding:4px 12px;border-radius:99px;background:rgba(255,209,102,0.16);border:1px solid #ffd166;color:#ffd166;font-size:11px;font-weight:800;letter-spacing:1.5px;margin-bottom:4px;">
+              ESCOLHE O TEU ELEMENTO E CLICA EM JOGAR (1 CLIQUE!)
+            </span>
+            <h1 style="margin:0;font-size:clamp(22px,3.2vw,34px);color:#fff;text-shadow:0 0 24px rgba(125,226,255,0.4);">
+              Qual Elemento Vais Dominar?
             </h1>
-            <p style="color:#cfc4e8;font-size:14px;line-height:1.55;margin:0 0 18px;max-width:480px;">
-              Domina 4 classes excêntricas — <strong>Mago do Xadrez</strong>, <strong>Cronomante</strong>, <strong>Feiticeira do Caos</strong> e <strong>Tecelão de Runas</strong>. Atravessa 5 campanhas místicas, evolui na árvore de habilidades e derrota os Guardiões da Ruptura.
-            </p>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <button data-act="start-tutorial" style="padding:9px 15px;border-radius:10px;border:1px solid #80ffdb;background:rgba(128,255,219,0.14);color:#80ffdb;font-weight:700;font-size:12px;cursor:pointer;">
-                🎓 Tutorial Jogável (3 min)
-              </button>
-              <button data-act="open-skill-tree" style="padding:9px 15px;border-radius:10px;border:1px solid #ffd166;background:rgba(255,209,102,0.16);color:#ffd166;font-weight:700;font-size:12px;cursor:pointer;">
-                🌿 Árvore de Habilidades & Evoluções
-              </button>
-            </div>
           </div>
 
-          <nav style="display:flex;flex-direction:column;gap:10px;max-width:400px;width:100%;justify-self:end;">
-            <button data-act="continue-run" ${!hasSave ? 'disabled' : ''} style="padding:14px 18px;border-radius:12px;border:2px solid ${
-              hasSave ? '#00f5d4' : 'rgba(255,255,255,0.12)'
-            };background:${
-              hasSave
-                ? 'linear-gradient(135deg,rgba(0,245,212,0.25),rgba(18,38,58,0.92))'
-                : 'rgba(20,16,32,0.5)'
-            };color:${hasSave ? '#fff' : '#6c6380'};text-align:left;cursor:${
-              hasSave ? 'pointer' : 'not-allowed'
-            };display:flex;justify-content:space-between;align-items:center;">
-              <div>
-                <div style="font-weight:800;font-size:15px;">▶ Continuar Aventura</div>
-                <div style="font-size:11px;opacity:0.85;">
-                  ${
-                    hasSave
-                      ? `${savedClass?.name} · Nível ${profile.savedCheckpoint!.playerLevel} · Campanha ${
-                          profile.savedCheckpoint!.campaignIndex + 1
-                        }`
-                      : 'Nenhuma aventura guardada em curso'
-                  }
-                </div>
-              </div>
-              <span>✦</span>
-            </button>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:14px;">
+            ${(['chess', 'chrono', 'chaos', 'rune'] as ArcanaClassId[])
+              .map(id => {
+                const c = ARCANA_CLASSES[id];
+                const active = id === selectedClassId;
+                const posMap: Record<ArcanaClassId, string> = {
+                  chess: '0% 0%',
+                  rune: '100% 0%',
+                  chaos: '0% 100%',
+                  chrono: '100% 100%',
+                };
+                return `
+                  <div style="border-radius:16px;border:2.5px solid ${
+                    active ? '#ffd166' : `${c.palette.glow}66`
+                  };background:linear-gradient(170deg,rgba(28,16,56,0.95),rgba(10,6,24,0.98));padding:12px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 10px 28px rgba(0,0,0,0.55),0 0 22px ${
+                    c.palette.glow
+                  }33;transition:transform 0.15s;">
+                    <div>
+                      <!-- Giant Pixel Art Portrait Banner -->
+                      <div data-act="quick-play:${id}" style="width:100%;height:155px;border-radius:12px;border:2px solid ${
+                        c.palette.accent
+                      };background-image:url('/arcana-benders.jpg');background-size:205% 205%;background-position:${
+                        posMap[id]
+                      };image-rendering:pixelated;position:relative;overflow:hidden;cursor:pointer;margin-bottom:10px;box-shadow:inset 0 -44px 36px rgba(8,4,20,0.92);">
+                        <div style="position:absolute;top:8px;left:8px;padding:3px 9px;border-radius:99px;background:rgba(8,4,20,0.85);border:1px solid ${
+                          c.palette.glow
+                        };font-size:10px;font-weight:900;color:${c.palette.accent};">
+                          ${c.primaryAttack.icon} ${c.title.toUpperCase()}
+                        </div>
+                        <div style="position:absolute;bottom:6px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-end;">
+                          <span style="font-size:18px;font-weight:900;color:#fff;text-shadow:0 2px 8px #000;">${c.name}</span>
+                          <span style="font-size:11px;color:#ffd166;font-weight:800;">♥ ${c.baseStats.maxHp} · ⚔ ${c.baseStats.baseDamage}</span>
+                        </div>
+                      </div>
 
-            <button data-act="open-class-select" style="padding:15px 18px;border-radius:12px;border:2px solid #ffd166;background:linear-gradient(135deg,rgba(255,209,102,0.28),rgba(58,28,94,0.92));color:#fff;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
-              <div>
-                <div style="font-weight:800;font-size:16px;color:#ffd166;">⚔ Nova Aventura (5 Campanhas)</div>
-                <div style="font-size:11px;color:#e2dbf0;">Escolhe a tua Classe, Especialização e Arena de Treino</div>
-              </div>
-              <span style="font-size:18px;color:#ffd166;">→</span>
-            </button>
+                      <!-- Visual Sub-Bending Badges (3 Icons + Names) -->
+                      <div style="font-size:10px;color:#80ffdb;font-weight:800;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:5px;">
+                        Sub-Dobras na Teia:
+                      </div>
+                      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
+                        ${c.specializations
+                          .map(
+                            sp => `
+                            <span style="padding:4px 8px;border-radius:8px;background:rgba(255,255,255,0.07);border:1px solid ${c.palette.glow}44;font-size:11px;font-weight:800;color:#fff;">
+                              ${sp.icon} ${sp.name.replace('Sub-dobra de ', '').replace('Sub-dobra do ', '')}
+                            </span>`
+                          )
+                          .join('')}
+                      </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <button data-act="open-coop" style="padding:12px 14px;border-radius:12px;border:1px solid rgba(125,226,255,0.35);background:rgba(22,16,42,0.9);color:#fff;text-align:left;cursor:pointer;">
-                <div style="font-weight:800;font-size:13px;color:#7de2ff;">👥 Multiplayer (2J)</div>
-                <div style="font-size:11px;color:#b8add4;">Sala Co-op ou Dupla IA</div>
-              </button>
-              <button data-act="open-grimoire" style="padding:12px 14px;border-radius:12px;border:1px solid rgba(199,125,255,0.35);background:rgba(22,16,42,0.9);color:#fff;text-align:left;cursor:pointer;">
-                <div style="font-weight:800;font-size:13px;color:#e0aaff;">📖 Grimório</div>
-                <div style="font-size:11px;color:#b8add4;">Cartas, Bosses & Lore</div>
-              </button>
-              <button data-act="open-ascensions" style="padding:12px 14px;border-radius:12px;border:1px solid rgba(255,159,28,0.35);background:rgba(22,16,42,0.9);color:#fff;text-align:left;cursor:pointer;">
-                <div style="font-weight:800;font-size:13px;color:#ffbe0b;">🔥 Ascensões (${selectedAscension})</div>
-                <div style="font-size:11px;color:#b8add4;">Dificuldade & Infinito</div>
-              </button>
-              <button data-act="open-settings" style="padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.22);background:rgba(22,16,42,0.9);color:#fff;text-align:left;cursor:pointer;">
-                <div style="font-weight:800;font-size:13px;">⚙ Definições</div>
-                <div style="font-size:11px;color:#b8add4;">Áudio, Qualidade & Toque</div>
-              </button>
-            </div>
-          </nav>
+                      <!-- 4 Compact Visual Ability Pills -->
+                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:12px;font-size:10px;color:#d6cce8;">
+                        <div style="padding:4px 6px;border-radius:6px;background:rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                          ${c.primaryAttack.icon} ${c.primaryAttack.name}
+                        </div>
+                        <div style="padding:4px 6px;border-radius:6px;background:rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                          ${c.specialSkill.icon} ${c.specialSkill.name}
+                        </div>
+                        <div style="padding:4px 6px;border-radius:6px;background:rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                          ${c.mobilitySkill.icon} ${c.mobilitySkill.name}
+                        </div>
+                        <div style="padding:4px 6px;border-radius:6px;background:rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                          ${c.ultimateSkill.icon} ${c.ultimateSkill.name}
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Instant 1-Click Play + Inspect Buttons -->
+                    <div style="display:flex;gap:6px;">
+                      <button data-act="quick-play:${id}" style="flex:1;padding:11px 10px;border-radius:10px;border:2px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 0 16px rgba(255,209,102,0.35);">
+                        ⚔ JOGAR AGORA
+                      </button>
+                      <button data-act="inspect-class:${id}" title="Ver Detalhes & Dojo" style="padding:11px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">
+                        🔍
+                      </button>
+                    </div>
+                  </div>
+                `;
+              })
+              .join('')}
+          </div>
         </div>
 
-        <footer style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#9d8ec4;flex-wrap:wrap;gap:8px;">
-          <span>Campanhas: I Pátio das Runas · II Cinza Viva · III Claustro Invertido · IV Ampulhetas · V Trono da Ruptura</span>
-          <span>Controlos: WASD/Rato ou Duplo Joystick Virtual Mobile</span>
+        <!-- 5-Nation Campaign Progression Roadmap Footer -->
+        <footer style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-radius:12px;background:rgba(14,9,30,0.85);border:1px solid rgba(125,226,255,0.2);font-size:11px;color:#cfc4e8;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <strong style="color:#ffd166;">Rota das 5 Nações:</strong>
+            <span>🌊 I. Polo Sul</span> →
+            <span>🌋 II. Cratera do Fogo</span> →
+            <span>🌪️ III. Templo do Ar</span> →
+            <span>⚙️ IV. Fortaleza de Zaofu</span> →
+            <span>🌌 V. Mundo Espiritual</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <span>✦ Essência: <strong style="color:#80ffdb;">${profile.eternalEssence}</strong></span>
+            <button data-act="start-tutorial" style="padding:4px 10px;border-radius:99px;border:1px solid #80ffdb;background:rgba(128,255,219,0.14);color:#80ffdb;font-weight:700;font-size:11px;cursor:pointer;">
+              🎓 Tutorial Rápido
+            </button>
+          </div>
         </footer>
       `;
       uiLayer.appendChild(menu);
@@ -645,112 +920,118 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       return;
     }
 
-    // 3. CLASS SELECTION & TRAINING ARENA PREVIEW (GDD 3.5)
+    // 3. CLASS DETAILS, DOJO & SUB-BENDING PREVIEW
     if (currentScreen === 'class_select') {
       const cls = ARCANA_CLASSES[selectedClassId];
+      const posMap: Record<ArcanaClassId, string> = {
+        chess: '0% 0%',
+        rune: '100% 0%',
+        chaos: '0% 100%',
+        chrono: '100% 100%',
+      };
       const modal = document.createElement('div');
       modal.style.cssText =
-        'position:absolute;inset:0;background:rgba(8,4,20,0.92);display:flex;flex-direction:column;padding:max(14px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));pointer-events:auto;overflow-y:auto;gap:14px;';
+        'position:absolute;inset:0;background:rgba(8,4,20,0.94);display:flex;flex-direction:column;padding:max(14px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));pointer-events:auto;overflow-y:auto;gap:12px;';
       modal.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
           <div>
-            <div style="font-size:11px;letter-spacing:2px;color:#7de2ff;">ESCOLHE O TEU ARCANISTA</div>
-            <h2 style="margin:0;font-size:24px;color:#ffd166;">Seleção de Classe & Especialização</h2>
+            <div style="font-size:11px;letter-spacing:2px;color:#7de2ff;">DETALHES DO DOMINADOR & DOJO DE TREINO</div>
+            <h2 style="margin:0;font-size:22px;color:#ffd166;">Escolhe o Teu Elemento</h2>
           </div>
           <div style="display:flex;gap:8px;">
-            <button data-act="open-skill-tree" style="padding:8px 14px;border-radius:8px;border:1px solid #ffd166;background:rgba(255,209,102,0.16);color:#ffd166;font-weight:700;cursor:pointer;">
-              🌿 Ver Árvore de Habilidades Completa
+            <button data-act="open-skill-tree" style="padding:8px 14px;border-radius:8px;border:1px solid #ffd166;background:rgba(255,209,102,0.18);color:#ffd166;font-weight:800;cursor:pointer;">
+              🕸️ Ver Teia de Habilidades
             </button>
             <button data-act="back-menu" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(20,14,36,0.9);color:#fff;cursor:pointer;">
-              ← Menu Principal
+              ← Voltar
             </button>
           </div>
         </div>
 
-        <!-- 4 Class Cards -->
-        <div style="display:grid;grid-template-columns:repeat(4,minmax(175px,1fr));gap:10px;overflow-x:auto;">
+        <!-- 4 Visual Element Switcher Tabs -->
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:10px;overflow-x:auto;">
           ${(['chess', 'chrono', 'chaos', 'rune'] as ArcanaClassId[])
             .map(id => {
               const c = ARCANA_CLASSES[id];
               const active = id === selectedClassId;
               return `
-                <button data-act="pick-class:${id}" style="padding:12px;border-radius:12px;border:2px solid ${
-                  active ? c.palette.accent : 'rgba(255,255,255,0.14)'
+                <button data-act="pick-class:${id}" style="padding:10px;border-radius:14px;border:2.5px solid ${
+                  active ? '#ffd166' : 'rgba(255,255,255,0.15)'
                 };background:${
                   active
-                    ? 'linear-gradient(160deg,rgba(68,38,118,0.92),rgba(20,12,42,0.96))'
+                    ? 'linear-gradient(160deg,rgba(45,28,88,0.96),rgba(14,9,32,0.98))'
                     : 'rgba(16,10,32,0.85)'
-                };color:#fff;text-align:left;cursor:pointer;box-shadow:${
-                  active ? `0 0 20px ${c.palette.glow}44` : 'none'
-                };">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                    <span style="font-size:26px;">${c.primaryAttack.icon}</span>
-                    <span style="font-size:11px;color:#ffd166;">${'★'.repeat(c.difficulty)}${'☆'.repeat(3 - c.difficulty)}</span>
+                };color:#fff;text-align:left;cursor:pointer;display:flex;align-items:center;gap:10px;">
+                  ${renderBenderPortraitBadge(id, 54, active ? '#ffd166' : c.palette.primary)}
+                  <div>
+                    <div style="font-size:14px;font-weight:900;color:${active ? '#ffd166' : '#fff'};">${c.name}</div>
+                    <div style="font-size:10px;color:#80ffdb;font-weight:700;">${c.specializations.map(s => s.icon).join(' ')} 3 Sub-dobras</div>
                   </div>
-                  <div style="font-weight:800;font-size:15px;color:${active ? '#ffd166' : '#fff'};">${c.name}</div>
-                  <div style="font-size:11px;color:#b8add4;margin-top:2px;">${c.combatStyle}</div>
                 </button>
               `;
             })
             .join('')}
         </div>
 
-        <!-- Selected Class Detailed Breakdown -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;background:rgba(18,12,38,0.88);border:1px solid rgba(125,226,255,0.25);border-radius:14px;padding:16px;">
-          <div>
-            <span style="font-size:11px;color:#80ffdb;letter-spacing:1.5px;text-transform:uppercase;">${cls.title}</span>
-            <h3 style="margin:4px 0 8px;font-size:22px;color:#fff;">${cls.name}</h3>
-            <p style="font-size:13px;color:#d6cce8;line-height:1.5;margin:0 0 12px;">${cls.concept}</p>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
-              <div style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.05);">
-                <div style="font-size:10px;color:#9d8ec4;">VIDA BASE</div>
-                <div style="font-size:16px;font-weight:800;color:#ff6b8b;">♥ ${cls.baseStats.maxHp}</div>
-              </div>
-              <div style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.05);">
-                <div style="font-size:10px;color:#9d8ec4;">DANO BASE</div>
-                <div style="font-size:16px;font-weight:800;color:#ffd166;">⚔ ${cls.baseStats.baseDamage}</div>
-              </div>
-              <div style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.05);">
-                <div style="font-size:10px;color:#9d8ec4;">VELOCIDADE</div>
-                <div style="font-size:16px;font-weight:800;color:#7de2ff;">⚡ ${cls.baseStats.moveSpeed}</div>
+        <!-- Visual Showcase of Selected Bender -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;background:rgba(18,12,38,0.92);border:1.5px solid ${cls.palette.glow}66;border-radius:16px;padding:16px;">
+          <!-- Left: Giant Portrait + Sub-dobras -->
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;gap:14px;align-items:center;">
+              <div style="width:128px;height:128px;border-radius:16px;border:3px solid ${cls.palette.accent};background-image:url('/arcana-benders.jpg');background-size:205% 205%;background-position:${posMap[selectedClassId]};image-rendering:pixelated;flex-shrink:0;box-shadow:0 0 24px ${cls.palette.glow}55;"></div>
+              <div>
+                <span style="font-size:11px;color:#80ffdb;font-weight:800;text-transform:uppercase;">${cls.title}</span>
+                <h3 style="margin:2px 0 6px;font-size:24px;color:#fff;">${cls.name}</h3>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;font-weight:800;">
+                  <span style="padding:4px 8px;border-radius:6px;background:rgba(255,107,139,0.16);color:#ff6b8b;">♥ ${cls.baseStats.maxHp} HP</span>
+                  <span style="padding:4px 8px;border-radius:6px;background:rgba(255,209,102,0.16);color:#ffd166;">⚔ ${cls.baseStats.baseDamage} Dano</span>
+                  <span style="padding:4px 8px;border-radius:6px;background:rgba(125,226,255,0.16);color:#7de2ff;">⚡ ${cls.baseStats.moveSpeed} Vel</span>
+                </div>
               </div>
             </div>
-            <div style="font-size:12px;color:#ffd166;font-weight:700;margin-bottom:6px;">Pré-visualização de Evoluções:</div>
-            <ul style="margin:0;padding-left:18px;font-size:12px;color:#cfc4e8;line-height:1.5;">
-              ${cls.evolutionsPreview.map(ev => `<li>${ev}</li>`).join('')}
-            </ul>
+
+            <div style="font-size:12px;font-weight:800;color:#ffd166;">3 Caminhos de Sub-Dobra Desbloqueáveis:</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+              ${cls.specializations
+                .map(
+                  sp => `
+                  <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid ${cls.palette.glow}44;text-align:center;">
+                    <div style="font-size:24px;margin-bottom:4px;">${sp.icon}</div>
+                    <div style="font-size:11px;font-weight:900;color:#fff;">${sp.name.replace('Sub-dobra de ', '').replace('Sub-dobra do ', '')}</div>
+                    <div style="font-size:10px;color:#80ffdb;">${sp.subtitle}</div>
+                  </div>`
+                )
+                .join('')}
+            </div>
           </div>
 
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <div style="padding:9px 12px;border-radius:9px;background:rgba(255,255,255,0.05);border-left:3px solid #7de2ff;">
-              <div style="font-size:12px;font-weight:800;color:#7de2ff;">${cls.primaryAttack.icon} Ataque Principal — ${cls.primaryAttack.name}</div>
-              <div style="font-size:11px;color:#cfc4e8;">${cls.primaryAttack.description}</div>
+          <!-- Right: 5 Visual Skill Cards -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border-left:3px solid #7de2ff;">
+              <div style="font-size:12px;font-weight:900;color:#7de2ff;">${cls.primaryAttack.icon} ${cls.primaryAttack.name}</div>
+              <div style="font-size:11px;color:#cfc4e8;margin-top:2px;">${cls.primaryAttack.description}</div>
             </div>
-            <div style="padding:9px 12px;border-radius:9px;background:rgba(255,255,255,0.05);border-left:3px solid #ffd166;">
-              <div style="font-size:12px;font-weight:800;color:#ffd166;">${cls.specialSkill.icon} Especial — ${cls.specialSkill.name} (${cls.specialSkill.cooldown}s)</div>
-              <div style="font-size:11px;color:#cfc4e8;">${cls.specialSkill.description}</div>
+            <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border-left:3px solid #ffd166;">
+              <div style="font-size:12px;font-weight:900;color:#ffd166;">${cls.specialSkill.icon} [E] ${cls.specialSkill.name}</div>
+              <div style="font-size:11px;color:#cfc4e8;margin-top:2px;">${cls.specialSkill.description}</div>
             </div>
-            <div style="padding:9px 12px;border-radius:9px;background:rgba(255,255,255,0.05);border-left:3px solid #80ffdb;">
-              <div style="font-size:12px;font-weight:800;color:#80ffdb;">${cls.mobilitySkill.icon} Mobilidade — ${cls.mobilitySkill.name} (${cls.mobilitySkill.cooldown}s)</div>
-              <div style="font-size:11px;color:#cfc4e8;">${cls.mobilitySkill.description}</div>
+            <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border-left:3px solid #80ffdb;">
+              <div style="font-size:12px;font-weight:900;color:#80ffdb;">${cls.mobilitySkill.icon} [Espaço] ${cls.mobilitySkill.name}</div>
+              <div style="font-size:11px;color:#cfc4e8;margin-top:2px;">${cls.mobilitySkill.description}</div>
             </div>
-            <div style="padding:9px 12px;border-radius:9px;background:rgba(255,255,255,0.05);border-left:3px solid #c77dff;">
-              <div style="font-size:12px;font-weight:800;color:#e0aaff;">${cls.passive.icon} Passiva — ${cls.passive.name}</div>
-              <div style="font-size:11px;color:#cfc4e8;">${cls.passive.description}</div>
-            </div>
-            <div style="padding:9px 12px;border-radius:9px;background:rgba(255,255,255,0.05);border-left:3px solid #ff4ecd;">
-              <div style="font-size:12px;font-weight:800;color:#ff99d8;">${cls.ultimateSkill.icon} Ultimate — ${cls.ultimateSkill.name}</div>
-              <div style="font-size:11px;color:#cfc4e8;">${cls.ultimateSkill.description}</div>
+            <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border-left:3px solid #ff4ecd;">
+              <div style="font-size:12px;font-weight:900;color:#ff99d8;">${cls.ultimateSkill.icon} [R] ${cls.ultimateSkill.name}</div>
+              <div style="font-size:11px;color:#cfc4e8;margin-top:2px;">${cls.ultimateSkill.description}</div>
             </div>
           </div>
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:auto;">
           <button data-act="start-training" style="padding:12px 20px;border-radius:12px;border:1px solid #7de2ff;background:rgba(125,226,255,0.16);color:#7de2ff;font-weight:800;font-size:14px;cursor:pointer;">
-            🎯 Experimentar na Arena de Treino
+            🎯 Testar no Dojo de Treino
           </button>
           <button data-act="launch-campaign" style="padding:14px 28px;border-radius:12px;border:2px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 0 25px rgba(255,209,102,0.45);">
-            INICIAR CAMPANHA COM ${cls.name.toUpperCase()} ✦
+            ⚔ JOGAR COM ${cls.name.toUpperCase()} ✦
           </button>
         </div>
       `;
@@ -759,18 +1040,18 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       return;
     }
 
-    // 4. SKILL TREE & EVOLUTIONS SCREEN
+    // 4. CONSTELLATION SKILL WEB SCREEN
     if (currentScreen === 'skill_tree') {
       const wrap = document.createElement('div');
       wrap.style.cssText =
-        'position:absolute;inset:0;background:rgba(8,4,20,0.95);padding:max(16px,env(safe-area-inset-top)) max(22px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left));pointer-events:auto;overflow-y:auto;display:flex;flex-direction:column;gap:14px;';
+        'position:absolute;inset:0;background:rgba(8,4,20,0.96);padding:max(14px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));pointer-events:auto;overflow-y:auto;display:flex;flex-direction:column;gap:12px;';
       wrap.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <button data-act="back-menu" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(20,14,36,0.9);color:#fff;cursor:pointer;">
-            ← Voltar
+            ← Voltar ao Menu
           </button>
           <button data-act="open-class-select" style="padding:8px 16px;border-radius:8px;border:1px solid #ffd166;background:rgba(255,209,102,0.2);color:#ffd166;font-weight:800;cursor:pointer;">
-            Escolher Classe e Jogar →
+            Escolher Dominador e Jogar →
           </button>
         </div>
         ${renderSkillTreeContent(selectedClassId, false)}
@@ -780,7 +1061,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       return;
     }
 
-    // 5. MULTIPLAYER CO-OP LOBBY (GDD 12)
+    // 5. MULTIPLAYER CO-OP LOBBY
     if (currentScreen === 'coop_lobby') {
       const wrap = document.createElement('div');
       wrap.style.cssText =
@@ -789,13 +1070,13 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         <div style="max-width:620px;width:100%;background:rgba(20,12,42,0.95);border:1px solid rgba(125,226,255,0.35);border-radius:16px;padding:22px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <div>
-              <span style="font-size:11px;color:#7de2ff;letter-spacing:2px;">COOPERATIVO ONLINE DE 2 JOGADORES</span>
-              <h2 style="margin:2px 0 0;color:#ffd166;">Salão da Aliança Arcana</h2>
+              <span style="font-size:11px;color:#7de2ff;letter-spacing:2px;">COOPERATIVO ONLINE DE 2 DOMINADORES</span>
+              <h2 style="margin:2px 0 0;color:#ffd166;">Ordem do Lótus Branco</h2>
             </div>
             <button data-act="back-menu" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#fff;cursor:pointer;">← Voltar</button>
           </div>
           <p style="font-size:13px;color:#cfc4e8;line-height:1.5;margin-bottom:16px;">
-            Joga em dupla com outro jogador (via código de sala sincronizado) ou ativa um <strong>Parceiro Arcano de IA</strong> que luta ao teu lado, combina sinergias e permite ressurreição cooperativa no campo!
+            Combina elementos em dupla com outro jogador (via código de sala sincronizado) ou invoca um <strong>Mestre Elemental Aliado de IA</strong> que conjura sub-dobras em sinergia contigo!
           </p>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
@@ -820,8 +1101,8 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             </div>
           </div>
 
-          <button data-act="coop-start-ai" style="width:100%;padding:14px;border-radius:12px;border:2px solid #f15bb5;background:linear-gradient(135deg,rgba(241,91,181,0.28),rgba(58,20,88,0.92));color:#fff;font-weight:800;font-size:15px;cursor:pointer;">
-            ⚡ Iniciar Aventura Cooperativa Agora (Com Guardião Aliado)
+          <button data-act="coop-start-ai" style="width:100%;padding:14px;border-radius:12px;border:2px solid #00bbf9;background:linear-gradient(135deg,rgba(0,187,249,0.28),rgba(58,20,88,0.92));color:#fff;font-weight:800;font-size:15px;cursor:pointer;">
+            ⚡ Iniciar Aventura Cooperativa Agora (Com Mestre Aliado)
           </button>
         </div>
       `;
@@ -830,7 +1111,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       return;
     }
 
-    // 6. GRIMÓRIO COMPENDIUM (GDD 9.3)
+    // 6. GRIMÓRIO / PERGAMINHOS ELEMENTAIS
     if (currentScreen === 'grimoire') {
       const wrap = document.createElement('div');
       wrap.style.cssText =
@@ -890,7 +1171,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
               <div style="font-size:12px;color:#ffd166;margin-bottom:6px;">${c.subtitle}</div>
               <p style="font-size:12px;color:#cfc4e8;margin:0 0 8px;">${c.themeDescription}</p>
               <div style="padding:8px;border-radius:8px;background:rgba(255,255,255,0.05);font-size:11px;color:#80ffdb;">
-                <strong>Mecânica Ambiental (${c.environmentalMechanic.name}):</strong> ${c.environmentalMechanic.description}
+                <strong>Mecânica Elemental (${c.environmentalMechanic.name}):</strong> ${c.environmentalMechanic.description}
               </div>
             </div>`
           ).join('')}
@@ -900,19 +1181,19 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       wrap.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
           <div>
-            <span style="font-size:11px;color:#e0aaff;letter-spacing:2px;">ENCICLOPÉDIA PERMANENTE</span>
-            <h2 style="margin:0;color:#ffd166;">Grimório da Ascensão</h2>
+            <span style="font-size:11px;color:#e0aaff;letter-spacing:2px;">ENCICLOPÉDIA DAS QUATRO NAÇÕES</span>
+            <h2 style="margin:0;color:#ffd166;">Pergaminhos de Dominação & Sub-dobras</h2>
           </div>
           <button data-act="back-menu" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(20,14,36,0.9);color:#fff;cursor:pointer;">← Voltar</button>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${(
             [
-              ['classes', '🌿 Árvores de Classe'],
-              ['upgrades', `🃏 Cartas & Evoluções (${ARCANA_UPGRADES.length})`],
-              ['enemies', '👾 Bestiário (10)'],
-              ['bosses', '👑 Guardiões Boss (6)'],
-              ['biomes', '🏛 Campanhas & Biomas (6)'],
+              ['classes', '🕸️ Teia de Habilidades'],
+              ['upgrades', `📜 Técnicas & Sub-dobras (${ARCANA_UPGRADES.length})`],
+              ['enemies', '👾 Inimigos (10)'],
+              ['bosses', '👑 Mestres Boss (6)'],
+              ['biomes', '🏛 Nações & Biomas (6)'],
             ] as const
           )
             .map(
@@ -940,17 +1221,17 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       wrap.innerHTML = `
         <div style="max-width:600px;width:100%;background:rgba(20,12,42,0.95);border:1px solid rgba(255,190,11,0.35);border-radius:16px;padding:22px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <h2 style="margin:0;color:#ffd166;">🔥 Graus de Ascensão</h2>
+            <h2 style="margin:0;color:#ffd166;">🔥 Graus de Ascensão Elemental</h2>
             <button data-act="back-menu" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#fff;cursor:pointer;">← Voltar</button>
           </div>
           <p style="font-size:13px;color:#cfc4e8;margin-bottom:14px;">
-            Escolhe o nível de desafio arcano. Graus superiores aumentam a ferocidade dos Guardiões e a recompensa de Essência Eterna.
+            Escolhe o nível de desafio espiritual. Graus superiores aumentam a ferocidade dos Mestres Guardiões e os Pontos de Chi recebidos.
           </p>
           <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
             <button data-act="pick-asc:0" style="padding:12px;border-radius:10px;border:2px solid ${
               selectedAscension === 0 ? '#00f5d4' : 'rgba(255,255,255,0.15)'
             };background:rgba(255,255,255,0.05);color:#fff;text-align:left;cursor:pointer;">
-              <strong>Ascensão 0 — Iniciação Padrão</strong> · Equilíbrio original das cinco campanhas.
+              <strong>Ascensão 0 — Harmonia Padrão</strong> · Equilíbrio original das cinco campanhas.
             </button>
             ${ASCENSION_MODIFIERS.map(
               m => `
@@ -969,7 +1250,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       return;
     }
 
-    // 8. SETTINGS MODAL (GDD 11 & 16)
+    // 8. SETTINGS MODAL
     if (currentScreen === 'settings') {
       const s = profile.settings;
       const wrap = document.createElement('div');
@@ -983,7 +1264,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           </div>
 
           <div>
-            <div style="font-size:12px;font-weight:700;color:#7de2ff;margin-bottom:6px;">Perfil de Qualidade Gráfica 2.5D</div>
+            <div style="font-size:12px;font-weight:700;color:#7de2ff;margin-bottom:6px;">Perfil de Qualidade Gráfica & Partículas 2.5D</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
               ${(['economico', 'equilibrado', 'alto'] as QualityProfile[])
                 .map(
@@ -1012,7 +1293,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           </label>
 
           <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;cursor:pointer;">
-            <span>Ataque Principal Automático por Padrão</span>
+            <span>Dobra Principal Automática por Padrão</span>
             <input type="checkbox" ${s.autoAttackDefault ? 'checked' : ''} data-setting-check="autoAttackDefault" />
           </label>
           <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;cursor:pointer;">
@@ -1026,7 +1307,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       return;
     }
 
-    // 9. IN-GAME HUD & INTERACTIVE OVERLAYS (GDD 11)
+    // 9. IN-GAME POWERS UX, HUD & INTERACTIVE MODALS
     if (currentScreen === 'playing' && runState) {
       const st = runState;
       const p = st.player;
@@ -1039,43 +1320,85 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         'position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:max(10px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));';
 
       hud.innerHTML = `
-        <!-- Top Bar: Player Status (Left), Campaign/Boss Bar (Center), Quick Actions (Right) -->
+        <!-- Top Bar: Elemental Master Card (Left), Campaign/Boss Bar (Center), Quick Actions (Right) -->
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
-          <!-- Player Status Card -->
-          <div class="arcana-hud-interactive" style="pointer-events:auto;background:rgba(12,8,28,0.84);border:1px solid rgba(125,226,255,0.3);border-radius:12px;padding:8px 12px;min-width:210px;backdrop-filter:blur(6px);">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-              <span style="font-weight:800;font-size:13px;color:#ffd166;">${cls.primaryAttack.icon} ${cls.name} · <span id="arc-hud-lv">Nv.${p.level}</span></span>
-              <span id="arc-hud-frags" style="font-size:12px;color:#80ffdb;font-weight:700;">◈ ${p.arcaneFragments}</span>
-            </div>
-            <!-- HP Bar -->
-            <div style="width:100%;height:10px;background:#1c1130;border-radius:99px;overflow:hidden;margin-bottom:4px;border:1px solid rgba(255,255,255,0.15);">
-              <div id="arc-hud-hp-fill" style="height:100%;width:${Math.max(0, Math.min(100, (p.hp / p.maxHp) * 100))}%;background:linear-gradient(90deg,#ff2a54,#ff758f);transition:width 0.12s;"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:#e2dbf0;margin-bottom:4px;">
-              <span id="arc-hud-hp-text">♥ ${Math.ceil(p.hp)} / ${Math.ceil(p.maxHp)}${p.shield > 0 ? ` (+${Math.ceil(p.shield)} 🛡)` : ''}</span>
-              <span id="arc-hud-passive" style="color:#ffd166;font-weight:700;"></span>
-            </div>
-            <!-- XP Bar -->
-            <div style="width:100%;height:5px;background:#140d24;border-radius:99px;overflow:hidden;">
-              <div id="arc-hud-xp-fill" style="height:100%;width:${Math.min(100, (p.xp / Math.max(1, p.xpToNext)) * 100)}%;background:linear-gradient(90deg,#00f5d4,#7de2ff);"></div>
+          <!-- Player Elemental Status Card with Pixel Art Portrait -->
+          <div class="arcana-hud-interactive" style="pointer-events:auto;background:rgba(10,6,24,0.88);border:1.5px solid ${cls.palette.glow}66;border-radius:14px;padding:8px 12px;min-width:255px;backdrop-filter:blur(8px);display:flex;align-items:center;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,0.5);">
+            ${renderBenderPortraitBadge(p.classId, 48, cls.palette.accent)}
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+                <span style="font-weight:900;font-size:13px;color:#ffd166;">${cls.name} · <span id="arc-hud-lv">Nv.${p.level}</span></span>
+                <span id="arc-hud-frags" style="font-size:11px;color:#80ffdb;font-weight:800;">◈ ${p.arcaneFragments}</span>
+              </div>
+              <!-- HP Bar -->
+              <div style="width:100%;height:10px;background:#1c1130;border-radius:99px;overflow:hidden;margin-bottom:3px;border:1px solid rgba(255,255,255,0.18);">
+                <div id="arc-hud-hp-fill" style="height:100%;width:${Math.max(0, Math.min(100, (p.hp / p.maxHp) * 100))}%;background:linear-gradient(90deg,#ff2a54,#ff758f);transition:width 0.12s;"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:#e2dbf0;margin-bottom:3px;">
+                <span id="arc-hud-hp-text">♥ ${Math.ceil(p.hp)} / ${Math.ceil(p.maxHp)}${p.shield > 0 ? ` (+${Math.ceil(p.shield)} 🛡)` : ''}</span>
+                <span id="arc-hud-passive" style="color:${cls.palette.glow};font-weight:800;"></span>
+              </div>
+              <!-- XP Bar -->
+              <div style="width:100%;height:5px;background:#140d24;border-radius:99px;overflow:hidden;">
+                <div id="arc-hud-xp-fill" style="height:100%;width:${Math.min(100, (p.xp / Math.max(1, p.xpToNext)) * 100)}%;background:linear-gradient(90deg,#00f5d4,#7de2ff);"></div>
+              </div>
             </div>
           </div>
 
-          <!-- Center Campaign / Boss Header -->
-          <div style="display:flex;flex-direction:column;align-items:center;flex:1;max-width:440px;">
-            <div style="padding:5px 14px;border-radius:99px;background:rgba(12,8,28,0.84);border:1px solid ${camp.palette.accentRunes};font-size:11px;font-weight:800;color:#fff;margin-bottom:6px;">
-              ${st.isTrainingArena ? '🎯 ARENA DE TREINO LIVRE' : st.isTutorial ? '🎓 INICIAÇÃO ARCANA' : `CAMPANHA ${camp.roman} — ${camp.name.toUpperCase()}`} · <span id="arc-hud-timer">00:00</span>
+          <!-- Center Campaign Stepper, Stage Progress Bar & Boss Header -->
+          <div style="display:flex;flex-direction:column;align-items:center;flex:1;max-width:490px;">
+            <!-- 5-Nation World Stepper -->
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;flex-wrap:wrap;justify-content:center;">
+              ${(['runes', 'ash', 'cloister', 'hourglasses', 'rift'] as const)
+                .map((cid, idx) => {
+                  const active = st.campaignId === cid;
+                  const done = st.campaignIndex > idx && st.campaignId !== 'infinite';
+                  const labels = ['I.Água', 'II.Fogo', 'III.Ar', 'IV.Terra', 'V.Espírito'];
+                  return `<span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:900;background:${
+                    active
+                      ? '#ffd166'
+                      : done
+                      ? 'rgba(0,245,212,0.25)'
+                      : 'rgba(14,10,30,0.82)'
+                  };color:${active ? '#140926' : done ? '#80ffdb' : '#8a829e'};border:1px solid ${
+                    active ? '#ffd166' : done ? '#00f5d4' : 'rgba(255,255,255,0.14)'
+                  };">${done ? '✓ ' : ''}${labels[idx]}</span>`;
+                })
+                .join('<span style="color:#6c6380;font-size:10px;">→</span>')}
+              ${
+                st.campaignId === 'infinite'
+                  ? `<span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:900;background:#ff007f;color:#fff;">∞ PÓS-JOGO INFINITO</span>`
+                  : ''
+              }
             </div>
-            <div id="arc-hud-boss-wrap" style="width:100%;display:${st.boss ? 'block' : 'none'};background:rgba(20,6,28,0.92);border:1px solid #ff4d6d;border-radius:10px;padding:6px 10px;">
+
+            <!-- Current Stage & Progress Bar Toward Boss -->
+            <div style="width:100%;background:rgba(12,8,28,0.9);border:1px solid ${camp.palette.accentRunes};border-radius:10px;padding:5px 12px;margin-bottom:5px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;color:#fff;margin-bottom:3px;">
+                <span>${
+                  st.isTrainingArena
+                    ? '🎯 DOJO DE TREINO ELEMENTAL'
+                    : st.isTutorial
+                    ? '🎓 INICIAÇÃO DOS 4 ELEMENTOS'
+                    : `FASE ${Math.min(5, st.campaignIndex + 1)}/5: ${camp.name.toUpperCase()}`
+                }</span>
+                <span id="arc-hud-stage-pct" style="color:#ffd166;">Progresso até ao Boss: 0%</span>
+              </div>
+              <div style="width:100%;height:6px;background:#1b1234;border-radius:99px;overflow:hidden;">
+                <div id="arc-hud-stage-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#00bbf9,#ffd166,#ff5400);transition:width 0.2s;"></div>
+              </div>
+            </div>
+
+            <div id="arc-hud-boss-wrap" style="width:100%;display:${st.boss ? 'block' : 'none'};background:rgba(20,6,28,0.92);border:1.5px solid #ff4d6d;border-radius:10px;padding:6px 10px;">
               <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;color:#ffd166;margin-bottom:3px;">
-                <span id="arc-hud-boss-name">${st.boss ? `${st.boss.def.name} (Fase ${st.boss.currentPhase})` : ''}</span>
+                <span id="arc-hud-boss-name">${st.boss ? `👑 ${st.boss.def.name} (Fase ${st.boss.currentPhase})` : ''}</span>
                 <span id="arc-hud-boss-hp">${st.boss ? `${Math.ceil(st.boss.hp)} / ${st.boss.maxHp}` : ''}</span>
               </div>
               <div style="width:100%;height:10px;background:#240818;border-radius:99px;overflow:hidden;">
                 <div id="arc-hud-boss-fill" style="height:100%;width:${st.boss ? Math.max(0, (st.boss.hp / st.boss.maxHp) * 100) : 100}%;background:linear-gradient(90deg,#ff0054,#ffbe0b);"></div>
               </div>
             </div>
-            <div id="arc-hud-banner" style="margin-top:6px;padding:6px 14px;border-radius:8px;background:rgba(16,10,36,0.9);border:1px solid #ffd166;font-size:12px;font-weight:800;color:#ffd166;display:none;text-align:center;"></div>
+            <div id="arc-hud-banner" style="margin-top:5px;padding:6px 14px;border-radius:8px;background:rgba(16,10,36,0.92);border:1px solid #ffd166;font-size:12px;font-weight:800;color:#ffd166;display:none;text-align:center;"></div>
           </div>
 
           <!-- Top-Right Utility Buttons -->
@@ -1086,8 +1409,8 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                    <button data-act="training-boss" style="padding:7px 10px;border-radius:8px;border:1px solid #ff4d6d;background:rgba(255,77,109,0.2);color:#ff99ac;font-size:11px;font-weight:800;cursor:pointer;">Invocar Boss</button>`
                 : ''
             }
-            <button data-act="toggle-inrun-tree" title="Árvore de Habilidades (Tecla K)" style="padding:8px 11px;border-radius:10px;border:1px solid #ffd166;background:rgba(16,10,34,0.88);color:#ffd166;font-weight:800;font-size:12px;cursor:pointer;">
-              🌿 Árvore [K]
+            <button data-act="toggle-inrun-tree" title="Teia de Habilidades & Sub-dobras (Tecla K)" style="padding:8px 12px;border-radius:10px;border:1.5px solid #ffd166;background:rgba(24,14,48,0.92);color:#ffd166;font-weight:900;font-size:12px;cursor:pointer;box-shadow:0 0 14px rgba(255,209,102,0.3);">
+              🕸️ Teia de Sub-dobras [K]
             </button>
             <button data-act="toggle-pause" title="Pausa (Esc)" style="padding:8px 11px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(16,10,34,0.88);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">
               Ⅱ
@@ -1095,7 +1418,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           </div>
         </div>
 
-        <!-- Tutorial Prompt Box (if active) -->
+        <!-- Tutorial Prompt Box -->
         ${
           st.tutorial.active
             ? `<div style="align-self:center;max-width:460px;background:rgba(14,24,42,0.92);border:1px solid #80ffdb;border-radius:12px;padding:10px 16px;text-align:center;">
@@ -1112,55 +1435,55 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             : ''
         }
 
-        <!-- Bottom Touch Controls: Left Virtual Move Stick + Center Interact Prompt + Right Action Arc -->
+        <!-- Bottom Controls: Left Virtual Move Stick + Center Powers Dock + Right Action Cluster -->
         <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:auto;">
           <!-- Left Virtual Joystick -->
-          <div id="arc-joy-move" class="arcana-hud-interactive" style="pointer-events:auto;width:118px;height:118px;border-radius:50%;background:radial-gradient(circle,rgba(125,226,255,0.14),rgba(12,8,28,0.65));border:2px solid rgba(125,226,255,0.35);position:relative;display:flex;align-items:center;justify-content:center;touch-action:none;">
-            <div id="arc-joy-move-knob" style="width:46px;height:46px;border-radius:50%;background:radial-gradient(circle,#7de2ff,#2b5876);box-shadow:0 0 14px #7de2ff;transform:translate(0px,0px);pointer-events:none;"></div>
+          <div id="arc-joy-move" class="arcana-hud-interactive" style="pointer-events:auto;width:116px;height:116px;border-radius:50%;background:radial-gradient(circle,rgba(125,226,255,0.14),rgba(12,8,28,0.68));border:2px solid ${cls.palette.glow}66;position:relative;display:flex;align-items:center;justify-content:center;touch-action:none;">
+            <div id="arc-joy-move-knob" style="width:46px;height:46px;border-radius:50%;background:radial-gradient(circle,${cls.palette.glow},${cls.palette.primary});box-shadow:0 0 14px ${cls.palette.glow};transform:translate(0px,0px);pointer-events:none;"></div>
           </div>
 
-          <!-- Center Contextual Interact / Next Campaign Portal Button -->
-          <div class="arcana-hud-interactive" style="pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:6px;">
+          <!-- Center Contextual Interact + Elemental Powers Hotbar Dock -->
+          <div class="arcana-hud-interactive" style="pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:8px;">
             <button id="arc-btn-interact" data-act="hud-interact" style="display:none;padding:10px 18px;border-radius:99px;border:2px solid #ffd166;background:linear-gradient(135deg,#3d1e6d,#140926);color:#ffd166;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 0 20px rgba(255,209,102,0.45);">
-              ✋ Interagir com Altar [F]
+              ✋ Interagir com Santuário [F]
             </button>
             ${
               st.phase === 'F_CONCLUSION'
                 ? `<button data-act="next-campaign" style="padding:12px 22px;border-radius:99px;border:2px solid #00f5d4;background:linear-gradient(135deg,#00f5d4,#1b3b5c);color:#08121e;font-weight:900;font-size:14px;cursor:pointer;box-shadow:0 0 26px #00f5d4;">
-                    🌀 ATRAVESSAR PORTAL DA PRÓXIMA CAMPANHA →
+                    🌀 ATRAVESSAR PORTAL DA PRÓXIMA NAÇÃO →
                   </button>`
                 : ''
             }
           </div>
 
-          <!-- Right Action Buttons Cluster -->
+          <!-- Right Elemental Powers Cluster -->
           <div class="arcana-hud-interactive" style="pointer-events:auto;display:flex;align-items:flex-end;gap:8px;">
-            <div style="display:grid;grid-template-columns:repeat(2,62px);gap:8px;">
-              <button id="arc-btn-dash" data-act="hud-dash" style="width:62px;height:62px;border-radius:50%;border:2px solid #80ffdb;background:rgba(14,24,42,0.88);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;">
-                <span style="font-size:18px;">${cls.mobilitySkill.icon}</span>
-                <span id="arc-cd-dash" style="font-size:9px;color:#80ffdb;font-weight:700;">ESQUIVA</span>
+            <div style="display:grid;grid-template-columns:repeat(2,64px);gap:8px;">
+              <button id="arc-btn-dash" data-act="hud-dash" title="${cls.mobilitySkill.name} [Espaço]" style="width:64px;height:64px;border-radius:50%;border:2px solid #80ffdb;background:radial-gradient(circle,rgba(0,245,212,0.22),rgba(14,24,42,0.92));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 14px rgba(128,255,219,0.3);">
+                <span style="font-size:20px;">${cls.mobilitySkill.icon}</span>
+                <span id="arc-cd-dash" style="font-size:9px;color:#80ffdb;font-weight:800;">PASSO</span>
               </button>
-              <button id="arc-btn-special" data-act="hud-special" style="width:62px;height:62px;border-radius:50%;border:2px solid #ffd166;background:rgba(28,16,48,0.88);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;">
-                <span style="font-size:18px;">${cls.specialSkill.icon}</span>
-                <span id="arc-cd-special" style="font-size:9px;color:#ffd166;font-weight:700;">ESPECIAL</span>
+              <button id="arc-btn-special" data-act="hud-special" title="${cls.specialSkill.name} [E]" style="width:64px;height:64px;border-radius:50%;border:2px solid #ffd166;background:radial-gradient(circle,rgba(255,209,102,0.25),rgba(28,16,48,0.92));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 14px rgba(255,209,102,0.35);">
+                <span style="font-size:20px;">${cls.specialSkill.icon}</span>
+                <span id="arc-cd-special" style="font-size:9px;color:#ffd166;font-weight:800;">SUB-DOBRA</span>
               </button>
-              <button id="arc-btn-auto" data-act="hud-auto" style="width:62px;height:52px;border-radius:14px;border:1px solid ${
+              <button id="arc-btn-auto" data-act="hud-auto" style="width:64px;height:52px;border-radius:14px;border:1px solid ${
                 input.autoAttackEnabled ? '#00f5d4' : 'rgba(255,255,255,0.25)'
               };background:${
-                input.autoAttackEnabled ? 'rgba(0,245,212,0.2)' : 'rgba(16,10,32,0.8)'
+                input.autoAttackEnabled ? 'rgba(0,245,212,0.22)' : 'rgba(16,10,32,0.85)'
               };color:#fff;font-size:10px;font-weight:800;cursor:pointer;">
                 AUTO: ${input.autoAttackEnabled ? 'ON' : 'OFF'}
               </button>
-              <button id="arc-btn-ult" data-act="hud-ult" style="width:62px;height:62px;border-radius:50%;border:2px solid #ff4ecd;background:rgba(42,12,48,0.9);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;">
-                <span style="font-size:18px;">${cls.ultimateSkill.icon}</span>
-                <span id="arc-cd-ult" style="font-size:9px;color:#ff99d8;font-weight:700;">${Math.floor(p.ultimateCharge)}%</span>
+              <button id="arc-btn-ult" data-act="hud-ult" title="${cls.ultimateSkill.name} [R]" style="width:64px;height:64px;border-radius:50%;border:2px solid #ff4ecd;background:radial-gradient(circle,rgba(255,78,205,0.28),rgba(42,12,48,0.94));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 18px rgba(255,78,205,0.4);">
+                <span style="font-size:20px;">${cls.ultimateSkill.icon}</span>
+                <span id="arc-cd-ult" style="font-size:9px;color:#ff99d8;font-weight:800;">${Math.floor(p.ultimateCharge)}%</span>
               </button>
             </div>
 
-            <!-- Right Aim / Primary Attack Virtual Stick -->
-            <div id="arc-joy-aim" style="width:94px;height:94px;border-radius:50%;background:radial-gradient(circle,rgba(255,209,102,0.22),rgba(24,12,42,0.75));border:2px solid #ffd166;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;">
-              <span style="font-size:22px;pointer-events:none;">${cls.primaryAttack.icon}</span>
-              <span style="font-size:9px;color:#ffd166;font-weight:800;pointer-events:none;">MIRAR</span>
+            <!-- Right Aim / Primary Bending Virtual Stick -->
+            <div id="arc-joy-aim" style="width:96px;height:96px;border-radius:50%;background:radial-gradient(circle,${cls.palette.primary}55,rgba(24,12,42,0.85));border:2.5px solid #ffd166;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;box-shadow:0 0 20px ${cls.palette.glow}44;">
+              <span style="font-size:24px;pointer-events:none;">${cls.primaryAttack.icon}</span>
+              <span style="font-size:9px;color:#ffd166;font-weight:900;pointer-events:none;">DOBRAR</span>
             </div>
           </div>
         </div>
@@ -1168,20 +1491,20 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       uiLayer.appendChild(hud);
       bindTouchJoysticks();
 
-      // SPECIALIZATION PICKER MODAL (Level 2 unlock!)
+      // SUB-BENDING SPECIALIZATION PICKER MODAL (Level 2 unlock!)
       if (showSpecChoiceModal && !p.specializationId) {
         const specModal = document.createElement('div');
         specModal.className = 'arcana-modal';
         specModal.style.cssText =
-          'position:absolute;inset:0;background:rgba(6,3,16,0.88);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;pointer-events:auto;z-index:10010;overflow-y:auto;';
+          'position:absolute;inset:0;background:rgba(6,3,16,0.9);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;pointer-events:auto;z-index:10010;overflow-y:auto;';
         specModal.innerHTML = `
-          <div style="max-width:820px;width:100%;text-align:center;">
-            <span style="font-size:11px;letter-spacing:3px;color:#80ffdb;text-transform:uppercase;">DESPERTAR DE CLASSE · NÍVEL ${p.level}</span>
-            <h2 style="margin:4px 0 6px;font-size:26px;color:#ffd166;">Escolhe o Ramo da Tua Árvore de Especialização</h2>
+          <div style="max-width:840px;width:100%;text-align:center;">
+            <span style="font-size:11px;letter-spacing:3px;color:#80ffdb;text-transform:uppercase;">DESPERTAR DE SUB-DOBRA · NÍVEL ${p.level}</span>
+            <h2 style="margin:4px 0 6px;font-size:26px;color:#ffd166;">Escolhe a Tua Artéria de Sub-Dobra Elemental</h2>
             <p style="font-size:13px;color:#cfc4e8;margin:0 0 18px;">
-              Esta escolha define a tua especialização principal e desbloqueia nós passivos adicionais nos níveis 5 e 8.
+              Esta escolha desperta a tua Sub-dobra principal na Teia de Habilidades e desbloqueia técnicas avançadas nos níveis 5 e 8.
             </p>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:14px;">
               ${cls.specializations
                 .map(
                   spec => `
@@ -1191,7 +1514,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                     <div style="font-size:11px;color:#80ffdb;margin-bottom:8px;">${spec.subtitle}</div>
                     <p style="font-size:12px;color:#e2dbf0;line-height:1.45;margin:0 0 10px;">${spec.description}</p>
                     <div style="font-size:11px;color:#b8add4;">
-                      Nós da Árvore: <strong>${spec.keyNodes.join(' → ')}</strong>
+                      Nós da Teia: <strong>${spec.keyNodes.join(' → ')}</strong>
                     </div>
                   </button>`
                 )
@@ -1202,16 +1525,16 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         uiLayer.appendChild(specModal);
       }
 
-      // 3-CARD LEVEL UP DRAFT MODAL (GDD 8)
+      // 3-TECHNIQUE LEVEL UP DRAFT MODAL
       else if (st.pendingLevelUps > 0 && st.currentUpgradeChoices.length > 0) {
         const draftModal = document.createElement('div');
         draftModal.className = 'arcana-modal';
         draftModal.style.cssText =
-          'position:absolute;inset:0;background:rgba(6,3,16,0.86);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;pointer-events:auto;z-index:10010;overflow-y:auto;';
+          'position:absolute;inset:0;background:rgba(6,3,16,0.88);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;pointer-events:auto;z-index:10010;overflow-y:auto;';
         draftModal.innerHTML = `
           <div style="max-width:860px;width:100%;text-align:center;">
-            <div style="font-size:11px;letter-spacing:3px;color:#00f5d4;text-transform:uppercase;">ASCENSÃO DE PODER · NÍVEL ${p.level}</div>
-            <h2 style="margin:4px 0 14px;font-size:24px;color:#ffd166;">Escolhe um Aprimoramento Arcano</h2>
+            <div style="font-size:11px;letter-spacing:3px;color:#00f5d4;text-transform:uppercase;">DOMÍNIO ELEMENTAL · NÍVEL ${p.level}</div>
+            <h2 style="margin:4px 0 14px;font-size:24px;color:#ffd166;">Escolhe uma Nova Técnica ou Sub-Dobra</h2>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:14px;margin-bottom:14px;">
               ${st.currentUpgradeChoices
                 .map(card => {
@@ -1235,7 +1558,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                             ${RARITY_LABELS[card.rarity]}
                           </span>
                         </div>
-                        <div style="font-size:11px;color:#80ffdb;margin-bottom:2px;">${CATEGORY_LABELS[card.category]} · Nv.${curStacks + 1}/${card.maxStacks}</div>
+                        <div style="font-size:11px;color:#80ffdb;margin-bottom:2px;">${CATEGORY_LABELS[card.category]} · Grau ${curStacks + 1}/${card.maxStacks}</div>
                         <h3 style="margin:0 0 8px;font-size:17px;color:#fff;">${card.name}</h3>
                         <p style="font-size:13px;color:#e2dbf0;line-height:1.4;margin:0 0 10px;">${card.shortDesc}</p>
                       </div>
@@ -1247,26 +1570,26 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                 })
                 .join('')}
             </div>
-            <button data-act="toggle-inrun-tree" style="padding:8px 16px;border-radius:8px;border:1px solid #7de2ff;background:rgba(125,226,255,0.14);color:#7de2ff;font-weight:700;cursor:pointer;">
-              🌿 Inspecionar Árvore de Habilidades & Sinergias Ativas
+            <button data-act="toggle-inrun-tree" style="padding:9px 18px;border-radius:99px;border:1.5px solid #ffd166;background:rgba(255,209,102,0.16);color:#ffd166;font-weight:800;cursor:pointer;">
+              🕸️ Abrir Teia de Habilidades & Alocar Pontos de Chi
             </button>
           </div>
         `;
         uiLayer.appendChild(draftModal);
       }
 
-      // IN-RUN SKILL TREE & BUILD INSPECTOR OVERLAY
+      // IN-RUN CONSTELLATION SKILL WEB OVERLAY
       if (showInRunSkillTree) {
         const treeOverlay = document.createElement('div');
         treeOverlay.className = 'arcana-modal';
         treeOverlay.style.cssText =
-          'position:absolute;inset:0;background:rgba(8,4,20,0.95);padding:20px;pointer-events:auto;z-index:10020;overflow-y:auto;';
+          'position:absolute;inset:0;background:rgba(8,4,20,0.96);padding:20px;pointer-events:auto;z-index:10020;overflow-y:auto;';
         treeOverlay.innerHTML = `
-          <div style="max-width:960px;margin:0 auto;">
+          <div style="max-width:980px;margin:0 auto;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-              <h2 style="margin:0;color:#ffd166;">🌿 Árvore de Habilidades & Build da Aventura</h2>
+              <h2 style="margin:0;color:#ffd166;">🕸️ Teia de Habilidades & Sub-dobras da Jornada</h2>
               <button data-act="toggle-inrun-tree" style="padding:8px 16px;border-radius:8px;border:1px solid #00f5d4;background:rgba(0,245,212,0.2);color:#fff;font-weight:800;cursor:pointer;">
-                Fechar [K / Esc]
+                Fechar Teia [K / Esc]
               </button>
             </div>
             ${renderSkillTreeContent(p.classId, true)}
@@ -1275,7 +1598,80 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         uiLayer.appendChild(treeOverlay);
       }
 
-      // PAUSE / DEFEAT / VICTORY OVERLAY
+      // CHAPTER VICTORY / NATION TRANSITION MODAL (Clear Progression Between Phases!)
+      if (st.phase === 'F_CONCLUSION' && !isPaused && p.hp > 0) {
+        const nextIdx = st.campaignIndex + 1;
+        const isFifthCampaignDone = st.campaignIndex === 4;
+        const nextCamp = ARCANA_CAMPAIGNS[Math.min(nextIdx, ARCANA_CAMPAIGNS.length - 1)];
+        const vicModal = document.createElement('div');
+        vicModal.className = 'arcana-modal';
+        vicModal.style.cssText =
+          'position:absolute;inset:0;background:rgba(6,3,16,0.88);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;pointer-events:auto;z-index:10025;';
+        vicModal.innerHTML = `
+          <div style="max-width:580px;width:100%;background:linear-gradient(165deg,rgba(28,16,58,0.97),rgba(10,6,24,0.98));border:2.5px solid #00f5d4;border-radius:18px;padding:24px;text-align:center;box-shadow:0 0 42px rgba(0,245,212,0.35);">
+            <div style="font-size:11px;letter-spacing:3px;color:#80ffdb;font-weight:900;text-transform:uppercase;margin-bottom:4px;">
+              ${isFifthCampaignDone ? '🏆 TODAS AS 5 NAÇÕES LIBERTADAS!' : `✦ FASE ${st.campaignIndex + 1} DE 5 CONCLUÍDA ✦`}
+            </div>
+            <h2 style="margin:0 0 8px;font-size:28px;color:#ffd166;">
+              ${camp.name} Libertada!
+            </h2>
+            <p style="font-size:13px;color:#e2dbf0;line-height:1.5;margin:0 0 16px;">
+              Derrotaste <strong>${camp.boss.name}</strong> e restauraste o equilíbrio elemental desta Nação! Recebeste <strong>+25 Essência Espiritual</strong> e curaste a tua energia vital.
+            </p>
+
+            <!-- 5-Nation Visual Progress Map -->
+            <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
+              ${ARCANA_CAMPAIGNS.slice(0, 5)
+                .map((c, idx) => {
+                  const done = idx <= st.campaignIndex;
+                  const isNext = idx === nextIdx;
+                  return `<div style="padding:8px 10px;border-radius:10px;border:1.5px solid ${
+                    done ? '#00f5d4' : isNext ? '#ffd166' : 'rgba(255,255,255,0.15)'
+                  };background:${
+                    done
+                      ? 'rgba(0,245,212,0.18)'
+                      : isNext
+                      ? 'rgba(255,209,102,0.2)'
+                      : 'rgba(255,255,255,0.04)'
+                  };font-size:11px;font-weight:800;color:${done ? '#80ffdb' : isNext ? '#ffd166' : '#8a829e'};">
+                    ${done ? '✓ ' : isNext ? '▶ ' : ''}${c.roman}. ${c.name.split(' ')[0]}
+                  </div>`;
+                })
+                .join('')}
+            </div>
+
+            ${
+              isFifthCampaignDone
+                ? `
+                <div style="padding:12px;border-radius:12px;background:rgba(255,209,102,0.12);border:1px solid #ffd166;margin-bottom:16px;font-size:12px;color:#ffd166;">
+                  🎉 <strong>Parabéns, Avatar!</strong> Concluíste a Campanha Principal das 5 Nações! Podes regressar vitorioso ao Menu ou entrar opcionalmente no <strong>Modo Pós-Jogo: Ascensão Infinita</strong>.
+                </div>
+                <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                  <button data-act="save-and-menu" style="padding:13px 22px;border-radius:12px;border:2px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:14px;cursor:pointer;">
+                    🏆 Concluir Vitória das 5 Nações (Menu)
+                  </button>
+                  <button data-act="next-campaign" style="padding:13px 20px;border-radius:12px;border:1.5px solid #ff007f;background:rgba(255,0,127,0.22);color:#ff99c8;font-weight:800;font-size:13px;cursor:pointer;">
+                    ∞ Entrar no Modo Pós-Jogo: Ascensão Infinita →
+                  </button>
+                </div>
+                `
+                : `
+                <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+                  <button data-act="toggle-inrun-tree" style="padding:12px 18px;border-radius:12px;border:1.5px solid #ffd166;background:rgba(255,209,102,0.16);color:#ffd166;font-weight:800;font-size:13px;cursor:pointer;">
+                    🕸️ Abrir Teia de Habilidades
+                  </button>
+                  <button data-act="next-campaign" style="padding:14px 26px;border-radius:12px;border:2px solid #00f5d4;background:linear-gradient(135deg,#00f5d4,#00bbf9);color:#06101e;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 0 24px rgba(0,245,212,0.45);">
+                    🌀 AVANÇAR PARA FASE ${nextIdx + 1}/5: ${nextCamp.name.toUpperCase()} →
+                  </button>
+                </div>
+                `
+            }
+          </div>
+        `;
+        uiLayer.appendChild(vicModal);
+      }
+
+      // PAUSE / DEFEAT OVERLAY
       if (isPaused || p.hp <= 0) {
         const dead = p.hp <= 0;
         const pauseModal = document.createElement('div');
@@ -1287,18 +1683,18 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             dead ? '#ff4d6d' : '#ffd166'
           };border-radius:16px;padding:24px;text-align:center;display:flex;flex-direction:column;gap:12px;">
             <h2 style="margin:0;font-size:26px;color:${dead ? '#ff4d6d' : '#ffd166'};">
-              ${dead ? '☠ O Teu Corpo Astral Caiu' : 'Ⅱ Aventura em Pausa'}
+              ${dead ? '☠ O Teu Espírito Elemental Caiu' : 'Ⅱ Jornada em Pausa'}
             </h2>
             <p style="font-size:13px;color:#cfc4e8;margin:0;">
-              ${cls.name} · Nível ${p.level} · Abates: ${st.kills} · Fragmentos: ◈ ${p.arcaneFragments}
+              ${cls.name} · Nível ${p.level} · Abates: ${st.kills} · Relíquias: ◈ ${p.arcaneFragments}
             </p>
             ${
               !dead
                 ? `<button data-act="toggle-pause" style="padding:12px;border-radius:10px;border:1px solid #00f5d4;background:rgba(0,245,212,0.22);color:#fff;font-weight:800;cursor:pointer;">▶ Continuar Combate</button>`
-                : `<button data-act="restart-run" style="padding:12px;border-radius:10px;border:1px solid #ffd166;background:rgba(255,209,102,0.24);color:#ffd166;font-weight:800;cursor:pointer;">↻ Tentar Nova Ascensão</button>`
+                : `<button data-act="restart-run" style="padding:12px;border-radius:10px;border:1px solid #ffd166;background:rgba(255,209,102,0.24);color:#ffd166;font-weight:800;cursor:pointer;">↻ Renascer no Ciclo Avatar</button>`
             }
             <button data-act="toggle-inrun-tree" style="padding:10px;border-radius:10px;border:1px solid rgba(125,226,255,0.35);background:rgba(255,255,255,0.06);color:#7de2ff;font-weight:700;cursor:pointer;">
-              🌿 Ver Árvore de Habilidades
+              🕸️ Abrir Teia de Habilidades
             </button>
             <button data-act="save-and-menu" style="padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#e2dbf0;cursor:pointer;">
               Guardar Progresso & Voltar ao Menu
@@ -1415,12 +1811,51 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           renderUi();
         } else if (key === 'tree-class') {
           selectedClassId = val as ArcanaClassId;
+          selectedWebNodeId = null;
+          renderUi();
+        } else if (key === 'web-node') {
+          selectedWebNodeId = val;
+          renderUi();
+        } else if (key === 'unlock-web-node') {
+          const activeCls = runState ? runState.player.classId : selectedClassId;
+          const nodes = SKILL_WEB_NODES.filter(n => n.classId === activeCls);
+          const targetNode = nodes.find(n => n.id === val);
+          if (targetNode) {
+            unlockedWebNodes.add(targetNode.id);
+            recordDiscovery(profile, 'upgrade', targetNode.id);
+            if (targetNode.upgradeId) {
+              recordDiscovery(profile, 'upgrade', targetNode.upgradeId);
+            }
+            if (runState) {
+              spentChiPointsInRun += 1;
+              const specId = ARCANA_CLASSES[activeCls].specializations[targetNode.branchIndex]?.id;
+              if (!runState.player.specializationId && specId) {
+                selectSpecialization(runState, specId);
+              }
+              if (targetNode.upgradeId) {
+                runState.player.upgrades[targetNode.upgradeId] =
+                  (runState.player.upgrades[targetNode.upgradeId] || 0) + 1;
+              }
+              audio.playSfx('card_pick', runState.player.classId);
+            } else if (profile.eternalEssence >= 15) {
+              profile.eternalEssence = Math.max(0, profile.eternalEssence - 15);
+              saveArcanaProfile(profile);
+            }
+          }
+          renderUi();
+        } else if (key === 'quick-play') {
+          selectedClassId = val as ArcanaClassId;
+          clearRunCheckpoint(profile);
+          startNewAdventure({});
+        } else if (key === 'inspect-class') {
+          selectedClassId = val as ArcanaClassId;
+          currentScreen = 'class_select';
           renderUi();
         } else if (key === 'open-coop') {
           currentScreen = 'coop_lobby';
           renderUi();
         } else if (key === 'coop-create') {
-          coop.createRoom(options.name || 'Arcanista', selectedClassId);
+          coop.createRoom(options.name || 'Dominador', selectedClassId);
           renderUi();
         } else if (key === 'coop-join') {
           const inp = uiLayer.querySelector<HTMLInputElement>('#arcana-room-input');
@@ -1453,6 +1888,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           renderUi();
         } else if (key === 'pick-class') {
           selectedClassId = val as ArcanaClassId;
+          selectedWebNodeId = null;
           menuBackdropState = createInitialRunState({ classId: selectedClassId, isTraining: true });
           renderUi();
         } else if (key === 'start-training') {
@@ -1561,31 +1997,43 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
     const xpFill = document.getElementById('arc-hud-xp-fill');
     if (xpFill) xpFill.style.width = `${Math.min(100, (p.xp / Math.max(1, p.xpToNext)) * 100)}%`;
 
-    // Passive gauge readout
+    // Elemental Bending Passive Gauge Readout
     let passiveTxt = '';
-    if (p.classId === 'chess') passiveTxt = `♔ Coordenação: ${p.chessCoordinationStacks}/10`;
-    else if (p.classId === 'chrono') passiveTxt = `⚙ Sequência: ${p.chronoSequenceStacks}/8`;
-    else if (p.classId === 'chaos') passiveTxt = `🌀 Instabilidade: ${Math.floor(p.chaosInstability)}%`;
-    else if (p.classId === 'rune') passiveTxt = `📜 Glifos: ${p.runeActiveSymbols.join('·') || '—'}`;
+    if (p.classId === 'chess') passiveTxt = `🌕 Lua Cheia: ${p.chessCoordinationStacks}/10`;
+    else if (p.classId === 'chrono') passiveTxt = `🍃 Correntes: ${p.chronoSequenceStacks}/8`;
+    else if (p.classId === 'chaos') passiveTxt = `☄️ Cometa: ${Math.floor(p.chaosInstability)}%`;
+    else if (p.classId === 'rune') passiveTxt = `⛰️ Sísmico: ${p.runeActiveSymbols.join('·') || 'Ativo'}`;
     setTxt('arc-hud-passive', passiveTxt);
 
-    // Timer
     const mins = Math.floor(st.elapsedCampaignSec / 60);
     const secs = Math.floor(st.elapsedCampaignSec % 60);
     setTxt('arc-hud-timer', `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
 
-    // Cooldowns
+    // Update Stage Progress Bar (0% -> 100% toward Boss)
+    const stagePct = st.boss
+      ? 100
+      : Math.min(100, Math.floor((st.elapsedCampaignSec / 115) * 100));
+    setTxt(
+      'arc-hud-stage-pct',
+      st.boss
+        ? '⚔ BOSS GUARDIÃO NA ARENA!'
+        : st.phase === 'F_CONCLUSION'
+        ? '✓ FASE CONCLUÍDA!'
+        : `Até ao Boss: ${stagePct}% (${st.kills} abates)`
+    );
+    const stageFill = document.getElementById('arc-hud-stage-fill');
+    if (stageFill) stageFill.style.width = `${stagePct}%`;
+
     setTxt(
       'arc-cd-dash',
-      p.mobilityCooldown > 0 ? `${p.mobilityCooldown.toFixed(1)}s` : 'ESQUIVA'
+      p.mobilityCooldown > 0 ? `${p.mobilityCooldown.toFixed(1)}s` : 'PASSO'
     );
     setTxt(
       'arc-cd-special',
-      p.specialCooldown > 0 ? `${p.specialCooldown.toFixed(1)}s` : 'ESPECIAL'
+      p.specialCooldown > 0 ? `${p.specialCooldown.toFixed(1)}s` : 'SUB-DOBRA'
     );
-    setTxt('arc-cd-ult', p.ultimateCharge >= 100 ? 'PRONTO!' : `${Math.floor(p.ultimateCharge)}%`);
+    setTxt('arc-cd-ult', p.ultimateCharge >= 100 ? 'AVATAR!' : `${Math.floor(p.ultimateCharge)}%`);
 
-    // Boss bar
     const bossWrap = document.getElementById('arc-hud-boss-wrap');
     if (bossWrap) {
       bossWrap.style.display = st.boss ? 'block' : 'none';
@@ -1597,7 +2045,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       }
     }
 
-    // Status Banner
     const bannerEl = document.getElementById('arc-hud-banner');
     if (bannerEl) {
       if (st.statusBanner && st.statusBanner.timer > 0) {
@@ -1610,7 +2057,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       }
     }
 
-    // Nearby interactive POI button
     const interactBtn = document.getElementById('arc-btn-interact');
     if (interactBtn) {
       const nearPoi = st.map.pois.find(
@@ -1625,9 +2071,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
     }
   }
 
-  // ============================================================================
-  // Main Loop
-  // ============================================================================
   function frame(now: number) {
     const dt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000));
     lastFrameTime = now;
@@ -1641,7 +2084,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         runState.player.hp <= 0;
 
       if (!pausedModalOpen) {
-        // Compute movement vector from WASD/Arrows + virtual stick
         let mx = joyMoveVec.x;
         let my = joyMoveVec.y;
         if (keysHeld.has('KeyW') || keysHeld.has('ArrowUp')) my -= 1;
@@ -1663,7 +2105,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           input.primaryHeld = true;
         }
 
-        // Check POI interaction
         if (input.interactPressed) {
           const nearPoi = runState.map.pois.find(
             poi =>
@@ -1721,7 +2162,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           coop.syncTick(dt, runState);
         }
 
-        // Clear one-shot triggers
         input.specialPressed = false;
         input.mobilityPressed = false;
         input.ultimatePressed = false;
@@ -1738,7 +2178,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       renderer.render(runState, dt);
       updateHudFast();
     } else {
-      // Animate lightweight 2.5D background scene behind menus
       menuBackdropState.elapsedCampaignSec += dt;
       menuBackdropState.player.animTime += dt;
       renderer.render(menuBackdropState, dt);

@@ -1,9 +1,11 @@
 // ============================================================================
-// ASCENSÃO ARCANA — 2.5D Isometric/Tilted Canvas Render Engine
+// ASCENSÃO ARCANA — 2.5D Elemental Bending Render & VFX Engine (v3.0)
 // ============================================================================
-// Implements smooth camera tracking with boss zoom-out, layered biome floors,
-// Y-sorted 2.5D painter's algorithm, high-contrast combat telegraphs, rune
-// laser networks, projectiles, floating damage popups, and directional markers.
+// Implements textured 16-bit pixel-art biome floors, Y-sorted 2.5D painter's
+// algorithm, Elemental Bending VFX (Water Whips, Blood-Moon Tendrils, Air
+// Scooters, Wind Blades, Blue-Fire Dragon Spirals, Forked Lightning Arcs,
+// Combustion Shockwaves, Seismic Sense Sonar Waves, Molten Lava Fissures &
+// Metalbending Cables), and Dynamic Additive Lighting.
 // ============================================================================
 
 import { ARCANA_CAMPAIGNS, ARCANA_CLASSES } from './data';
@@ -16,6 +18,7 @@ import {
   drawEnemySprite,
   drawObstacle25D,
   drawPoiShrine25D,
+  getBiomeTileCanvas,
 } from './sprites';
 import type {
   ActiveProjectile,
@@ -45,6 +48,33 @@ interface DashGhost {
   maxLife: number;
 }
 
+interface ElementalParticle {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  size: number;
+  color: string;
+  coreColor: string;
+  life: number;
+  maxLife: number;
+  gravity: number;
+}
+
+interface ElementalShockwave {
+  x: number;
+  y: number;
+  radius: number;
+  maxRadius: number;
+  color: string;
+  lineWidth: number;
+  life: number;
+  maxLife: number;
+  dashed?: boolean;
+}
+
 interface Renderable25D {
   sortY: number;
   draw: (ctx: CanvasRenderingContext2D) => void;
@@ -65,10 +95,15 @@ export class ArcanaRenderer {
   private camInitialized = false;
   private elapsedTime = 0;
 
-  // Ambient Parallax Motes & Dash Trail Ghosts
+  // Ambient Parallax Motes, Dash Ghosts & Elemental VFX Emitters
   private ambientParticles: AmbientParticle[] = [];
   private dashGhosts: DashGhost[] = [];
+  private vfxParticles: ElementalParticle[] = [];
+  private shockwaves: ElementalShockwave[] = [];
   private ghostSpawnTimer = 0;
+  private sonarPulseTimer = 0;
+  private lastKnownProjCount = 0;
+  private lastKnownKills = 0;
 
   constructor(canvas: HTMLCanvasElement, quality: QualityProfile = 'equilibrado') {
     this.canvas = canvas;
@@ -113,23 +148,80 @@ export class ArcanaRenderer {
   public dispose(): void {
     this.ambientParticles = [];
     this.dashGhosts = [];
+    this.vfxParticles = [];
+    this.shockwaves = [];
     clearSpriteCache();
   }
 
   private initAmbientParticles(): void {
-    const count = this.quality === 'economico' ? 22 : this.quality === 'equilibrado' ? 45 : 75;
+    const count = this.quality === 'economico' ? 25 : this.quality === 'equilibrado' ? 50 : 85;
     this.ambientParticles = [];
     for (let i = 0; i < count; i++) {
       this.ambientParticles.push({
         x: Math.random() * 2000 - 1000,
         y: Math.random() * 2000 - 1000,
-        vx: (Math.random() - 0.5) * 18,
-        vy: -10 - Math.random() * 22,
-        size: 1.5 + Math.random() * 3,
+        vx: (Math.random() - 0.5) * 22,
+        vy: -12 - Math.random() * 24,
+        size: 1.5 + Math.random() * 3.2,
         alpha: 0.25 + Math.random() * 0.55,
         phase: Math.random() * Math.PI * 2,
       });
     }
+  }
+
+  private spawnBurstParticles(
+    x: number,
+    y: number,
+    count: number,
+    color: string,
+    coreColor = '#ffffff',
+    speed = 110,
+    gravity = 0
+  ): void {
+    const maxAllowed = this.quality === 'economico' ? 90 : this.quality === 'equilibrado' ? 200 : 340;
+    if (this.vfxParticles.length >= maxAllowed) return;
+    for (let i = 0; i < count; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = (0.35 + Math.random() * 0.85) * speed;
+      const life = 0.22 + Math.random() * 0.34;
+      this.vfxParticles.push({
+        x: x + (Math.random() - 0.5) * 8,
+        y: y + (Math.random() - 0.5) * 8,
+        z: 6 + Math.random() * 14,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd,
+        vz: 20 + Math.random() * 45,
+        size: 2.2 + Math.random() * 3.8,
+        color,
+        coreColor,
+        life,
+        maxLife: life,
+        gravity,
+      });
+    }
+  }
+
+  private spawnShockwave(
+    x: number,
+    y: number,
+    maxRadius: number,
+    color: string,
+    duration = 0.42,
+    lineWidth = 3,
+    dashed = false
+  ): void {
+    if (this.shockwaves.length > 24) return;
+    this.shockwaves.push({
+      x,
+      y,
+      radius: 8,
+      maxRadius,
+      color,
+      lineWidth,
+      life: duration,
+      maxLife: duration,
+      dashed,
+    });
   }
 
   private getCampaignDef(state: ArcanaRunState): CampaignDef {
@@ -144,9 +236,10 @@ export class ArcanaRenderer {
     const campaign = this.getCampaignDef(state);
     const ctx = this.ctx;
 
-    // 1. Update Camera Position & Contextual Zoom
+    // 1. Update Camera, Dash Trail & Elemental VFX Emitters
     this.updateCamera(state, safeDt);
     this.updateDashGhosts(state, safeDt);
+    this.updateElementalVfx(state, safeDt);
 
     // 2. Clear & Render Deep Abyssal Backdrop
     ctx.save();
@@ -169,39 +262,46 @@ export class ArcanaRenderer {
     ctx.scale(this.camZoom, this.camZoom);
     ctx.translate(-this.camX, -this.camY);
 
-    // 3. Render Modular 2.5D Biome Floor, Secret Shimmers & Boss Arena Ring
+    // 3. Render Pixel-Art Biome Floor, Secret Shimmers & Boss Arena Ring
     this.renderBiomeFloor(ctx, state, campaign);
 
-    // 4. Render Floor-Level Decorations & Class Ground Grids
-    this.renderFloorDecorationsAndClassGrids(ctx, state);
+    // 4. Render Floor-Level Decorations & Elemental Bending Ground Effects
+    this.renderFloorDecorationsAndElementalAuras(ctx, state);
 
-    // 5. Render Combat Telegraphs (Always Crisp Above Floor, Below Characters)
+    // 5. Render Expanding Elemental Shockwaves (Seismic Sonar, Sound Booms, Blood Moon)
+    this.renderShockwaves(ctx);
+
+    // 6. Render Combat Telegraphs (Crisp Above Floor, Below Characters)
     this.renderTelegraphs(ctx, state.telegraphs);
 
-    // 6. Render Connected Rune Laser Network (Tecelão de Runas)
-    this.renderRuneLaserNetwork(ctx, state);
+    // 7. Render Sub-Bending Network (Lava Fissures & Titanium Metal Cables for Terra)
+    this.renderSubBendingConstructNetwork(ctx, state);
 
-    // 7. Y-Sorted 2.5D Painter's Algorithm Pass (Obstacles, POIs, Constructs, Loot, Entities)
+    // 8. Y-Sorted 2.5D Painter's Algorithm Pass (Obstacles, POIs, Constructs, Loot, Entities)
     this.renderYSortedWorld(ctx, state);
 
-    // 8. Render Active Projectiles & Beams Above Entities
-    this.renderProjectiles(ctx, state.projectiles);
+    // 9. Render Active Elemental Projectiles, Water Whips, Lightning Chains & Dragon Flames
+    this.renderProjectiles(ctx, state);
 
-    // 9. Render Floating Combat Damage Numbers
+    // 10. Render Elemental Burst Particles & Additive Dynamic Bloom Lighting
+    this.renderVfxParticlesAndLighting(ctx, state);
+
+    // 11. Render Floating Combat Damage Numbers
     this.renderFloatingTexts(ctx, state);
 
     ctx.restore(); // End World Camera Transform
 
-    // 10. Render Parallax Biome Motes, Atmospheric Vignette & Off-Screen Indicators
+    // 12. Render Parallax Biome Motes, Atmospheric Vignette, Off-Screen Indicators & Radar Minimap
     this.renderAmbientParallax(ctx, campaign, safeDt);
     this.renderAtmosphericVignette(ctx, state, campaign);
     this.renderOffscreenIndicators(ctx, state);
+    this.renderMinimap(ctx, state, campaign);
 
     ctx.restore();
   }
 
   // --------------------------------------------------------------------------
-  // Camera & Dash Trail Updates
+  // Camera, Dash Trail & Elemental VFX Updates
   // --------------------------------------------------------------------------
 
   private updateCamera(state: ArcanaRunState, dt: number): void {
@@ -226,6 +326,7 @@ export class ArcanaRenderer {
 
   private updateDashGhosts(state: ArcanaRunState, dt: number): void {
     const p = state.player;
+    const pal = ARCANA_CLASSES[p.classId].palette;
     if (p.dashTimer > 0 || p.animState === 'dash') {
       this.ghostSpawnTimer -= dt;
       if (this.ghostSpawnTimer <= 0) {
@@ -235,9 +336,10 @@ export class ArcanaRenderer {
           y: p.y,
           facingX: p.facingX,
           facingY: p.facingY,
-          life: 0.24,
-          maxLife: 0.24,
+          life: 0.26,
+          maxLife: 0.26,
         });
+        this.spawnBurstParticles(p.x, p.y, 3, pal.glow, '#ffffff', 75, 0);
       }
     }
 
@@ -249,8 +351,93 @@ export class ArcanaRenderer {
     }
   }
 
+  private updateElementalVfx(state: ArcanaRunState, dt: number): void {
+    const p = state.player;
+    const pal = ARCANA_CLASSES[p.classId].palette;
+
+    // Periodic Elemental Pulse (Seismic Sense sonar for Earth, Lunar Tide for Water, etc.)
+    this.sonarPulseTimer -= dt;
+    if (this.sonarPulseTimer <= 0) {
+      this.sonarPulseTimer = p.classId === 'rune' ? 1.15 : 1.65;
+      if (p.classId === 'rune') {
+        this.spawnShockwave(p.x, p.y, 190, '#ffd166', 0.65, 2.5, true);
+      } else if (p.classId === 'chess' && p.chessCoordinationStacks >= 5) {
+        this.spawnShockwave(p.x, p.y, 165, '#ff0054', 0.55, 2.5, false);
+      } else if (p.classId === 'chrono' && p.chronoSequenceStacks >= 4) {
+        this.spawnShockwave(p.x, p.y, 175, '#80ffdb', 0.5, 2.2, true);
+      } else if (p.classId === 'chaos' && p.chaosInstability >= 50) {
+        this.spawnShockwave(p.x, p.y, 170, '#00bbf9', 0.5, 2.8, false);
+      }
+    }
+
+    // Detect newly fired projectiles for muzzle/bending bursts
+    if (state.projectiles.length > this.lastKnownProjCount) {
+      this.spawnBurstParticles(
+        p.x + p.facingX * 22,
+        p.y + p.facingY * 22,
+        4,
+        pal.primary,
+        pal.glow,
+        95
+      );
+    }
+    this.lastKnownProjCount = state.projectiles.length;
+
+    // Detect enemy kills for elemental shatter bursts
+    if (state.kills > this.lastKnownKills) {
+      this.spawnShockwave(p.x + p.facingX * 65, p.y + p.facingY * 65, 85, pal.glow, 0.32, 3);
+      this.lastKnownKills = state.kills;
+    }
+
+    // Spawn continuous elemental trails from active projectiles
+    for (const proj of state.projectiles) {
+      if (Math.random() < (this.quality === 'economico' ? 0.25 : 0.55)) {
+        const coreCol =
+          proj.kind === 'chaos_orb' || proj.kind === 'chaos_prism'
+            ? '#00bbf9'
+            : proj.kind === 'rune_glyph'
+            ? '#ffd166'
+            : '#ffffff';
+        this.spawnBurstParticles(proj.x, proj.y, 1, proj.color, coreCol, 45, 0);
+      }
+    }
+
+    // Spawn particles on enemies taking hit flash
+    for (const en of state.enemies) {
+      if (en.hitFlashTimer > 0.08 && Math.random() < 0.45) {
+        this.spawnBurstParticles(en.x, en.y - 12, 2, pal.glow, '#ffffff', 110, 80);
+      }
+    }
+
+    // Update active particles
+    for (let i = this.vfxParticles.length - 1; i >= 0; i--) {
+      const pt = this.vfxParticles[i];
+      pt.life -= dt;
+      if (pt.life <= 0) {
+        this.vfxParticles.splice(i, 1);
+        continue;
+      }
+      pt.x += pt.vx * dt;
+      pt.y += pt.vy * dt;
+      pt.vz -= pt.gravity * dt;
+      pt.z = Math.max(0, pt.z + pt.vz * dt);
+    }
+
+    // Update expanding shockwaves
+    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+      const sw = this.shockwaves[i];
+      sw.life -= dt;
+      if (sw.life <= 0) {
+        this.shockwaves.splice(i, 1);
+        continue;
+      }
+      const pRatio = 1 - sw.life / sw.maxLife;
+      sw.radius = 8 + (sw.maxRadius - 8) * (1 - Math.pow(1 - pRatio, 2));
+    }
+  }
+
   // --------------------------------------------------------------------------
-  // Biome Floor, Secret Zones & Boss Arena Perimeter
+  // Pixel-Art Biome Floor, Secret Zones & Boss Arena Perimeter
   // --------------------------------------------------------------------------
 
   private renderBiomeFloor(
@@ -267,33 +454,21 @@ export class ArcanaRenderer {
     const minY = Math.max(0, Math.floor((this.camY - halfH) / 96) * 96);
     const maxY = Math.min(map.height, Math.ceil((this.camY + halfH) / 96) * 96);
 
-    // Base Sanctuary Platform Fill + 2.5D Outer Abyssal Ledge
     ctx.fillStyle = '#070510';
     ctx.fillRect(-16, -16, map.width + 32, map.height + 54);
     ctx.fillStyle = campaign.palette.floorPrimary;
     ctx.fillRect(0, 0, map.width, map.height);
 
-    // Checkerboard / Isometric Modular Stone Slabs
+    // Draw 16-bit Pixel-Art Textured Biome Tiles
     const tileSize = 96;
-    ctx.lineWidth = 1;
+    ctx.imageSmoothingEnabled = false;
     for (let ty = minY; ty < maxY; ty += tileSize) {
       for (let tx = minX; tx < maxX; tx += tileSize) {
         const ix = Math.floor(tx / tileSize);
         const iy = Math.floor(ty / tileSize);
-        const isAlt = (ix + iy) % 2 === 0;
-        ctx.fillStyle = isAlt ? campaign.palette.floorPrimary : campaign.palette.floorSecondary;
-        ctx.fillRect(tx, ty, tileSize, tileSize);
-
-        // Subtle stone bevel & carved circuit line on every 4th tile
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-        ctx.strokeRect(tx + 2, ty + 2, tileSize - 4, tileSize - 4);
-
-        if ((ix * 7 + iy * 13) % 11 === 0) {
-          ctx.strokeStyle = campaign.palette.accentRunes;
-          ctx.globalAlpha = 0.16 + 0.08 * Math.sin(this.elapsedTime * 2 + ix + iy);
-          ctx.strokeRect(tx + 18, ty + 18, tileSize - 36, tileSize - 36);
-          ctx.globalAlpha = 1;
-        }
+        const variant = (ix * 3 + iy * 7) % 4;
+        const tileCanvas = getBiomeTileCanvas(state.campaignId, variant);
+        ctx.drawImage(tileCanvas, tx, ty, tileSize, tileSize);
       }
     }
 
@@ -301,6 +476,79 @@ export class ArcanaRenderer {
     ctx.strokeStyle = campaign.palette.accentRunes;
     ctx.lineWidth = 4;
     ctx.strokeRect(0, 0, map.width, map.height);
+
+    // Biome Elemental River / Chasm & Paved Temple Pathways (eliminates flat empty maps!)
+    const arena = map.bossArenaCenter;
+    ctx.save();
+    const riverColor =
+      state.campaignId === 'runes'
+        ? 'rgba(0, 187, 249, 0.24)'
+        : state.campaignId === 'ash'
+        ? 'rgba(255, 84, 0, 0.28)'
+        : state.campaignId === 'cloister'
+        ? 'rgba(128, 255, 219, 0.2)'
+        : state.campaignId === 'hourglasses'
+        ? 'rgba(82, 183, 136, 0.22)'
+        : 'rgba(199, 125, 255, 0.24)';
+    const riverCore =
+      state.campaignId === 'runes'
+        ? '#90e0ef'
+        : state.campaignId === 'ash'
+        ? '#ffd166'
+        : state.campaignId === 'cloister'
+        ? '#ffffff'
+        : state.campaignId === 'hourglasses'
+        ? '#80ffdb'
+        : '#ff99c8';
+
+    // Winding Elemental Canal across the biome
+    ctx.strokeStyle = riverColor;
+    ctx.lineWidth = 64;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(80, map.height * 0.22);
+    ctx.bezierCurveTo(
+      map.width * 0.35,
+      map.height * 0.12,
+      map.width * 0.65,
+      map.height * 0.88,
+      map.width - 80,
+      map.height * 0.78
+    );
+    ctx.stroke();
+
+    ctx.strokeStyle = riverCore;
+    ctx.globalAlpha = 0.22 + 0.08 * Math.sin(this.elapsedTime * 3);
+    ctx.lineWidth = 14;
+    ctx.setLineDash([24, 18]);
+    ctx.lineDashOffset = -this.elapsedTime * 28;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Paved Sacred Pathways connecting Spawn -> Shrines -> Boss Arena
+    ctx.globalAlpha = 0.32;
+    ctx.strokeStyle = campaign.palette.floorSecondary;
+    ctx.lineWidth = 42;
+    for (const poi of map.pois) {
+      ctx.beginPath();
+      ctx.moveTo(map.spawnX, map.spawnY);
+      ctx.lineTo(poi.x, poi.y);
+      ctx.lineTo(arena.x, arena.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.45;
+    ctx.strokeStyle = campaign.palette.accentRunes;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 12]);
+    for (const poi of map.pois) {
+      ctx.beginPath();
+      ctx.moveTo(map.spawnX, map.spawnY);
+      ctx.lineTo(poi.x, poi.y);
+      ctx.lineTo(arena.x, arena.y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
 
     // Secret Areas Shimmer
     for (const secret of map.secretAreas) {
@@ -318,68 +566,148 @@ export class ArcanaRenderer {
       ctx.restore();
     }
 
-    // Boss Arena Sacred Ring
-    const arena = map.bossArenaCenter;
+    // Boss Arena Sacred Ring & Temple Plaza Floor
     ctx.save();
     ctx.translate(arena.x, arena.y);
     const isBossActive = state.phase === 'E_BOSS' || state.boss !== null;
+    ctx.fillStyle = isBossActive ? 'rgba(48, 10, 28, 0.32)' : 'rgba(20, 14, 42, 0.25)';
+    ctx.beginPath();
+    ctx.arc(0, 0, arena.radius, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.strokeStyle = isBossActive ? campaign.boss.palette.danger : campaign.palette.accentRunes;
-    ctx.globalAlpha = isBossActive ? 0.68 : 0.24;
-    ctx.lineWidth = isBossActive ? 5 : 2.5;
+    ctx.globalAlpha = isBossActive ? 0.72 : 0.32;
+    ctx.lineWidth = isBossActive ? 5 : 3;
     ctx.beginPath();
     ctx.arc(0, 0, arena.radius, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Inner octagram seal at Boss Arena center
-    ctx.globalAlpha = isBossActive ? 0.32 : 0.14;
+    // 8 Cardinal Elemental Compass Lines inside Boss Plaza
+    ctx.globalAlpha = isBossActive ? 0.35 : 0.18;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * (arena.radius * 0.35), Math.sin(a) * (arena.radius * 0.35));
+      ctx.lineTo(Math.cos(a) * arena.radius, Math.sin(a) * arena.radius);
+      ctx.stroke();
+    }
+
     ctx.beginPath();
     ctx.arc(0, 0, arena.radius * 0.35, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
 
-  private renderFloorDecorationsAndClassGrids(
+  private renderFloorDecorationsAndElementalAuras(
     ctx: CanvasRenderingContext2D,
     state: ArcanaRunState
   ): void {
     const p = state.player;
-    // Ground-level rune tiles & sand vortices
     for (const dec of state.map.decorations) {
       if (dec.kind === 'rune_tile' || dec.kind === 'sand_vortex' || dec.kind === 'void_fissure') {
         drawDecoration25D(ctx, dec, state.campaignId, this.elapsedTime);
       }
     }
 
-    // Chess Mage Spectral Board Overlay when Coordination >= 6 or many pieces active
-    if (p.classId === 'chess' && (p.chessCoordinationStacks >= 6 || state.constructs.length >= 3)) {
+    // 1. ÁGUA (`chess`): Swirling Ocean Tide & Crimson Blood-Moon Ritual Ring
+    if (p.classId === 'chess') {
+      const isBloodMoon = p.chessCoordinationStacks >= 6;
       ctx.save();
-      const cell = 64;
-      const gx0 = Math.floor((p.x - 256) / cell) * cell;
-      const gy0 = Math.floor((p.y - 256) / cell) * cell;
-      ctx.globalAlpha = p.chessCoordinationStacks >= 10 ? 0.24 : 0.12;
-      for (let gy = gy0; gy < gy0 + 512; gy += cell) {
-        for (let gx = gx0; gx < gx0 + 512; gx += cell) {
-          const isGold = (Math.floor(gx / cell) + Math.floor(gy / cell)) % 2 === 0;
-          ctx.fillStyle = isGold ? '#d4af37' : '#7de2ff';
-          if (isGold) ctx.fillRect(gx, gy, cell, cell);
+      ctx.translate(p.x, p.y);
+      ctx.strokeStyle = isBloodMoon ? '#ff0054' : '#00bbf9';
+      ctx.lineWidth = isBloodMoon ? 3 : 2;
+      ctx.globalAlpha = isBloodMoon ? 0.42 : 0.24;
+      for (let r = 1; r <= 2; r++) {
+        const rad = 52 * r + Math.sin(this.elapsedTime * 4 + r) * 6;
+        ctx.beginPath();
+        ctx.arc(0, 0, rad, this.elapsedTime * (r % 2 === 0 ? -2 : 2), this.elapsedTime * 2 + Math.PI * 1.4);
+        ctx.stroke();
+      }
+      // Bloodbending crimson tendrils linking player to nearby enemies during Full Moon
+      if (isBloodMoon) {
+        for (const en of state.enemies) {
+          const d = Math.hypot(en.x - p.x, en.y - p.y);
+          if (d < 240) {
+            ctx.strokeStyle = '#ff0054';
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.55;
+            ctx.beginPath();
+            ctx.moveTo(0, -14);
+            const mx = (en.x - p.x) * 0.5 + Math.sin(this.elapsedTime * 8 + en.x) * 18;
+            const my = (en.y - p.y) * 0.5 + Math.cos(this.elapsedTime * 8 + en.y) * 18;
+            ctx.quadraticCurveTo(mx, my, en.x - p.x, en.y - p.y - 12);
+            ctx.stroke();
+          }
         }
       }
       ctx.restore();
     }
 
-    // Pickup Radius subtle indicator ring around player
-    ctx.save();
-    ctx.strokeStyle = ARCANA_CLASSES[p.classId].palette.glow;
-    ctx.globalAlpha = 0.09;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.computed.pickupRadius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+    // 2. AR (`chrono`): Spinning Air Scooter Vortex & Supersonic Currents
+    if (p.classId === 'chrono' && (Math.hypot(p.vx, p.vy) > 25 || p.dashTimer > 0)) {
+      ctx.save();
+      ctx.translate(p.x, p.y + 6);
+      ctx.strokeStyle = '#80ffdb';
+      ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 0.65;
+      for (let i = 0; i < 3; i++) {
+        const r = 16 + i * 8;
+        const a = this.elapsedTime * 12 + i * 2;
+        ctx.beginPath();
+        ctx.ellipse(0, -i * 4, r, r * 0.48, 0, a, a + Math.PI * 1.3);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // 3. FOGO (`chaos`): Blazing Sozin Comet Ring & Electric Lightning Sparks
+    if (p.classId === 'chaos' && p.chaosInstability >= 25) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      const isBlueFlame = p.chaosInstability >= 65;
+      ctx.strokeStyle = isBlueFlame ? '#00bbf9' : '#ff5400';
+      ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 0.48;
+      ctx.beginPath();
+      ctx.arc(0, 0, 58 + Math.sin(this.elapsedTime * 10) * 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 4. TERRA (`rune`): Toph's Golden Seismic Sense Grid & Orbiting Metal Plates
+    if (p.classId === 'rune') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.26;
+      const sonarR = ((this.elapsedTime * 110) % 220);
+      ctx.beginPath();
+      ctx.arc(0, 0, sonarR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  private renderShockwaves(ctx: CanvasRenderingContext2D): void {
+    for (const sw of this.shockwaves) {
+      const alpha = Math.max(0, sw.life / sw.maxLife);
+      ctx.save();
+      ctx.translate(sw.x, sw.y);
+      ctx.scale(1, 0.62); // 2.5D isometric perspective foreshortening
+      ctx.strokeStyle = sw.color;
+      ctx.globalAlpha = alpha * 0.78;
+      ctx.lineWidth = sw.lineWidth;
+      if (sw.dashed) ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.arc(0, 0, sw.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   // --------------------------------------------------------------------------
-  // Combat Readability: Ground Telegraphs & Rune Laser Connections
+  // Combat Readability: Ground Telegraphs & Sub-Bending Construct Networks
   // --------------------------------------------------------------------------
 
   private renderTelegraphs(ctx: CanvasRenderingContext2D, telegraphs: TelegraphZone[]): void {
@@ -391,14 +719,12 @@ export class ArcanaRenderer {
 
       ctx.save();
       if (t.shape === 'circle' || t.shape === 'ring') {
-        // Outer crisp danger border
         ctx.strokeStyle = borderColor;
         ctx.lineWidth = 2.5;
         ctx.beginPath();
         ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Animated expanding inner fill indicating exact impact timing
         ctx.fillStyle = fillColor;
         ctx.beginPath();
         ctx.arc(t.x, t.y, t.radius * progress, 0, Math.PI * 2);
@@ -459,7 +785,7 @@ export class ArcanaRenderer {
     }
   }
 
-  private renderRuneLaserNetwork(ctx: CanvasRenderingContext2D, state: ArcanaRunState): void {
+  private renderSubBendingConstructNetwork(ctx: CanvasRenderingContext2D, state: ArcanaRunState): void {
     const runes = state.constructs.filter(
       (c) => c.kind.startsWith('rune_circle') || c.kind === 'rune_great_inscription'
     );
@@ -472,17 +798,18 @@ export class ArcanaRenderer {
         const b = runes[j];
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         if (dist <= 380) {
-          ctx.strokeStyle = '#80ffdb';
-          ctx.lineWidth = 4;
-          ctx.globalAlpha = 0.45 + 0.25 * Math.sin(this.elapsedTime * 10);
+          // Molten Lava Fissure + Whipping Titanium Metal Cable between Earth Monoliths
+          ctx.strokeStyle = '#ff5400';
+          ctx.lineWidth = 7;
+          ctx.globalAlpha = 0.45 + 0.25 * Math.sin(this.elapsedTime * 8);
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
           ctx.stroke();
 
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.5;
-          ctx.globalAlpha = 0.9;
+          ctx.strokeStyle = '#ffbe0b';
+          ctx.lineWidth = 2.5;
+          ctx.globalAlpha = 0.92;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(b.x, b.y);
@@ -501,7 +828,6 @@ export class ArcanaRenderer {
     const items: Renderable25D[] = [];
     const p = state.player;
 
-    // 1. Obstacles
     for (const obs of state.map.obstacles) {
       items.push({
         sortY: obs.y + obs.h * 0.5,
@@ -509,7 +835,6 @@ export class ArcanaRenderer {
       });
     }
 
-    // 2. Vertical Decorations (trees, mirror arches, floating shards)
     for (const dec of state.map.decorations) {
       if (dec.kind !== 'rune_tile' && dec.kind !== 'sand_vortex' && dec.kind !== 'void_fissure') {
         items.push({
@@ -519,7 +844,6 @@ export class ArcanaRenderer {
       }
     }
 
-    // 3. Interactive POI Shrines
     for (const poi of state.map.pois) {
       const dist = Math.hypot(p.x - poi.x, p.y - poi.y);
       items.push({
@@ -528,7 +852,6 @@ export class ArcanaRenderer {
       });
     }
 
-    // 4. Constructs & Summons
     for (const con of state.constructs) {
       items.push({
         sortY: con.kind.startsWith('rune_') || con.kind === 'chrono_dome' ? con.y - 40 : con.y,
@@ -536,7 +859,6 @@ export class ArcanaRenderer {
       });
     }
 
-    // 5. XP Gems, Arcane Fragments, HP Orbs & Relic Chests
     for (const loot of state.loot) {
       items.push({
         sortY: loot.y,
@@ -544,7 +866,6 @@ export class ArcanaRenderer {
       });
     }
 
-    // 6. Dash Afterimages
     for (const ghost of this.dashGhosts) {
       items.push({
         sortY: ghost.y - 1,
@@ -561,7 +882,6 @@ export class ArcanaRenderer {
       });
     }
 
-    // 7. Enemies
     for (const enemy of state.enemies) {
       items.push({
         sortY: enemy.y,
@@ -569,7 +889,6 @@ export class ArcanaRenderer {
       });
     }
 
-    // 8. Coop Partner (if connected)
     if (state.coopPartner && state.coopPartner.connected) {
       const partner = state.coopPartner;
       items.push({
@@ -593,7 +912,6 @@ export class ArcanaRenderer {
       });
     }
 
-    // 9. Local Player
     items.push({
       sortY: p.y,
       draw: (c) => {
@@ -605,21 +923,19 @@ export class ArcanaRenderer {
           hitFlash: p.hitFlashTimer > 0,
         });
 
-        // Shield Bubble / Iframe Shimmer
         if (p.shield > 0 || p.iframeTimer > 0) {
           c.save();
-          c.strokeStyle = p.shield > 0 ? '#7de2ff' : '#ffffff';
-          c.lineWidth = 2;
-          c.globalAlpha = 0.65;
+          c.strokeStyle = p.shield > 0 ? '#00bbf9' : '#ffffff';
+          c.lineWidth = 2.5;
+          c.globalAlpha = 0.72;
           c.beginPath();
-          c.arc(p.x, p.y - 24, 30, 0, Math.PI * 2);
+          c.arc(p.x, p.y - 24, 32, 0, Math.PI * 2);
           c.stroke();
           c.restore();
         }
       },
     });
 
-    // 10. Active Boss
     if (state.boss) {
       const boss = state.boss;
       items.push({
@@ -628,7 +944,6 @@ export class ArcanaRenderer {
       });
     }
 
-    // Sort ascending by sortY (back-to-front 2.5D depth)
     items.sort((a, b) => a.sortY - b.sortY);
     for (let i = 0; i < items.length; i++) {
       items[i].draw(ctx);
@@ -669,7 +984,6 @@ export class ArcanaRenderer {
       ctx.fill();
       ctx.stroke();
     } else {
-      // XP Gems (small / medium / large)
       const r = loot.kind === 'xp_large' ? 7.5 : loot.kind === 'xp_medium' ? 5.8 : 4.2;
       ctx.fillStyle =
         loot.kind === 'xp_large'
@@ -692,56 +1006,184 @@ export class ArcanaRenderer {
   }
 
   // --------------------------------------------------------------------------
-  // Projectiles & Floating Combat Text
+  // Elemental Bending Projectiles (Water Whips, Wind Blades, Blue-Fire Dragons,
+  // Lightning Arcs & Tectonic Boulders)
   // --------------------------------------------------------------------------
 
-  private renderProjectiles(ctx: CanvasRenderingContext2D, projectiles: ActiveProjectile[]): void {
+  private renderProjectiles(ctx: CanvasRenderingContext2D, state: ArcanaRunState): void {
+    const projectiles = state.projectiles;
     for (const proj of projectiles) {
       ctx.save();
       ctx.translate(proj.x, proj.y);
       const ang = Math.atan2(proj.vy, proj.vx);
 
-      // Luminous motion tail
-      ctx.strokeStyle = proj.color;
-      ctx.globalAlpha = 0.45;
-      ctx.lineWidth = Math.max(2, proj.radius * 0.85);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(-proj.vx * 0.045, -proj.vy * 0.045);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      ctx.rotate(ang);
-      ctx.fillStyle = proj.color;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
-
-      if (proj.kind === 'chrono_shard' || proj.kind === 'pawn_lance' || proj.kind === 'boss_lance') {
-        // Crystalline clockhand / lance silhouette
+      if (proj.kind === 'pawn_lance') {
+        // ÁGUA: Flowing Sine-Wave Water Whip + Crystalline Ice Tip
+        ctx.rotate(ang);
+        ctx.strokeStyle = '#00bbf9';
+        ctx.lineWidth = proj.radius * 1.15;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(proj.radius * 1.6, 0);
-        ctx.lineTo(-proj.radius, proj.radius * 0.7);
-        ctx.lineTo(-proj.radius * 0.5, 0);
-        ctx.lineTo(-proj.radius, -proj.radius * 0.7);
+        for (let s = 0; s <= 6; s++) {
+          const lx = -s * 7.5;
+          const ly = Math.sin(this.elapsedTime * 18 + s * 0.9 + proj.x * 0.05) * (s * 1.25);
+          if (s === 0) ctx.moveTo(proj.radius, 0);
+          else ctx.lineTo(lx, ly);
+        }
+        ctx.stroke();
+
+        // Inner white foam highlight
+        ctx.strokeStyle = '#caf0f8';
+        ctx.lineWidth = proj.radius * 0.45;
+        ctx.stroke();
+
+        // Crystalline Glacial Ice Spearhead
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(proj.radius * 1.8, 0);
+        ctx.lineTo(0, proj.radius * 0.75);
+        ctx.lineTo(0, -proj.radius * 0.75);
+        ctx.closePath();
+        ctx.fill();
+      } else if (proj.kind === 'chrono_shard') {
+        // AR: Spinning Crescent Wind Blade & Supersonic Wake
+        ctx.rotate(ang);
+        for (let w = 0; w < 2; w++) {
+          const offset = w * 8;
+          ctx.strokeStyle = w === 0 ? '#ffffff' : '#80ffdb';
+          ctx.lineWidth = w === 0 ? 3.5 : 2;
+          ctx.beginPath();
+          ctx.arc(-offset, 0, proj.radius * 1.45, -Math.PI * 0.42, Math.PI * 0.42);
+          ctx.stroke();
+        }
+      } else if (proj.kind === 'chaos_orb' || proj.kind === 'chaos_prism') {
+        // FOGO: Swirling Orange + Azure Blue Dragon Fireball & Forked Lightning Arcs
+        ctx.rotate(ang);
+        // Dragon Fire Tail
+        ctx.strokeStyle = '#ff5400';
+        ctx.lineWidth = proj.radius * 1.3;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-proj.radius * 3.2, Math.sin(this.elapsedTime * 22) * 5);
+        ctx.stroke();
+
+        // Outer Solar Fire Core
+        ctx.fillStyle = '#ff5400';
+        ctx.beginPath();
+        ctx.arc(0, 0, proj.radius * 1.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Inner Azula Blue Flame Core
+        ctx.fillStyle = '#00bbf9';
+        ctx.beginPath();
+        ctx.arc(proj.radius * 0.2, 0, proj.radius * 0.78, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(proj.radius * 0.3, 0, proj.radius * 0.38, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Jagged Electric Lightning Arcs around Fire/Lightning projectile
+        ctx.strokeStyle = '#7df9ff';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(proj.radius, 0);
+        ctx.lineTo(0, (Math.random() - 0.5) * proj.radius * 2.6);
+        ctx.lineTo(-proj.radius * 1.8, (Math.random() - 0.5) * proj.radius * 2.2);
+        ctx.stroke();
+      } else if (proj.kind === 'rune_glyph') {
+        // TERRA: Rotating Jagged Boulder / Zaofu Metal Disc with Molten Lava Cracks
+        ctx.rotate(this.elapsedTime * 9 + proj.x * 0.02);
+        const r = proj.radius * 1.35;
+        ctx.fillStyle = '#5c4b33';
+        ctx.strokeStyle = '#080510';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = (i * Math.PI) / 3;
+          const rad = r * (i % 2 === 0 ? 1.05 : 0.82);
+          if (i === 0) ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
+          else ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+        }
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-      } else if (proj.kind === 'rune_glyph' || proj.kind === 'chaos_prism') {
-        // Rotating square/diamond glyph
-        ctx.rotate(this.elapsedTime * 8);
-        ctx.fillRect(-proj.radius, -proj.radius, proj.radius * 2, proj.radius * 2);
-        ctx.strokeRect(-proj.radius, -proj.radius, proj.radius * 2, proj.radius * 2);
+
+        // Glowing Emerald Crystal / Molten Magma Core
+        ctx.fillStyle = '#52b788';
+        ctx.fillRect(-r * 0.35, -r * 0.35, r * 0.7, r * 0.7);
       } else {
-        // Glowing Arcane Orb with white hot core
+        // Enemy / Boss Projectiles
+        ctx.strokeStyle = proj.color;
+        ctx.globalAlpha = 0.45;
+        ctx.lineWidth = Math.max(2, proj.radius * 0.85);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-proj.vx * 0.045, -proj.vy * 0.045);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        ctx.rotate(ang);
+        ctx.fillStyle = proj.color;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.arc(0, 0, proj.radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 0, proj.radius * 0.48, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.stroke();
       }
 
+      ctx.restore();
+    }
+  }
+
+  private renderVfxParticlesAndLighting(
+    ctx: CanvasRenderingContext2D,
+    state: ArcanaRunState
+  ): void {
+    // 1. Render Elemental Burst Particles
+    for (const pt of this.vfxParticles) {
+      const alpha = Math.max(0, pt.life / pt.maxLife);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = pt.color;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y - pt.z, pt.size, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = pt.coreColor;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y - pt.z, pt.size * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 2. Dynamic Additive Bloom Lighting Pass
+    if (this.quality !== 'economico') {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const p = state.player;
+      const pal = ARCANA_CLASSES[p.classId].palette;
+
+      // Player Elemental Aura Glow
+      const pGrad = ctx.createRadialGradient(p.x, p.y - 16, 4, p.x, p.y - 16, 85);
+      pGrad.addColorStop(0, `${pal.glow}44`);
+      pGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = pGrad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y - 16, 85, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Projectile Additive Glows
+      for (const proj of state.projectiles) {
+        ctx.fillStyle = proj.color;
+        ctx.globalAlpha = 0.18;
+        ctx.beginPath();
+        ctx.arc(proj.x, proj.y, proj.radius * 2.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     }
   }
@@ -811,7 +1253,6 @@ export class ArcanaRenderer {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    // Low HP Crimson Pulse Warning
     const hpRatio = state.player.hp / Math.max(1, state.player.maxHp);
     if (hpRatio < 0.3) {
       const dangerAlpha = (0.3 - hpRatio) * (0.65 + 0.35 * Math.sin(this.elapsedTime * 7));
@@ -829,7 +1270,7 @@ export class ArcanaRenderer {
     const drawPointer = (wx: number, wy: number, color: string, label: string) => {
       const dx = (wx - this.camX) * this.camZoom;
       const dy = (wy - this.camY) * this.camZoom;
-      if (Math.abs(dx) <= halfW && Math.abs(dy) <= halfH) return; // Already on screen
+      if (Math.abs(dx) <= halfW && Math.abs(dy) <= halfH) return;
 
       const ang = Math.atan2(dy, dx);
       const px = this.width * 0.5 + Math.cos(ang) * Math.min(halfW, halfH * 1.35);
@@ -867,5 +1308,80 @@ export class ArcanaRenderer {
         }
       }
     }
+  }
+
+  private renderMinimap(
+    ctx: CanvasRenderingContext2D,
+    state: ArcanaRunState,
+    campaign: CampaignDef
+  ): void {
+    if (this.width < 520) return;
+    const map = state.map;
+    const mw = 132;
+    const mh = Math.round(mw * (map.height / Math.max(1, map.width)));
+    const mx = this.width - mw - 16;
+    const my = 56;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(8, 5, 20, 0.82)';
+    ctx.strokeStyle = campaign.palette.accentRunes;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.roundRect(mx, my, mw, mh, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    const sx = mw / map.width;
+    const sy = mh / map.height;
+
+    // Boss Arena Ring on Minimap
+    const ax = mx + map.bossArenaCenter.x * sx;
+    const ay = my + map.bossArenaCenter.y * sy;
+    ctx.strokeStyle = state.boss ? '#ff2a54' : 'rgba(255, 209, 102, 0.45)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(ax, ay, map.bossArenaCenter.radius * sx, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // POIs (Shrines) on Minimap
+    for (const poi of map.pois) {
+      if (poi.used) continue;
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(mx + poi.x * sx - 2.5, my + poi.y * sy - 2.5, 5, 5);
+    }
+
+    // Enemies on Minimap
+    for (const en of state.enemies) {
+      ctx.fillStyle = en.isElite ? '#ffbe0b' : '#ff4d6d';
+      const r = en.isElite ? 2.5 : 1.6;
+      ctx.beginPath();
+      ctx.arc(mx + en.x * sx, my + en.y * sy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Boss Dot on Minimap
+    if (state.boss) {
+      ctx.fillStyle = '#ff0054';
+      ctx.beginPath();
+      ctx.arc(mx + state.boss.x * sx, my + state.boss.y * sy, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Player Dot on Minimap
+    const px = mx + state.player.x * sx;
+    const py = my + state.player.y * sy;
+    ctx.fillStyle = '#00f5d4';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(px, py, 3.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#cfc4e8';
+    ctx.font = 'bold 9px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`MAPA · ${campaign.roman}`, mx + 6, my + mh - 5);
+    ctx.restore();
   }
 }
