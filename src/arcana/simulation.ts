@@ -250,6 +250,7 @@ export function createInitialRunState(options: {
     map,
     player,
     coopPartner: null,
+    coopAllies: [],
     enemies: [],
     boss: null,
     projectiles: [],

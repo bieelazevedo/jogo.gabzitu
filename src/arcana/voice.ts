@@ -169,6 +169,11 @@ export class ArcanaVoiceChat {
     return this.locallyMutedPeers.has(peerId);
   }
 
+  public isPeerSpeaking(peerId: string): boolean {
+    if (peerId === this.localPeerId) return this.isInVoice && !this.isMicMuted;
+    return this.remotePeers.get(peerId)?.isSpeaking ?? false;
+  }
+
   public getParticipants(): VoiceParticipant[] {
     const list: VoiceParticipant[] = [];
 

@@ -1257,3 +1257,103 @@
   box-shadow: 0 2px 6px rgba(0,0,0,0.8);
   pointer-events: none;
 }
+
+/* ========================================================================== */
+/* Mobile First Touch Layout & Ergonomic Action Clusters (<820px)            */
+/* ========================================================================== */
+@media (max-width: 820px) {
+  .arcana-root .ravenswatch-keybind-pill {
+    display: none !important; /* Hide keyboard labels on mobile */
+  }
+
+  /* Compact Left Status & Health HUD */
+  .arcana-root .arcana-player-hud-left {
+    padding: 8px 12px !important;
+    max-width: 200px !important;
+    gap: 4px !important;
+  }
+  .arcana-root .ravenswatch-hp-container {
+    width: 140px !important;
+    height: 14px !important;
+  }
+  .arcana-root .ravenswatch-level-diamond {
+    width: 28px !important;
+    height: 28px !important;
+  }
+  .arcana-root .ravenswatch-level-num {
+    font-size: 11px !important;
+  }
+
+  /* Right Thumb Combat Action Cluster */
+  .arcana-root .arcana-hotbar-dock {
+    position: absolute !important;
+    bottom: 20px !important;
+    right: 18px !important;
+    display: grid !important;
+    grid-template-columns: 56px 66px !important;
+    grid-template-rows: 56px 66px !important;
+    gap: 12px !important;
+    align-items: center !important;
+    justify-items: center !important;
+    background: rgba(14, 8, 28, 0.92) !important;
+    padding: 12px !important;
+    border-radius: 28px !important;
+    border: 1.5px solid rgba(255, 209, 102, 0.45) !important;
+    box-shadow: 0 10px 32px rgba(0,0,0,0.9) !important;
+    z-index: 95 !important;
+  }
+
+  .arcana-root #arc-btn-primary {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    width: 66px !important;
+    height: 66px !important;
+    border-radius: 50% !important;
+    border: 2.5px solid #ffd166 !important;
+    box-shadow: 0 0 18px rgba(255, 209, 102, 0.7) !important;
+  }
+
+  .arcana-root #arc-btn-special {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 50% !important;
+    border: 2px solid #00f5d4 !important;
+  }
+
+  .arcana-root #arc-btn-dash {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: 54px !important;
+    height: 54px !important;
+    border-radius: 50% !important;
+    border: 2px solid #7de2ff !important;
+  }
+
+  .arcana-root #arc-btn-ult {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 58px !important;
+    height: 58px !important;
+    border-radius: 50% !important;
+    border: 2.5px solid #ff4ecd !important;
+    box-shadow: 0 0 16px rgba(255, 78, 205, 0.6) !important;
+  }
+
+  /* Virtual Movement Stick Position */
+  .arcana-root .arcana-joystick-zone {
+    bottom: 20px !important;
+    left: 18px !important;
+    width: 120px !important;
+    height: 120px !important;
+  }
+
+  /* Modals on mobile */
+  .arcana-root .arcana-modal {
+    padding: 14px !important;
+    max-width: 95vw !important;
+    max-height: 92vh !important;
+  }
+}
+

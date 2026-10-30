@@ -403,6 +403,7 @@ export class ArcanaRenderer {
   // Actors
   private playerHero: Hero3DInstance | null = null;
   private allyHero: Hero3DInstance | null = null;
+  private allyHeroes = new Map<string, Hero3DInstance>();
   private enemyInstances = new Map<string, Enemy3DInstance>();
   private bossInstance: Boss3DInstance | null = null;
 
@@ -519,6 +520,11 @@ export class ArcanaRenderer {
           this.allyHero.root.removeFromParent();
           this.allyHero = null;
         }
+        for (const [, a] of this.allyHeroes) {
+          a.actor?.dispose();
+          a.root.removeFromParent();
+        }
+        this.allyHeroes.clear();
         for (const [, en] of this.enemyInstances) {
           en.actor?.dispose();
           en.root.removeFromParent();
@@ -2679,19 +2685,38 @@ export class ArcanaRenderer {
       this.playerHero.actor.root.rotation.y = Math.sin(this.elapsedTime * 0.65) * 0.42;
     }
 
-    if (state.coopPartner && !menuHeroShowcase) {
-      this.allyHero = this.getOrCreateHero3D(this.allyHero, state.coopPartner.classId);
-      this.allyHero.root.visible = true;
-      this.updateHero3D(
-        this.allyHero,
-        state.coopPartner,
-        state.map.width,
-        state.map.height,
-        safeDt,
-        false
-      );
-    } else if (this.allyHero) {
-      this.allyHero.root.visible = false;
+    const allies = state.coopAllies && state.coopAllies.length > 0
+      ? state.coopAllies
+      : (state.coopPartner ? [state.coopPartner] : []);
+
+    if (!menuHeroShowcase && allies.length > 0) {
+      const activeKeys = new Set<string>();
+      allies.forEach((ally, i) => {
+        const allyKey = ally.peerId || `ally_${i}`;
+        activeKeys.add(allyKey);
+        let instance = this.allyHeroes.get(allyKey) || null;
+        instance = this.getOrCreateHero3D(instance, ally.classId);
+        this.allyHeroes.set(allyKey, instance);
+        instance.root.visible = true;
+        this.updateHero3D(
+          instance,
+          ally,
+          state.map.width,
+          state.map.height,
+          safeDt,
+          false
+        );
+      });
+      for (const [key, inst] of this.allyHeroes) {
+        if (!activeKeys.has(key)) {
+          inst.root.visible = false;
+        }
+      }
+    } else {
+      for (const [, inst] of this.allyHeroes) {
+        inst.root.visible = false;
+      }
+      if (this.allyHero) this.allyHero.root.visible = false;
     }
 
     for (const poi of state.map.pois) {
@@ -2908,10 +2933,14 @@ export class ArcanaRenderer {
       );
     }
 
-    if (state.coopPartner) {
+    const renderAllies = state.coopAllies && state.coopAllies.length > 0
+      ? state.coopAllies
+      : (state.coopPartner ? [state.coopPartner] : []);
+
+    for (const ally of renderAllies) {
       const aProj = this.projectToScreen(
-        state.coopPartner.x,
-        state.coopPartner.y,
+        ally.x,
+        ally.y,
         2.55,
         mapW,
         mapH
@@ -2923,11 +2952,19 @@ export class ArcanaRenderer {
           aProj.y,
           50,
           6,
-          state.coopPartner.hp / Math.max(1, state.coopPartner.maxHp),
+          ally.hp / Math.max(1, ally.maxHp),
           '#4cc9f0',
           0,
           4
         );
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px Cinzel, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#000000';
+        ctx.shadowBlur = 4;
+        const shortName = ally.name.split(' (')[0] || ally.name;
+        ctx.fillText(shortName, aProj.x, aProj.y - 8);
+        ctx.shadowBlur = 0;
       }
     }
 

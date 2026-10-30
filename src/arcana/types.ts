@@ -509,6 +509,9 @@ export interface CoopPartnerState {
   animState: EntityAnimState;
   downed: boolean;
   reviveProgress: number; // 0..1
+  isAi?: boolean;
+  voiceMuted?: boolean;
+  isSpeaking?: boolean;
 }
 
 export interface TutorialStepState {
@@ -539,6 +542,7 @@ export interface ArcanaRunState {
   map: GeneratedCampaignMap;
   player: PlayerRuntimeState;
   coopPartner: CoopPartnerState | null;
+  coopAllies: CoopPartnerState[];
   enemies: ActiveEnemy[];
   boss: ActiveBoss | null;
   projectiles: ActiveProjectile[];

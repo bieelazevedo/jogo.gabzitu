@@ -197,6 +197,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
 
   let isPaused = false;
   let showInRunSkillTree = false;
+  let showInRunVoiceOverlay = false;
   let showSpecChoiceModal = false;
   let portraitDismissed = false;
   let introTimer: number | null = null;
@@ -255,8 +256,9 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
     if (currentScreen !== 'playing' || !runState) return;
 
     if (code === 'Escape' || code === 'KeyP') {
-      if (showInRunSkillTree) {
+      if (showInRunSkillTree || showInRunVoiceOverlay) {
         showInRunSkillTree = false;
+        showInRunVoiceOverlay = false;
         renderUi();
         return;
       }
@@ -1127,34 +1129,34 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       wrap.style.cssText =
         'position:absolute;inset:0;background:rgba(8,4,20,0.94);padding:20px;pointer-events:auto;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;';
       wrap.innerHTML = `
-        <div style="max-width:680px;width:100%;background:linear-gradient(165deg,rgba(24,14,48,0.97),rgba(10,6,24,0.98));border:1.5px solid rgba(125,226,255,0.4);border-radius:18px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,0.85);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div style="max-width:720px;width:95vw;background:linear-gradient(165deg,rgba(24,14,48,0.98),rgba(10,6,24,0.99));border:1.5px solid rgba(125,226,255,0.45);border-radius:20px;padding:22px;box-shadow:0 16px 48px rgba(0,0,0,0.85);max-height:92vh;overflow-y:auto;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <div>
-              <span style="font-size:11px;color:#7de2ff;letter-spacing:2px;font-weight:900;">COOPERATIVO ONLINE COM CHAT DE VOZ</span>
-              <h2 style="margin:2px 0 0;color:#ffd166;font-size:24px;">Pacto dos Guardiões</h2>
+              <span style="font-size:11px;color:#7de2ff;letter-spacing:2px;font-weight:900;">COOPERATIVO ONLINE (ATÉ 5 JOGADORES)</span>
+              <h2 style="margin:2px 0 0;color:#ffd166;font-size:22px;">Pacto dos Guardiões Celestiais</h2>
             </div>
             <button data-act="back-menu" style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.06);color:#fff;font-weight:700;cursor:pointer;">← Voltar</button>
           </div>
-          <p style="font-size:13px;color:#cfc4e8;line-height:1.5;margin-bottom:18px;">
-            Cria uma sala, partilha o código com um amigo para jogarem juntos em tempo real com <strong>Chat de Voz Integrado</strong> e sinergia de magias!
+          <p style="font-size:12px;color:#cfc4e8;line-height:1.4;margin-bottom:14px;">
+            Cria uma sala para até <strong>5 Guardiões</strong>, partilha o código para amigos entrarem em qualquer dispositivo ou joga acompanhado de Guardiões Elementares com <strong>Chat de Voz em Tempo Real</strong>!
           </p>
 
           <!-- Room Creation & Join Grid -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px;margin-bottom:16px;">
             <!-- Create Room -->
-            <div style="padding:16px;border-radius:14px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(0,245,212,0.3);">
-              <h4 style="margin:0 0 8px;color:#80ffdb;font-size:14px;">Criar Nova Sala</h4>
-              <button data-act="coop-create" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #00f5d4;background:linear-gradient(135deg,#00f5d4,#00bbf9);color:#06101e;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 0 16px rgba(0,245,212,0.3);">
-                ✨ Gerar Código de Sala
+            <div style="padding:14px;border-radius:14px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(0,245,212,0.35);">
+              <h4 style="margin:0 0 6px;color:#80ffdb;font-size:13px;font-weight:900;">👑 Criar Sala do Esquadrão</h4>
+              <button data-act="coop-create" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid #00f5d4;background:linear-gradient(135deg,#00f5d4,#00bbf9);color:#06101e;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 0 16px rgba(0,245,212,0.3);">
+                ✨ Gerar Código de Sala (5 Vagas)
               </button>
               ${
                 coop.roomCode
                   ? `
-                  <div style="margin-top:12px;padding:10px;border-radius:10px;background:#100622;border:1px solid rgba(255,209,102,0.4);text-align:center;">
-                    <div style="font-size:10px;color:#80ffdb;font-weight:800;letter-spacing:1px;margin-bottom:2px;">CÓDIGO DA TUA SALA:</div>
-                    <div style="font-size:22px;font-weight:900;color:#ffd166;letter-spacing:3px;">${coop.roomCode}</div>
-                    <button data-act="copy-room-code" style="margin-top:6px;padding:5px 12px;border-radius:6px;border:1px solid #ffd166;background:rgba(255,209,102,0.18);color:#ffd166;font-size:11px;font-weight:800;cursor:pointer;">
-                      📋 Copiar Código
+                  <div style="margin-top:10px;padding:10px;border-radius:10px;background:#0d061c;border:1.5px solid rgba(255,209,102,0.5);text-align:center;">
+                    <div style="font-size:10px;color:#80ffdb;font-weight:800;letter-spacing:1px;margin-bottom:2px;">CÓDIGO DE PARTILHA:</div>
+                    <div style="font-size:24px;font-weight:900;color:#ffd166;letter-spacing:3px;">${coop.roomCode}</div>
+                    <button data-act="copy-room-code" style="margin-top:6px;padding:6px 14px;border-radius:8px;border:1px solid #ffd166;background:rgba(255,209,102,0.2);color:#ffd166;font-size:11px;font-weight:900;cursor:pointer;">
+                      📋 Copiar Código da Sala
                     </button>
                   </div>
                   `
@@ -1163,20 +1165,58 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             </div>
 
             <!-- Join Room -->
-            <div style="padding:16px;border-radius:14px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,209,102,0.3);">
-              <h4 style="margin:0 0 8px;color:#ffd166;font-size:14px;">Entrar Numa Sala</h4>
-              <input id="arcana-room-input" placeholder="Ex: ARC-742" value="${coop.roomCode || ''}" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:#0d071c;color:#fff;margin-bottom:10px;font-weight:800;font-size:14px;" />
-              <button data-act="coop-join" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:13px;cursor:pointer;">
-                🚀 Conectar e Jogar
+            <div style="padding:14px;border-radius:14px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,209,102,0.35);">
+              <h4 style="margin:0 0 6px;color:#ffd166;font-size:13px;font-weight:900;">🚀 Entrar Numa Sala</h4>
+              <input id="arcana-room-input" placeholder="Ex: ARC-742" value="${coop.roomCode || ''}" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:#0d071c;color:#fff;margin-bottom:10px;font-weight:800;font-size:15px;text-transform:uppercase;" />
+              <button data-act="coop-join" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:13px;cursor:pointer;">
+                🔗 Conectar à Sala
               </button>
             </div>
           </div>
 
-          <!-- Integrated Voice Chat Panel -->
-          <div style="padding:16px;border-radius:14px;background:rgba(14,9,30,0.85);border:1.5px solid ${voice.isInVoice ? '#00f5d4' : 'rgba(255,255,255,0.15)'};margin-bottom:18px;">
+          <!-- 5-Player Squad Roster -->
+          <div style="padding:14px;border-radius:14px;background:rgba(12,6,26,0.88);border:1.5px solid rgba(125,226,255,0.3);margin-bottom:14px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <span style="font-size:12px;font-weight:900;color:#ffd166;letter-spacing:1px;">ESQUADRÃO ELEMENTAL (1 LÍDER + 4 ALIADOS)</span>
+              <span style="font-size:11px;font-weight:800;color:#80ffdb;">5 / 5 Vagas Prontas</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:8px;">
+              <!-- Slot 1: Host / You -->
+              <div style="padding:8px;border-radius:10px;background:rgba(0,245,212,0.1);border:1.5px solid #00f5d4;text-align:center;">
+                <div style="font-size:10px;color:#00f5d4;font-weight:900;">LÍDER (TU)</div>
+                <div style="font-size:12px;font-weight:800;color:#fff;margin:3px 0;">${options.name || 'Guardião'}</div>
+                <div style="font-size:10px;color:#cfc4e8;">${ARCANA_CLASSES[selectedClassId]?.name.split(' (')[0] || 'Avatar'}</div>
+                <div style="margin-top:4px;font-size:9px;color:${voice.isInVoice ? (voice.isMicMuted ? '#ff4d6d' : '#80ffdb') : '#888'};">
+                  ${voice.isInVoice ? (voice.isMicMuted ? '🔇 Mudo' : '🎙️ Na Voz') : 'Sem Voz'}
+                </div>
+              </div>
+
+              <!-- Slots 2-5: Allies -->
+              ${(coop.getPartners().length > 0 ? coop.getPartners() : [
+                { name: 'Nerys', classId: 'chrono', isAi: true, peerId: 'ai_1' },
+                { name: 'Iskra', classId: 'chaos', isAi: true, peerId: 'ai_2' },
+                { name: 'Borak', classId: 'rune', isAi: true, peerId: 'ai_3' },
+                { name: 'Kyoshi', classId: 'chess', isAi: true, peerId: 'ai_4' },
+              ]).slice(0, 4).map((ally, idx) => `
+                <div style="padding:8px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid ${ally.isAi ? 'rgba(255,209,102,0.3)' : '#00bbf9'};text-align:center;">
+                  <div style="font-size:10px;color:${ally.isAi ? '#ffd166' : '#00bbf9'};font-weight:900;">SLOT ${idx + 2} ${ally.isAi ? '(IA)' : '(JOGADOR)'}</div>
+                  <div style="font-size:12px;font-weight:800;color:#fff;margin:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ally.name.split(' (')[0]}</div>
+                  <div style="font-size:10px;color:#cfc4e8;">${ARCANA_CLASSES[ally.classId as ArcanaClassId]?.name.split(' (')[0] || 'Guardião'}</div>
+                  ${!ally.isAi ? `
+                    <button data-act="voice-mute-peer:${ally.peerId}" style="margin-top:4px;padding:3px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:${voice.isPeerMuted(ally.peerId) ? '#ffd166' : '#aaa'};font-size:9px;font-weight:800;cursor:pointer;">
+                      ${voice.isPeerMuted(ally.peerId) ? '🔊 Desmutar' : '🔇 Mutar'}
+                    </button>
+                  ` : '<div style="margin-top:4px;font-size:9px;color:#888;">Guardião Pronto</div>'}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Integrated Voice Chat Panel -->
+          <div style="padding:14px;border-radius:14px;background:rgba(14,9,30,0.85);border:1.5px solid ${voice.isInVoice ? '#00f5d4' : 'rgba(255,255,255,0.15)'};margin-bottom:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:18px;">${voice.isInVoice ? (voice.isMicMuted ? '🔇' : '🎙️') : '🎧'}</span>
+                <span style="font-size:20px;">${voice.isInVoice ? (voice.isMicMuted ? '🔇' : '🎙️') : '🎧'}</span>
                 <div>
                   <div style="font-size:13px;font-weight:900;color:${voice.isInVoice ? '#80ffdb' : '#aaa'};">
                     ${voice.isInVoice ? 'Chat de Voz Ativo na Sala' : 'Chat de Voz Desconectado'}
@@ -1184,7 +1224,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                   <div style="font-size:10px;color:#8a809f;">Comunicação em tempo real entre jogadores</div>
                 </div>
               </div>
-              <div style="display:flex;gap:6px;">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 ${
                   voice.isInVoice
                     ? `
@@ -1208,7 +1248,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             ${
               voice.isInVoice
                 ? `
-                <div style="display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
+                <div style="display:flex;flex-direction:column;gap:6px;padding-top:10px;margin-top:8px;border-top:1px solid rgba(255,255,255,0.08);">
                   ${voice.getParticipants().map(p => `
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.03);font-size:11px;">
                       <div style="display:flex;align-items:center;gap:6px;">
@@ -1231,8 +1271,8 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             }
           </div>
 
-          <button data-act="coop-start-ai" style="width:100%;padding:14px;border-radius:12px;border:2px solid #00bbf9;background:linear-gradient(135deg,rgba(0,187,249,0.3),rgba(58,20,88,0.95));color:#fff;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 0 24px rgba(0,187,249,0.35);">
-            ⚡ Iniciar Partida Cooperativa Agora
+          <button data-act="coop-start-ai" style="width:100%;padding:14px;border-radius:12px;border:2px solid #00bbf9;background:linear-gradient(135deg,rgba(0,187,249,0.35),rgba(58,20,88,0.98));color:#fff;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 0 26px rgba(0,187,249,0.45);letter-spacing:1px;">
+            ⚡ INICIAR PARTIDA COOPERATIVA (5 GUARDIÕES)
           </button>
         </div>
       `;
@@ -1505,6 +1545,10 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                      <button data-act="training-boss" style="padding:6px 10px;border-radius:8px;border:1px solid #ff4d6d;background:rgba(255,77,109,0.2);color:#ff99ac;font-size:11px;font-weight:800;cursor:pointer;">Boss</button>`
                   : ''
               }
+              <button data-act="hud-toggle-voice" id="arc-voice-hud-pill" title="Chat de Voz do Esquadrão" style="padding:6px 12px;border-radius:8px;border:1.5px solid ${voice.isInVoice ? (voice.isMicMuted ? '#ff4d6d' : '#00f5d4') : 'rgba(255,255,255,0.2)'};background:${voice.isInVoice ? (voice.isMicMuted ? 'rgba(255,77,109,0.25)' : 'rgba(0,245,212,0.22)') : 'rgba(16,10,34,0.9)'};color:#fff;font-weight:800;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                <span>${voice.isInVoice ? (voice.isMicMuted ? '🔇' : '🎙️') : '🎧'}</span>
+                <span>${voice.isInVoice ? `Voz (${voice.getParticipants().length})` : 'Entrar Voz'}</span>
+              </button>
               <button data-act="toggle-inrun-tree" title="Teia de Vertentes (K)" style="padding:6px 12px;border-radius:8px;border:1.5px solid #ffd166;background:rgba(20,12,38,0.9);color:#ffd166;font-weight:800;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;">
                 <span style="width:14px;height:14px;display:inline-block;color:#ffd166;">${skillIcon('beams-aura')}</span> Teia [K]
               </button>
@@ -1534,7 +1578,25 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         <!-- Bottom Ravenswatch Dock: Left Status & Stats + Center Framed Skills -->
         <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;width:100%;pointer-events:none;">
           <!-- Bottom-Left: Ravenswatch Diamond Level Crest + Angled Emerald Health Bar + 4 Stats -->
-          <div style="pointer-events:auto;display:flex;flex-direction:column;gap:6px;background:rgba(8,5,18,0.88);padding:12px 16px;border-radius:16px;border:1.5px solid rgba(255,209,102,0.35);backdrop-filter:blur(8px);box-shadow:0 8px 26px rgba(0,0,0,0.7);">
+          <div class="arcana-player-hud-left" style="pointer-events:auto;display:flex;flex-direction:column;gap:6px;background:rgba(8,5,18,0.88);padding:12px 16px;border-radius:16px;border:1.5px solid rgba(255,209,102,0.35);backdrop-filter:blur(8px);box-shadow:0 8px 26px rgba(0,0,0,0.7);">
+            <!-- 5-Player Squad Mini Status -->
+            ${(st.coopAllies && st.coopAllies.length > 0) ? `
+              <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <div style="font-size:9px;font-weight:900;color:#ffd166;letter-spacing:1px;">ESQUADRÃO (5 GUARDIÕES):</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                  ${st.coopAllies.map(a => `
+                    <div style="display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;font-size:9px;">
+                      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${a.downed ? '#ff4d6d' : (voice.isPeerSpeaking(a.peerId) ? '#00f5d4' : '#52b788')};"></span>
+                      <span style="color:${a.downed ? '#ff4d6d' : '#cfc4e8'};font-weight:800;max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.name.split(' (')[0]}</span>
+                      <div style="width:24px;height:3px;background:#1a1028;border-radius:2px;overflow:hidden;">
+                        <div style="height:100%;width:${Math.round((a.hp / Math.max(1, a.maxHp)) * 100)}%;background:${a.downed ? '#ff4d6d' : '#4cc9f0'};"></div>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
             <!-- Active Vertente Badges Diagonally Floating -->
             <div style="display:flex;gap:6px;margin-bottom:2px;">
               ${cls.specializations
@@ -1577,7 +1639,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           </div>
 
           <!-- Bottom-Center: Hero Portrait Crest + 5 Framed Square Skill Slots (Ravenswatch Hotbar) -->
-          <div style="pointer-events:auto;display:flex;align-items:center;gap:10px;background:rgba(8,5,18,0.92);padding:10px 18px;border-radius:18px;border:1.5px solid rgba(255,209,102,0.4);backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+          <div class="arcana-hotbar-dock" style="pointer-events:auto;display:flex;align-items:center;gap:10px;background:rgba(8,5,18,0.92);padding:10px 18px;border-radius:18px;border:1.5px solid rgba(255,209,102,0.4);backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,0.8);">
             <!-- Hero Crest -->
             <div style="position:relative;margin-right:4px;">
               ${renderBenderPortraitBadge(p.classId, 54, cls.palette.accent)}
@@ -1772,6 +1834,56 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           </div>
         `;
         uiLayer.appendChild(treeOverlay);
+      }
+
+      // IN-RUN VOICE CHAT DRAWER
+      if (showInRunVoiceOverlay) {
+        const voiceOverlay = document.createElement('div');
+        voiceOverlay.className = 'arcana-modal';
+        voiceOverlay.style.cssText =
+          'position:absolute;inset:0;background:rgba(8,4,20,0.75);display:flex;align-items:center;justify-content:center;padding:16px;pointer-events:auto;z-index:10030;';
+        voiceOverlay.innerHTML = `
+          <div style="max-width:380px;width:100%;background:linear-gradient(165deg,rgba(26,14,50,0.98),rgba(10,6,24,0.99));border:2px solid #00f5d4;box-shadow:0 14px 44px rgba(0,0,0,0.9),0 0 20px rgba(0,245,212,0.3);padding:20px;border-radius:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <h3 style="margin:0;color:#80ffdb;font-size:16px;font-weight:900;">🎙️ Chat de Voz do Esquadrão</h3>
+              <button data-act="hud-toggle-voice" style="padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.06);color:#fff;font-weight:800;cursor:pointer;">✕</button>
+            </div>
+            <div style="font-size:12px;color:#cfc4e8;margin-bottom:12px;">
+              Sala: <strong style="color:#ffd166;">${coop.roomCode || 'ARC-777'}</strong> (${voice.getParticipants().length}/5 no Chat)
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              ${voice.isInVoice ? `
+                <button data-act="voice-toggle-mic" style="flex:1;padding:8px;border-radius:8px;border:1px solid ${voice.isMicMuted ? '#ff4d6d' : '#00f5d4'};background:${voice.isMicMuted ? 'rgba(255,77,109,0.2)' : 'rgba(0,245,212,0.2)'};color:#fff;font-size:11px;font-weight:800;cursor:pointer;">
+                  ${voice.isMicMuted ? '🔇 Desmutar Microfone' : '🎙️ Mutar Microfone'}
+                </button>
+                <button data-act="voice-leave" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#ff99ac;font-size:11px;font-weight:800;cursor:pointer;">
+                  📞 Sair
+                </button>
+              ` : `
+                <button data-act="voice-join" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid #00f5d4;background:rgba(0,245,212,0.25);color:#80ffdb;font-size:12px;font-weight:900;cursor:pointer;">
+                  🎙️ Ligar Microfone / Entrar na Voz
+                </button>
+              `}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto;">
+              ${voice.getParticipants().map(p => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,0.04);font-size:11px;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.isSpeaking ? '#00f5d4' : '#5a526d'};box-shadow:${p.isSpeaking ? '0 0 8px #00f5d4' : 'none'};"></span>
+                    <span style="font-weight:800;color:#fff;">${p.name}</span>
+                    <span style="font-size:10px;color:${p.micMuted ? '#ff4d6d' : '#80ffdb'};">${p.micMuted ? '(Mudo)' : ''}</span>
+                  </div>
+                  ${!p.isSelf ? `
+                    <button data-act="voice-mute-peer:${p.id}" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:${p.isMuted ? '#ffd166' : '#aaa'};font-size:10px;font-weight:800;cursor:pointer;">
+                      ${p.isMuted ? '🔊 Desmutar' : '🔇 Mutar'}
+                    </button>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+        uiLayer.appendChild(voiceOverlay);
       }
 
       // CHAPTER VICTORY / NATION TRANSITION MODAL (Clear Progression Between Phases!)
@@ -2009,6 +2121,21 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         voice.toggleMuteSelf();
       } else if (key === 'voice-mute-peer') {
         voice.toggleMutePeer(val);
+      } else if (key === 'copy-room-code') {
+        if (coop.roomCode) {
+          try {
+            navigator.clipboard.writeText(coop.roomCode);
+            const btn = uiLayer.querySelector<HTMLElement>('[data-act="copy-room-code"]');
+            if (btn) btn.innerText = '✅ Código Copiado!';
+            setTimeout(() => {
+              const b = uiLayer.querySelector<HTMLElement>('[data-act="copy-room-code"]');
+              if (b) b.innerText = '📋 Copiar Código da Sala';
+            }, 2200);
+          } catch {}
+        }
+      } else if (key === 'hud-toggle-voice') {
+        showInRunVoiceOverlay = !showInRunVoiceOverlay;
+        renderUi();
       } else if (key === 'open-coop') {
         currentScreen = 'coop_lobby';
         renderUi();

@@ -1,6 +1,6 @@
 // ============================================================================
-// ASCENSÃO ARCANA — 2-Player Co-op Session (BroadcastChannel + AI Companion)
-// Implements GDD Section 12 (Multiplayer Cooperativo de 2 Jogadores)
+// SURVIVOR ELEMENTAL — Multiplayer Co-op Session (Até 5 Jogadores)
+// Suporta 1 Anfitrião + até 4 Aliados (Jogadores Reais via BroadcastChannel / WebRTC + Guardiões IA)
 // ============================================================================
 
 import { ARCANA_CLASSES } from './data';
@@ -15,9 +15,10 @@ import type {
 
 export const COOP_REVIVE_DURATION_SEC = 2.5;
 export const COOP_REVIVE_RADIUS = 95;
+export const MAX_COOP_PLAYERS = 5;
 
 interface CoopWireMessage {
-  type: 'HANDSHAKE_SYN' | 'HANDSHAKE_ACK' | 'STATE_UPDATE' | 'REVIVE_COMPLETE' | 'LEAVE';
+  type: 'HANDSHAKE_SYN' | 'HANDSHAKE_ACK' | 'ROSTER_SYNC' | 'STATE_UPDATE' | 'REVIVE_COMPLETE' | 'LEAVE';
   roomCode: string;
   senderId: string;
   senderName: string;
@@ -35,49 +36,53 @@ interface CoopWireMessage {
   };
 }
 
-const AI_COMPANION_NAMES: Record<ArcanaClassId, string> = {
-  chess: 'Kaelen (Grão-Mestre)',
-  chrono: 'Lyra (Vigia do Tempo)',
-  chaos: 'Nyx (Dama do Acaso)',
-  rune: 'Theron (Calígrafo)',
-};
-
-function pickCompanionClass(playerClass: ArcanaClassId): ArcanaClassId {
-  const order: ArcanaClassId[] = ['chess', 'chrono', 'chaos', 'rune'];
-  const idx = order.indexOf(playerClass);
-  return order[(idx + 1) % order.length];
-}
+const GUARDIAN_COMPANION_DEFS: Array<{ classId: ArcanaClassId; name: string }> = [
+  { classId: 'chess', name: 'Kael (Avatar Vento & Bastão)' },
+  { classId: 'chrono', name: 'Nerys (Maré & Dança do Gelo)' },
+  { classId: 'chaos', name: 'Iskra (Fúria Solar & Magma)' },
+  { classId: 'rune', name: 'Borak (Bastião de Basalto)' },
+];
 
 export class ArcanaCoopSession {
   public roomCode: string | null = null;
   public role: 'host' | 'guest' | 'none' = 'none';
   public isActive = false;
-  public isAiCompanion = false;
   public localPeerId: string;
-  public localName = 'Arcanista';
+  public localName = 'Guardião';
   public localClassId: ArcanaClassId = 'chess';
 
+  public partners: Map<string, CoopPartnerState> = new Map();
   private channel: BroadcastChannel | null = null;
-  private partner: CoopPartnerState | null = null;
-  private lastRemotePacketMs = 0;
-  private aiAttackCooldown = 0;
+  private lastRemotePacketMs = new Map<string, number>();
+  private aiAttackCooldowns = new Map<string, number>();
   private aiOrbitAngle = 0;
-  private onPartnerChangedCallback: ((partner: CoopPartnerState | null) => void) | null = null;
+  private onPartnersChangedCallback: ((partners: CoopPartnerState[]) => void) | null = null;
 
   constructor() {
     this.localPeerId = `peer_${Math.random().toString(36).slice(2, 9)}`;
   }
 
+  public onPartnersUpdate(cb: (partners: CoopPartnerState[]) => void): void {
+    this.onPartnersChangedCallback = cb;
+  }
+
   public onPartnerUpdate(cb: (partner: CoopPartnerState | null) => void): void {
-    this.onPartnerChangedCallback = cb;
+    this.onPartnersChangedCallback = (partners) => {
+      cb(partners[0] ?? null);
+    };
+  }
+
+  public getPartners(): CoopPartnerState[] {
+    return Array.from(this.partners.values());
   }
 
   public getPartnerState(): CoopPartnerState | null {
-    return this.partner;
+    return this.getPartners()[0] ?? null;
   }
 
   /**
-   * Creates a 2-player Co-op Room and returns a 6-character code like `ARC-742`.
+   * Cria uma sala para até 5 Guardiões (Host + até 4 Aliados).
+   * Retorna um código como `ARC-742`.
    */
   public createRoom(hostName: string, classId: ArcanaClassId): string {
     this.disconnect();
@@ -88,37 +93,49 @@ export class ArcanaCoopSession {
     this.roomCode = code;
     this.role = 'host';
     this.isActive = true;
-    this.isAiCompanion = true; // Starts with Arcane Companion ready until a real tab/peer joins
-    this.localName = hostName.trim() || 'Anfitrião Arcano';
+    this.localName = hostName.trim() || 'Anfitrião Elemental';
     this.localClassId = classId;
 
-    const companionClass = pickCompanionClass(classId);
-    const classDef = ARCANA_CLASSES[companionClass];
+    // Inicializa 4 Guardiões companheiros para formar o esquadrão completo de 5
+    this.partners.clear();
+    const companionList = GUARDIAN_COMPANION_DEFS.filter(c => c.classId !== classId);
+    // Se sobrar 3, duplicamos com estilo alternativo para perfazer 4 aliados
+    while (companionList.length < 4) {
+      companionList.push({
+        classId: 'chess',
+        name: 'Kyoshi (Avatar dos Leques Celestiais)',
+      });
+    }
 
-    this.partner = {
-      connected: true,
-      peerId: 'arcane_companion_ai',
-      name: AI_COMPANION_NAMES[companionClass],
-      classId: companionClass,
-      x: 0,
-      y: 0,
-      facingX: 1,
-      facingY: 0,
-      hp: classDef.baseStats.maxHp,
-      maxHp: classDef.baseStats.maxHp,
-      animState: 'idle',
-      downed: false,
-      reviveProgress: 0,
-    };
+    companionList.slice(0, 4).forEach((comp, idx) => {
+      const classDef = ARCANA_CLASSES[comp.classId] ?? ARCANA_CLASSES.chess;
+      const peerId = `ai_ally_${idx}_${comp.classId}`;
+      this.partners.set(peerId, {
+        connected: true,
+        peerId,
+        name: comp.name,
+        classId: comp.classId,
+        x: 0,
+        y: 0,
+        facingX: 1,
+        facingY: 0,
+        hp: classDef.baseStats.maxHp,
+        maxHp: classDef.baseStats.maxHp,
+        animState: 'idle',
+        downed: false,
+        reviveProgress: 0,
+        isAi: true,
+      });
+      this.aiAttackCooldowns.set(peerId, 0.4 + idx * 0.2);
+    });
 
     this.openBroadcastChannel(code);
-    this.notifyPartnerChanged();
+    this.notifyPartnersChanged();
     return code;
   }
 
   /**
-   * Joins an existing room by code (e.g. `ARC-742`).
-   * Works across browser tabs via BroadcastChannel and falls back to paired Arcane Companion if solo.
+   * Conecta a uma sala existente com o código (ex: ARC-742).
    */
   public joinRoom(roomCode: string, guestName: string, classId: ArcanaClassId): boolean {
     const cleaned = roomCode.trim().toUpperCase();
@@ -135,28 +152,33 @@ export class ArcanaCoopSession {
     this.roomCode = normalizedCode;
     this.role = 'guest';
     this.isActive = true;
-    this.isAiCompanion = true; // Automatically switches to false when live host answers
-    this.localName = guestName.trim() || 'Convidado Arcano';
+    this.localName = guestName.trim() || 'Guardião Convidado';
     this.localClassId = classId;
 
-    const companionClass = pickCompanionClass(classId);
-    const classDef = ARCANA_CLASSES[companionClass];
-
-    this.partner = {
-      connected: true,
-      peerId: 'host_peer_simulated',
-      name: AI_COMPANION_NAMES[companionClass],
-      classId: companionClass,
-      x: 0,
-      y: 0,
-      facingX: 1,
-      facingY: 0,
-      hp: classDef.baseStats.maxHp,
-      maxHp: classDef.baseStats.maxHp,
-      animState: 'idle',
-      downed: false,
-      reviveProgress: 0,
-    };
+    // Cria parceiros temporários que serão sincronizados com o Host
+    this.partners.clear();
+    const companionList = GUARDIAN_COMPANION_DEFS.filter(c => c.classId !== classId);
+    companionList.slice(0, 4).forEach((comp, idx) => {
+      const classDef = ARCANA_CLASSES[comp.classId] ?? ARCANA_CLASSES.chrono;
+      const peerId = `ai_ally_${idx}_${comp.classId}`;
+      this.partners.set(peerId, {
+        connected: true,
+        peerId,
+        name: comp.name,
+        classId: comp.classId,
+        x: 0,
+        y: 0,
+        facingX: 1,
+        facingY: 0,
+        hp: classDef.baseStats.maxHp,
+        maxHp: classDef.baseStats.maxHp,
+        animState: 'idle',
+        downed: false,
+        reviveProgress: 0,
+        isAi: true,
+      });
+      this.aiAttackCooldowns.set(peerId, 0.3 + idx * 0.2);
+    });
 
     this.openBroadcastChannel(normalizedCode);
     this.sendWireMessage({
@@ -167,15 +189,15 @@ export class ArcanaCoopSession {
       classId: this.localClassId,
     });
 
-    this.notifyPartnerChanged();
+    this.notifyPartnersChanged();
     return true;
   }
 
   public enableAiCompanion(playerClassId: ArcanaClassId): CoopPartnerState {
-    if (!this.isActive || !this.partner) {
+    if (!this.isActive || this.partners.size === 0) {
       this.createRoom(this.localName, playerClassId);
     }
-    return this.partner!;
+    return this.getPartners()[0]!;
   }
 
   private openBroadcastChannel(code: string): void {
@@ -201,32 +223,59 @@ export class ArcanaCoopSession {
     if (!this.channel) return;
     try {
       this.channel.postMessage(msg);
-    } catch {
-      // Ignore closed channel errors
-    }
+    } catch {}
   }
 
   private handleWireMessage(msg: CoopWireMessage): void {
-    this.lastRemotePacketMs = performance.now();
+    this.lastRemotePacketMs.set(msg.senderId, performance.now());
 
     if (msg.type === 'HANDSHAKE_SYN') {
-      this.isAiCompanion = false;
       const def = ARCANA_CLASSES[msg.classId] ?? ARCANA_CLASSES.chrono;
-      this.partner = {
-        connected: true,
-        peerId: msg.senderId,
-        name: msg.senderName,
-        classId: msg.classId,
-        x: this.partner?.x ?? 0,
-        y: this.partner?.y ?? 0,
-        facingX: 1,
-        facingY: 0,
-        hp: def.baseStats.maxHp,
-        maxHp: def.baseStats.maxHp,
-        animState: 'idle',
-        downed: false,
-        reviveProgress: 0,
-      };
+      // Substitui um slot de IA pelo jogador humano real que entrou
+      let slotReplaced = false;
+      for (const [key, partner] of this.partners.entries()) {
+        if (partner.isAi) {
+          this.partners.delete(key);
+          this.partners.set(msg.senderId, {
+            connected: true,
+            peerId: msg.senderId,
+            name: msg.senderName,
+            classId: msg.classId,
+            x: partner.x,
+            y: partner.y,
+            facingX: 1,
+            facingY: 0,
+            hp: def.baseStats.maxHp,
+            maxHp: def.baseStats.maxHp,
+            animState: 'idle',
+            downed: false,
+            reviveProgress: 0,
+            isAi: false,
+          });
+          slotReplaced = true;
+          break;
+        }
+      }
+
+      if (!slotReplaced && this.partners.size < 4) {
+        this.partners.set(msg.senderId, {
+          connected: true,
+          peerId: msg.senderId,
+          name: msg.senderName,
+          classId: msg.classId,
+          x: 0,
+          y: 0,
+          facingX: 1,
+          facingY: 0,
+          hp: def.baseStats.maxHp,
+          maxHp: def.baseStats.maxHp,
+          animState: 'idle',
+          downed: false,
+          reviveProgress: 0,
+          isAi: false,
+        });
+      }
+
       this.sendWireMessage({
         type: 'HANDSHAKE_ACK',
         roomCode: this.roomCode!,
@@ -234,141 +283,169 @@ export class ArcanaCoopSession {
         senderName: this.localName,
         classId: this.localClassId,
       });
-      this.notifyPartnerChanged();
+      this.notifyPartnersChanged();
       return;
     }
 
     if (msg.type === 'HANDSHAKE_ACK') {
-      this.isAiCompanion = false;
       const def = ARCANA_CLASSES[msg.classId] ?? ARCANA_CLASSES.chrono;
-      this.partner = {
-        connected: true,
-        peerId: msg.senderId,
-        name: msg.senderName,
-        classId: msg.classId,
-        x: this.partner?.x ?? 0,
-        y: this.partner?.y ?? 0,
-        facingX: 1,
-        facingY: 0,
-        hp: def.baseStats.maxHp,
-        maxHp: def.baseStats.maxHp,
-        animState: 'idle',
-        downed: false,
-        reviveProgress: 0,
-      };
-      this.notifyPartnerChanged();
-      return;
-    }
-
-    if (msg.type === 'STATE_UPDATE' && msg.payload) {
-      this.isAiCompanion = false;
-      const p = msg.payload;
-      if (!this.partner) {
-        this.partner = {
+      let slotReplaced = false;
+      for (const [key, partner] of this.partners.entries()) {
+        if (partner.isAi) {
+          this.partners.delete(key);
+          this.partners.set(msg.senderId, {
+            connected: true,
+            peerId: msg.senderId,
+            name: msg.senderName,
+            classId: msg.classId,
+            x: partner.x,
+            y: partner.y,
+            facingX: 1,
+            facingY: 0,
+            hp: def.baseStats.maxHp,
+            maxHp: def.baseStats.maxHp,
+            animState: 'idle',
+            downed: false,
+            reviveProgress: 0,
+            isAi: false,
+          });
+          slotReplaced = true;
+          break;
+        }
+      }
+      if (!slotReplaced && this.partners.size < 4) {
+        this.partners.set(msg.senderId, {
           connected: true,
           peerId: msg.senderId,
           name: msg.senderName,
           classId: msg.classId,
-          ...p,
-        };
-      } else {
-        this.partner.connected = true;
-        this.partner.peerId = msg.senderId;
-        this.partner.name = msg.senderName;
-        this.partner.classId = msg.classId;
-        this.partner.x = p.x;
-        this.partner.y = p.y;
-        this.partner.facingX = p.facingX;
-        this.partner.facingY = p.facingY;
-        this.partner.hp = p.hp;
-        this.partner.maxHp = p.maxHp;
-        this.partner.animState = p.animState;
-        this.partner.downed = p.downed;
+          x: 0,
+          y: 0,
+          facingX: 1,
+          facingY: 0,
+          hp: def.baseStats.maxHp,
+          maxHp: def.baseStats.maxHp,
+          animState: 'idle',
+          downed: false,
+          reviveProgress: 0,
+          isAi: false,
+        });
+      }
+      this.notifyPartnersChanged();
+      return;
+    }
+
+    if (msg.type === 'STATE_UPDATE' && msg.payload) {
+      const p = msg.payload;
+      const existing = this.partners.get(msg.senderId);
+      if (existing) {
+        existing.connected = true;
+        existing.name = msg.senderName;
+        existing.classId = msg.classId;
+        existing.x = p.x;
+        existing.y = p.y;
+        existing.facingX = p.facingX;
+        existing.facingY = p.facingY;
+        existing.hp = p.hp;
+        existing.maxHp = p.maxHp;
+        existing.animState = p.animState;
+        existing.downed = p.downed;
+        existing.isAi = false;
       }
       return;
     }
 
     if (msg.type === 'REVIVE_COMPLETE') {
-      if (this.partner) {
-        this.partner.downed = false;
-        this.partner.reviveProgress = 0;
-        this.partner.hp = Math.max(1, Math.round(this.partner.maxHp * 0.55));
+      const existing = this.partners.get(msg.senderId);
+      if (existing) {
+        existing.downed = false;
+        existing.reviveProgress = 0;
+        existing.hp = Math.max(1, Math.round(existing.maxHp * 0.6));
       }
       return;
     }
 
     if (msg.type === 'LEAVE') {
-      // Fallback smoothly to AI control if remote tab closes mid-run
-      this.isAiCompanion = true;
-      this.notifyPartnerChanged();
+      const leavingPartner = this.partners.get(msg.senderId);
+      if (leavingPartner) {
+        // Converte de volta suavemente para IA
+        leavingPartner.isAi = true;
+        leavingPartner.name = `${leavingPartner.name} (IA)`;
+      }
+      this.notifyPartnersChanged();
     }
   }
 
   /**
-   * Synchronizes local player state, updates AI companion or remote interpolation,
-   * and processes the 2.5s cooperative revival mechanic.
+   * Sincroniza o estado local, atualiza IA dos aliados e gerencia o renascimento cooperativo de 2.5s.
    */
   public syncTick(dt: number, state: ArcanaRunState): void {
-    if (!this.isActive || !this.partner) {
+    if (!this.isActive || this.partners.size === 0) {
       return;
     }
 
-    // Ensure run state references our partner state
-    if (!state.coopPartner) {
-      state.coopPartner = this.partner;
-    }
+    const allies = this.getPartners();
+    state.coopAllies = allies;
+    state.coopPartner = allies[0] ?? null;
 
     const player = state.player;
-
-    // Initialize partner spawn near player on first frame
-    if (this.partner.x === 0 && this.partner.y === 0) {
-      this.partner.x = player.x + 64;
-      this.partner.y = player.y + 36;
-    }
-
-    // Check if remote peer timed out (> 4 seconds without packet) -> seamlessly hand over to AI
-    if (!this.isAiCompanion && this.lastRemotePacketMs > 0 && performance.now() - this.lastRemotePacketMs > 4000) {
-      this.isAiCompanion = true;
-    }
-
-    // Broadcast our current state to any connected tab
     this.broadcastLocalState(player);
 
-    // Handle 2.5s Cooperative Revival when ally is downed
-    if (this.partner.downed) {
-      this.partner.animState = 'defeat';
-      const dist = Math.hypot(player.x - this.partner.x, player.y - this.partner.y);
-      if (dist <= COOP_REVIVE_RADIUS && player.hp > 0) {
-        this.partner.reviveProgress = Math.min(1, this.partner.reviveProgress + dt / COOP_REVIVE_DURATION_SEC);
-        if (this.partner.reviveProgress >= 1) {
-          this.partner.downed = false;
-          this.partner.reviveProgress = 0;
-          this.partner.hp = Math.round(this.partner.maxHp * 0.6);
-          this.partner.animState = 'victory';
-          state.statusBanner = {
-            text: 'ALIADO REERGUIDO!',
-            subtext: `${this.partner.name} voltou ao combate arcano`,
-            timer: 2.2,
-            color: '#64dfdf',
-          };
-          this.sendWireMessage({
-            type: 'REVIVE_COMPLETE',
-            roomCode: this.roomCode ?? 'ARC-000',
-            senderId: this.localPeerId,
-            senderName: this.localName,
-            classId: this.localClassId,
-          });
-        }
-      } else {
-        this.partner.reviveProgress = Math.max(0, this.partner.reviveProgress - dt * 0.5);
-      }
-      return;
-    }
+    const now = performance.now();
+    this.aiOrbitAngle += dt * 0.95;
 
-    // If AI-assisted companion is active, simulate tactical movement, combat & damage
-    if (this.isAiCompanion) {
-      this.updateAiCompanion(dt, state);
-    }
+    allies.forEach((ally, index) => {
+      // Inicia spawn do aliado perto do jogador se zerado
+      if (ally.x === 0 && ally.y === 0) {
+        const angle = (index * (Math.PI * 2)) / 4;
+        ally.x = player.x + Math.cos(angle) * 75;
+        ally.y = player.y + Math.sin(angle) * 75;
+      }
+
+      // Se for peer remoto e parou de enviar pacotes (>4s), reverte para controle de IA
+      if (!ally.isAi) {
+        const lastPacket = this.lastRemotePacketMs.get(ally.peerId) || 0;
+        if (lastPacket > 0 && now - lastPacket > 4000) {
+          ally.isAi = true;
+        }
+      }
+
+      // Sistema de Renascimento Cooperativo (2.5 segundos junto ao corpo)
+      if (ally.downed) {
+        ally.animState = 'defeat';
+        const dist = Math.hypot(player.x - ally.x, player.y - ally.y);
+        if (dist <= COOP_REVIVE_RADIUS && player.hp > 0) {
+          ally.reviveProgress = Math.min(1, ally.reviveProgress + dt / COOP_REVIVE_DURATION_SEC);
+          if (ally.reviveProgress >= 1) {
+            ally.downed = false;
+            ally.reviveProgress = 0;
+            ally.hp = Math.round(ally.maxHp * 0.65);
+            ally.animState = 'victory';
+            state.statusBanner = {
+              text: 'ALIADO REERGUIDO!',
+              subtext: `${ally.name} retornou à batalha elemental!`,
+              timer: 2.2,
+              color: '#64dfdf',
+            };
+            this.sendWireMessage({
+              type: 'REVIVE_COMPLETE',
+              roomCode: this.roomCode ?? 'ARC-000',
+              senderId: ally.peerId,
+              senderName: ally.name,
+              classId: ally.classId,
+            });
+          }
+        } else {
+          ally.reviveProgress = Math.max(0, ally.reviveProgress - dt * 0.4);
+        }
+        return;
+      }
+
+      // Se o aliado for IA, simular movimento tático em formação e disparos elementares
+      if (ally.isAi) {
+        this.updateAiAlly(ally, index, dt, state);
+      }
+    });
   }
 
   public update(dt: number, state: ArcanaRunState): void {
@@ -397,45 +474,44 @@ export class ArcanaCoopSession {
     });
   }
 
-  private updateAiCompanion(dt: number, state: ArcanaRunState): void {
-    const partner = this.partner;
-    if (!partner || partner.downed) return;
+  private updateAiAlly(ally: CoopPartnerState, index: number, dt: number, state: ArcanaRunState): void {
+    if (ally.downed) return;
 
     const player = state.player;
-    this.aiOrbitAngle += dt * 1.15;
+    // Formação em diamante / pentágono ao redor do líder
+    const offsetAngle = this.aiOrbitAngle + index * ((Math.PI * 2) / 4);
+    const formationRadius = 80 + (index % 2) * 25;
+    const desiredX = player.x + Math.cos(offsetAngle) * formationRadius;
+    const desiredY = player.y + Math.sin(offsetAngle) * formationRadius;
 
-    // Desired formation point near player
-    const desiredX = player.x + Math.cos(this.aiOrbitAngle) * 85;
-    const desiredY = player.y + Math.sin(this.aiOrbitAngle) * 85;
+    const dx = desiredX - ally.x;
+    const dy = desiredY - ally.y;
+    const dist = Math.hypot(dx, dy);
+    const speed = 230;
 
-    const dx = desiredX - partner.x;
-    const dy = desiredY - partner.y;
-    const distToFormation = Math.hypot(dx, dy);
-
-    const moveSpeed = 215;
-    if (distToFormation > 12) {
-      const step = Math.min(distToFormation, moveSpeed * dt);
-      partner.x += (dx / distToFormation) * step;
-      partner.y += (dy / distToFormation) * step;
-      partner.facingX = dx / distToFormation;
-      partner.facingY = dy / distToFormation;
-      partner.animState = 'walk';
+    if (dist > 14) {
+      const step = Math.min(dist, speed * dt);
+      ally.x += (dx / dist) * step;
+      ally.y += (dy / dist) * step;
+      ally.facingX = dx / dist;
+      ally.facingY = dy / dist;
+      ally.animState = 'walk';
     } else {
-      partner.animState = 'idle';
+      ally.animState = 'idle';
     }
 
-    // Check enemy contact damage against AI companion
+    // Dano de contato dos monstros contra o aliado IA
     for (const enemy of state.enemies) {
-      const edist = Math.hypot(enemy.x - partner.x, enemy.y - partner.y);
+      const edist = Math.hypot(enemy.x - ally.x, enemy.y - ally.y);
       if (edist < enemy.radius + 18) {
-        partner.hp = Math.max(0, partner.hp - enemy.damage * 0.35 * dt);
-        if (partner.hp <= 0) {
-          partner.downed = true;
-          partner.reviveProgress = 0;
-          partner.animState = 'defeat';
+        ally.hp = Math.max(0, ally.hp - enemy.damage * 0.28 * dt);
+        if (ally.hp <= 0) {
+          ally.downed = true;
+          ally.reviveProgress = 0;
+          ally.animState = 'defeat';
           state.statusBanner = {
             text: 'ALIADO CAÍDO!',
-            subtext: `Permanece junto a ${partner.name} por 2.5s para o reerguer`,
+            subtext: `Aproxima-te de ${ally.name} por 2.5s para o reerguer`,
             timer: 3.0,
             color: '#ff4d6d',
           };
@@ -444,16 +520,17 @@ export class ArcanaCoopSession {
       }
     }
 
-    // Cooperative auto-fire at nearest enemy or boss
-    this.aiAttackCooldown -= dt;
-    if (this.aiAttackCooldown <= 0) {
+    // Ataque cooperativo automático no inimigo mais próximo
+    let cd = this.aiAttackCooldowns.get(ally.peerId) || 0;
+    cd -= dt;
+    if (cd <= 0) {
       let targetX: number | null = null;
       let targetY: number | null = null;
-      let bestDist = 420;
+      let bestDist = 450;
 
       if (state.boss && state.boss.hp > 0) {
-        const bDist = Math.hypot(state.boss.x - partner.x, state.boss.y - partner.y);
-        if (bDist < 520) {
+        const bDist = Math.hypot(state.boss.x - ally.x, state.boss.y - ally.y);
+        if (bDist < 550) {
           targetX = state.boss.x;
           targetY = state.boss.y;
           bestDist = bDist;
@@ -461,7 +538,7 @@ export class ArcanaCoopSession {
       }
 
       for (const enemy of state.enemies) {
-        const d = Math.hypot(enemy.x - partner.x, enemy.y - partner.y);
+        const d = Math.hypot(enemy.x - ally.x, enemy.y - ally.y);
         if (d < bestDist) {
           bestDist = d;
           targetX = enemy.x;
@@ -470,18 +547,18 @@ export class ArcanaCoopSession {
       }
 
       if (targetX !== null && targetY !== null) {
-        this.aiAttackCooldown = 0.68;
-        const angle = Math.atan2(targetY - partner.y, targetX - partner.x);
-        partner.facingX = Math.cos(angle);
-        partner.facingY = Math.sin(angle);
-        partner.animState = 'attack';
+        this.aiAttackCooldowns.set(ally.peerId, 0.62 + (index % 3) * 0.15);
+        const angle = Math.atan2(targetY - ally.y, targetX - ally.x);
+        ally.facingX = Math.cos(angle);
+        ally.facingY = Math.sin(angle);
+        ally.animState = 'attack';
 
-        const projSpeed = 520;
+        const projSpeed = 580;
         const projKindMap: Record<ArcanaClassId, ActiveProjectile['kind']> = {
-          chess: 'pawn_lance',
-          chrono: 'chrono_shard',
-          chaos: 'chaos_orb',
-          rune: 'rune_glyph',
+          chess: 'fan_gale',
+          chrono: 'water_whip',
+          chaos: 'solar_fist',
+          rune: 'terracotta_block',
         };
         const projElemMap: Record<ArcanaClassId, ActiveProjectile['element']> = {
           chess: 'spectral',
@@ -489,28 +566,32 @@ export class ArcanaCoopSession {
           chaos: 'chaos',
           rune: 'runic',
         };
-        const classPalette = ARCANA_CLASSES[partner.classId]?.palette.glow ?? '#7de2ff';
+        const classPalette = ARCANA_CLASSES[ally.classId]?.palette.glow ?? '#7de2ff';
 
         state.projectiles.push({
-          id: `coop_proj_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          id: `coop_proj_${ally.peerId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
           owner: 'coop_ally',
-          kind: projKindMap[partner.classId],
-          element: projElemMap[partner.classId],
-          x: partner.x + partner.facingX * 18,
-          y: partner.y + partner.facingY * 18,
+          kind: projKindMap[ally.classId] || 'pawn_lance',
+          element: projElemMap[ally.classId] || 'spectral',
+          x: ally.x + ally.facingX * 18,
+          y: ally.y + ally.facingY * 18,
           vx: Math.cos(angle) * projSpeed,
           vy: Math.sin(angle) * projSpeed,
-          radius: 8,
-          damage: Math.round(player.computed.damage * 0.65),
-          pierceLeft: 1,
+          radius: 12,
+          damage: Math.round(player.computed.damage * 0.7),
+          pierceLeft: 3,
           bouncesLeft: 0,
-          life: 1.35,
-          maxLife: 1.35,
-          homingStrength: 0.15,
+          life: 2.2,
+          maxLife: 2.2,
+          homingStrength: 0.2,
           hitEntityIds: new Set<string>(),
           color: classPalette,
         });
+      } else {
+        this.aiAttackCooldowns.set(ally.peerId, 0.2);
       }
+    } else {
+      this.aiAttackCooldowns.set(ally.peerId, cd);
     }
   }
 
@@ -525,17 +606,16 @@ export class ArcanaCoopSession {
       });
       try {
         this.channel.close();
-      } catch {
-        // Ignore close error
-      }
+      } catch {}
     }
     this.channel = null;
     this.roomCode = null;
     this.role = 'none';
     this.isActive = false;
-    this.isAiCompanion = false;
-    this.partner = null;
-    this.notifyPartnerChanged();
+    this.partners.clear();
+    this.lastRemotePacketMs.clear();
+    this.aiAttackCooldowns.clear();
+    this.notifyPartnersChanged();
   }
 
   public leaveRoom(): void {
@@ -546,8 +626,9 @@ export class ArcanaCoopSession {
     this.disconnect();
   }
 
-  private notifyPartnerChanged(): void {
-    this.onPartnerChangedCallback?.(this.partner);
+  private notifyPartnersChanged(): void {
+    const list = this.getPartners();
+    this.onPartnersChangedCallback?.(list);
   }
 }
 
