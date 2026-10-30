@@ -26,6 +26,9 @@ export function background(level: Level): HTMLCanvasElement {
     const cached = backgrounds.get(level.id);
     if (cached)
         return cached;
+    const pxCanvas = battleBackground(level, W / H);
+    backgrounds.set(level.id, pxCanvas);
+    return pxCanvas;
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;

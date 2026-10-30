@@ -1,0 +1,1143 @@
+/* ============================================================================
+   ASCENSÃO ARCANA — Dark-Arcane Fantasy Stylesheet (GDD v1.0)
+   Strictly scoped under .arcana-root for zero interference with global styles
+   ============================================================================ */
+
+.arcana-root {
+  --arc-bg-deep: #070612;
+  --arc-bg-panel: rgba(16, 14, 34, 0.88);
+  --arc-bg-card: rgba(24, 20, 48, 0.92);
+  --arc-border-gold: rgba(212, 175, 55, 0.48);
+  --arc-border-cyan: rgba(100, 223, 223, 0.42);
+  --arc-gold: #f4c95d;
+  --arc-gold-bright: #ffe699;
+  --arc-cyan: #64dfdf;
+  --arc-cyan-glow: #80ffdb;
+  --arc-violet: #9d4edd;
+  --arc-crimson: #ff4d6d;
+  --arc-emerald: #06d6a0;
+  --arc-text-main: #f4f1ea;
+  --arc-text-muted: #a9a4c4;
+  --arc-safe-top: env(safe-area-inset-top, 0px);
+  --arc-safe-right: env(safe-area-inset-right, 0px);
+  --arc-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --arc-safe-left: env(safe-area-inset-left, 0px);
+
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, #161130 0%, #070510 75%, #030208 100%);
+  color: var(--arc-text-main);
+  font-family: 'Cinzel', 'Georgia', 'Times New Roman', serif;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  z-index: 9999;
+  box-sizing: border-box;
+}
+
+.arcana-root *,
+.arcana-root *::before,
+.arcana-root *::after {
+  box-sizing: border-box;
+}
+
+.arcana-root button,
+.arcana-root input,
+.arcana-root select {
+  font-family: inherit;
+}
+
+.arcana-root.arcana-reduced-flashes * {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.05s !important;
+}
+
+/* ============================================================================
+   KEYFRAMES (Prefixed with arcana-)
+   ============================================================================ */
+
+@keyframes arcana-fissure-pulse {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 28px rgba(100, 223, 223, 0.75)) drop-shadow(0 0 65px rgba(157, 78, 221, 0.55));
+  }
+  50% {
+    transform: scale(1.08) rotate(3deg);
+    filter: drop-shadow(0 0 45px rgba(128, 255, 219, 0.95)) drop-shadow(0 0 95px rgba(244, 201, 93, 0.65));
+  }
+}
+
+@keyframes arcana-orbit-spin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes arcana-orbit-reverse {
+  0% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+}
+
+@keyframes arcana-title-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.92);
+    letter-spacing: 0.35em;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    letter-spacing: 0.14em;
+  }
+}
+
+@keyframes arcana-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes arcana-ult-ready-pulse {
+  0%, 100% {
+    box-shadow: 0 0 14px rgba(244, 201, 93, 0.65), inset 0 0 12px rgba(244, 201, 93, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(255, 230, 153, 0.98), 0 0 48px rgba(100, 223, 223, 0.7), inset 0 0 18px rgba(255, 230, 153, 0.8);
+  }
+}
+
+@keyframes arcana-mythic-shimmer {
+  0% {
+    border-color: #ff4ecd;
+    box-shadow: 0 0 24px rgba(255, 78, 205, 0.55), inset 0 0 18px rgba(255, 78, 205, 0.2);
+  }
+  33% {
+    border-color: #00f5d4;
+    box-shadow: 0 0 28px rgba(0, 245, 212, 0.65), inset 0 0 18px rgba(0, 245, 212, 0.25);
+  }
+  66% {
+    border-color: #ffbe0b;
+    box-shadow: 0 0 28px rgba(255, 190, 11, 0.65), inset 0 0 18px rgba(255, 190, 11, 0.25);
+  }
+  100% {
+    border-color: #ff4ecd;
+    box-shadow: 0 0 24px rgba(255, 78, 205, 0.55), inset 0 0 18px rgba(255, 78, 205, 0.2);
+  }
+}
+
+/* ============================================================================
+   1. OPENING ANIMATED SCENE (GDD 3.2)
+   ============================================================================ */
+
+.arcana-root .arcana-intro-scene,
+.arcana-root .arcana-opening-scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 45%, #190e36 0%, #080414 60%, #020106 100%);
+  z-index: 50;
+  overflow: hidden;
+  padding: 24px;
+}
+
+.arcana-root .arcana-intro-void-fissure,
+.arcana-root .arcana-fissure-core {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+  animation: arcana-fissure-pulse 4s ease-in-out infinite;
+}
+
+.arcana-root .arcana-fissure-crack {
+  width: 110px;
+  height: 185px;
+  background: linear-gradient(180deg, transparent 0%, #80ffdb 22%, #f4c95d 50%, #9d4edd 78%, transparent 100%);
+  clip-path: polygon(50% 0%, 68% 24%, 44% 48%, 74% 72%, 50% 100%, 28% 70%, 54% 46%, 32% 22%);
+  box-shadow: 0 0 48px #64dfdf;
+}
+
+.arcana-root .arcana-orbit-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 220px;
+  height: 220px;
+  border: 1px dashed rgba(244, 201, 93, 0.45);
+  border-radius: 50%;
+  animation: arcana-orbit-spin 16s linear infinite;
+  pointer-events: none;
+}
+
+.arcana-root .arcana-orbit-ring.ring-outer {
+  width: 290px;
+  height: 290px;
+  border-color: rgba(100, 223, 223, 0.35);
+  animation: arcana-orbit-reverse 22s linear infinite;
+}
+
+.arcana-root .arcana-rune-fragment {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(18, 14, 38, 0.9);
+  border: 1px solid var(--arc-gold);
+  color: var(--arc-cyan-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  box-shadow: 0 0 14px rgba(100, 223, 223, 0.6);
+}
+
+.arcana-root .arcana-intro-title {
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--arc-gold-bright);
+  text-shadow: 0 0 24px rgba(244, 201, 93, 0.65), 0 4px 18px rgba(0, 0, 0, 0.9);
+  animation: arcana-title-reveal 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  margin: 0 0 10px;
+}
+
+.arcana-root .arcana-intro-subtitle {
+  max-width: 620px;
+  text-align: center;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: clamp(0.92rem, 1.8vw, 1.12rem);
+  color: var(--arc-text-muted);
+  line-height: 1.5;
+  margin: 0 0 26px;
+}
+
+.arcana-root .arcana-skip-intro-btn {
+  position: absolute;
+  top: calc(18px + var(--arc-safe-top));
+  right: calc(22px + var(--arc-safe-right));
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: rgba(16, 14, 34, 0.78);
+  border: 1px solid var(--arc-border-gold);
+  color: var(--arc-gold-bright);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+
+.arcana-root .arcana-skip-intro-btn:hover {
+  background: rgba(212, 175, 55, 0.22);
+  border-color: var(--arc-gold-bright);
+  transform: translateY(-1px);
+}
+
+/* ============================================================================
+   2. MAIN MENU & ATMOSPHERIC BACKDROP (GDD 3.3)
+   ============================================================================ */
+
+.arcana-root .arcana-main-menu {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 24px;
+  padding: calc(20px + var(--arc-safe-top)) calc(28px + var(--arc-safe-right))
+    calc(20px + var(--arc-safe-bottom)) calc(28px + var(--arc-safe-left));
+  background:
+    radial-gradient(circle at 26% 50%, rgba(100, 223, 223, 0.14) 0%, transparent 52%),
+    radial-gradient(circle at 78% 30%, rgba(157, 78, 221, 0.18) 0%, transparent 55%),
+    linear-gradient(135deg, #070512 0%, #120d29 50%, #090616 100%);
+  overflow-y: auto;
+  z-index: 20;
+}
+
+.arcana-root .arcana-menu-hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 12px;
+}
+
+.arcana-root .arcana-menu-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(100, 223, 223, 0.12);
+  border: 1px solid var(--arc-border-cyan);
+  color: var(--arc-cyan-glow);
+  font-family: system-ui, sans-serif;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.arcana-root .arcana-menu-title {
+  font-size: clamp(2rem, 4.2vw, 3.3rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0;
+  background: linear-gradient(180deg, #ffffff 0%, #ffe699 48%, #d4af37 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 18px rgba(212, 175, 55, 0.35));
+}
+
+.arcana-root .arcana-menu-tagline {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: clamp(0.88rem, 1.5vw, 1.02rem);
+  color: var(--arc-text-muted);
+  max-width: 520px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.arcana-root .arcana-menu-stats-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.arcana-root .arcana-stat-pill {
+  padding: 7px 13px;
+  border-radius: 10px;
+  background: rgba(16, 13, 34, 0.78);
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  color: var(--arc-text-main);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.arcana-root .arcana-stat-pill strong {
+  color: var(--arc-gold-bright);
+}
+
+.arcana-root .arcana-menu-nav {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+  max-width: 440px;
+  width: 100%;
+  justify-self: center;
+}
+
+.arcana-root .arcana-btn,
+.arcana-root .arcana-menu-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(28, 22, 56, 0.92) 0%, rgba(16, 12, 34, 0.95) 100%);
+  border: 1px solid var(--arc-border-gold);
+  color: var(--arc-text-main);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  text-align: left;
+}
+
+.arcana-root .arcana-btn:hover,
+.arcana-root .arcana-menu-btn:hover {
+  transform: translateX(4px) translateY(-1px);
+  border-color: var(--arc-gold-bright);
+  box-shadow: 0 6px 22px rgba(212, 175, 55, 0.25), inset 0 0 12px rgba(244, 201, 93, 0.12);
+}
+
+.arcana-root .arcana-btn:active,
+.arcana-root .arcana-menu-btn:active {
+  transform: scale(0.98);
+}
+
+.arcana-root .arcana-btn-primary,
+.arcana-root .arcana-menu-btn.primary {
+  background: linear-gradient(135deg, #3c2369 0%, #1f3b5c 100%);
+  border-color: var(--arc-cyan-glow);
+  box-shadow: 0 0 20px rgba(100, 223, 223, 0.28);
+}
+
+.arcana-root .arcana-btn-continue,
+.arcana-root .arcana-menu-btn.continue {
+  background: linear-gradient(135deg, #4b3214 0%, #2b1a38 100%);
+  border-color: var(--arc-gold-bright);
+  box-shadow: 0 0 22px rgba(244, 201, 93, 0.35);
+}
+
+.arcana-root .arcana-btn-exit,
+.arcana-root .arcana-menu-btn.exit {
+  border-color: rgba(255, 77, 109, 0.45);
+  color: #ffb3c1;
+}
+
+/* ============================================================================
+   3. CLASS SHOWCASE & PLAYABLE PREVIEW (GDD 3.5)
+   ============================================================================ */
+
+.arcana-root .arcana-showcase-screen,
+.arcana-root .arcana-screen-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: calc(14px + var(--arc-safe-top)) calc(20px + var(--arc-safe-right))
+    calc(14px + var(--arc-safe-bottom)) calc(20px + var(--arc-safe-left));
+  background: rgba(7, 6, 18, 0.96);
+  overflow-y: auto;
+  z-index: 30;
+}
+
+.arcana-root .arcana-screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.26);
+  margin-bottom: 14px;
+}
+
+.arcana-root .arcana-class-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.arcana-root .arcana-class-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--arc-bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.arcana-root .arcana-class-card:hover,
+.arcana-root .arcana-class-card.selected,
+.arcana-root .arcana-class-card.active {
+  border-color: var(--arc-gold-bright);
+  box-shadow: 0 0 24px rgba(244, 201, 93, 0.28), inset 0 0 18px rgba(100, 223, 223, 0.12);
+  transform: translateY(-2px);
+}
+
+.arcana-root .arcana-class-detail-layout {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 16px;
+  flex: 1;
+}
+
+.arcana-root .arcana-stat-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: system-ui, sans-serif;
+  font-size: 0.82rem;
+  margin-bottom: 6px;
+}
+
+.arcana-root .arcana-stat-bar-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.arcana-root .arcana-stat-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--arc-cyan) 0%, var(--arc-gold) 100%);
+}
+
+.arcana-root .arcana-spec-list,
+.arcana-root .arcana-evolution-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arcana-root .arcana-spec-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 12, 32, 0.85);
+  border: 1px solid rgba(100, 223, 223, 0.25);
+  font-family: system-ui, sans-serif;
+  font-size: 0.82rem;
+}
+
+.arcana-root .arcana-spec-card.selected {
+  border-color: var(--arc-gold-bright);
+  background: rgba(212, 175, 55, 0.14);
+}
+
+.arcana-root .arcana-arena-test-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0f5257 0%, #1b3b5c 100%);
+  border: 1px solid var(--arc-cyan-glow);
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(100, 223, 223, 0.35);
+}
+
+/* ============================================================================
+   4. MOBILE-FIRST HORIZONTAL HUD & CANVAS LAYER (GDD 11)
+   ============================================================================ */
+
+.arcana-root .arcana-canvas-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 1;
+}
+
+.arcana-root .arcana-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  padding: calc(10px + var(--arc-safe-top)) calc(14px + var(--arc-safe-right))
+    calc(10px + var(--arc-safe-bottom)) calc(14px + var(--arc-safe-left));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.arcana-root .arcana-hud-interactive {
+  pointer-events: auto;
+}
+
+/* Top Row: Left Player Status | Center Boss/Campaign Timer | Right Pause/Coop */
+.arcana-root .arcana-hud-top {
+  display: grid;
+  grid-template-columns: minmax(210px, 290px) 1fr minmax(140px, 240px);
+  align-items: start;
+  gap: 12px;
+}
+
+/* Top-Left Player Status Box */
+.arcana-root .arcana-hud-player-box {
+  background: rgba(12, 10, 28, 0.82);
+  border: 1px solid var(--arc-border-gold);
+  border-radius: 14px;
+  padding: 8px 12px;
+  backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  pointer-events: auto;
+}
+
+.arcana-root .arcana-hud-player-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.arcana-root .arcana-level-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #d4af37, #8a6421);
+  color: #090614;
+  font-family: system-ui, sans-serif;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.arcana-root .arcana-fragments-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--arc-cyan-glow);
+}
+
+.arcana-root .arcana-hp-bar-outer,
+.arcana-root .arcana-xp-bar-outer {
+  position: relative;
+  width: 100%;
+  height: 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.arcana-root .arcana-xp-bar-outer {
+  height: 6px;
+}
+
+.arcana-root .arcana-hp-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff2a54 0%, #ff6b6b 100%);
+  transition: width 0.12s ease-out;
+}
+
+.arcana-root .arcana-shield-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(100, 223, 223, 0.65);
+  pointer-events: none;
+}
+
+.arcana-root .arcana-xp-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #64dfdf 0%, #f4c95d 100%);
+  transition: width 0.15s ease-out;
+}
+
+.arcana-root .arcana-passive-gauge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-family: system-ui, sans-serif;
+  font-size: 0.72rem;
+  color: var(--arc-gold-bright);
+  padding-top: 2px;
+}
+
+.arcana-root .arcana-rune-symbols-strip {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.arcana-root .arcana-rune-pip {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(100, 223, 223, 0.18);
+  border: 1px solid var(--arc-cyan);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+/* Top-Center Boss Health Bar & Campaign Timer */
+.arcana-root .arcana-hud-center-box {
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 480px;
+}
+
+.arcana-root .arcana-campaign-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(12, 10, 28, 0.82);
+  border: 1px solid rgba(212, 175, 55, 0.38);
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  backdrop-filter: blur(6px);
+}
+
+.arcana-root .arcana-boss-bar-container {
+  width: 100%;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(20, 8, 28, 0.9);
+  border: 1px solid rgba(255, 77, 109, 0.65);
+  box-shadow: 0 0 24px rgba(255, 0, 84, 0.3);
+}
+
+.arcana-root .arcana-boss-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #ffb3c1;
+}
+
+.arcana-root .arcana-boss-hp-track {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.arcana-root .arcana-boss-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #9d0208 0%, #ff0054 55%, #ffbe0b 100%);
+  transition: width 0.1s linear;
+}
+
+.arcana-root .arcana-boss-phase-pip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.arcana-root .arcana-early-boss-btn,
+.arcana-root .arcana-poi-prompt-btn {
+  pointer-events: auto;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6a040f 0%, #9d4edd 100%);
+  border: 1px solid var(--arc-gold-bright);
+  color: #ffffff;
+  font-family: system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(255, 77, 109, 0.6);
+}
+
+/* Top-Right Controls & Co-op Partner Pill */
+.arcana-root .arcana-hud-right-box {
+  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.arcana-root .arcana-hud-icon-btn {
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: rgba(12, 10, 28, 0.84);
+  border: 1px solid var(--arc-border-gold);
+  color: var(--arc-gold-bright);
+  font-family: system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.arcana-root .arcana-coop-hud-pill {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(14, 24, 38, 0.86);
+  border: 1px solid var(--arc-border-cyan);
+  font-family: system-ui, sans-serif;
+  font-size: 0.74rem;
+  min-width: 145px;
+}
+
+/* Bottom Touch Controls: Left Virtual Joystick & Right Action Arc */
+.arcana-root .arcana-hud-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+  pointer-events: none;
+}
+
+.arcana-root .arcana-joystick-zone {
+  position: relative;
+  width: 146px;
+  height: 146px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(100, 223, 223, 0.14) 0%, rgba(12, 10, 28, 0.55) 75%);
+  border: 1.5px solid rgba(100, 223, 223, 0.36);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.arcana-root .arcana-joystick-knob {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffe699 0%, #d4af37 65%, #7a5c12 100%);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 18px rgba(244, 201, 93, 0.65);
+  pointer-events: none;
+  transition: transform 0.03s linear;
+}
+
+/* Ergonomic Curved Action Arc (Bottom-Right) */
+.arcana-root .arcana-action-arc {
+  position: relative;
+  width: 240px;
+  height: 175px;
+  pointer-events: none;
+}
+
+.arcana-root .arcana-skill-btn {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(44, 34, 84, 0.95) 0%, rgba(14, 10, 30, 0.96) 100%);
+  border: 2px solid var(--arc-border-gold);
+  color: var(--arc-text-main);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.65);
+  transition: transform 0.08s ease;
+  overflow: hidden;
+}
+
+.arcana-root .arcana-skill-btn:active {
+  transform: scale(0.92);
+}
+
+/* Primary Attack / Aim Joystick anchor (bottom-right corner) */
+.arcana-root .arcana-skill-btn.btn-primary-attack {
+  right: 6px;
+  bottom: 6px;
+  width: 82px;
+  height: 82px;
+  border-color: var(--arc-cyan-glow);
+  box-shadow: 0 0 22px rgba(100, 223, 223, 0.4);
+}
+
+/* Mobility / Dash (left of primary) */
+.arcana-root .arcana-skill-btn.btn-mobility {
+  right: 102px;
+  bottom: 8px;
+  width: 60px;
+  height: 60px;
+}
+
+/* Special Skill (diagonal arc above-left of primary) */
+.arcana-root .arcana-skill-btn.btn-special {
+  right: 84px;
+  bottom: 78px;
+  width: 64px;
+  height: 64px;
+}
+
+/* Ultimate Skill with Charge Ring (top of arc) */
+.arcana-root .arcana-skill-btn.btn-ultimate {
+  right: 10px;
+  bottom: 100px;
+  width: 66px;
+  height: 66px;
+  border-color: var(--arc-gold);
+}
+
+.arcana-root .arcana-skill-btn.btn-ultimate.ready {
+  animation: arcana-ult-ready-pulse 1.5s ease-in-out infinite;
+  border-color: #ffffff;
+}
+
+/* Auto-attack toggle & Interact pill buttons */
+.arcana-root .arcana-skill-btn.btn-auto-toggle {
+  right: 170px;
+  bottom: 14px;
+  width: 48px;
+  height: 48px;
+  font-size: 0.65rem;
+  font-family: system-ui, sans-serif;
+}
+
+.arcana-root .arcana-skill-btn.btn-auto-toggle.active {
+  border-color: var(--arc-emerald);
+  box-shadow: 0 0 14px rgba(6, 214, 160, 0.55);
+}
+
+.arcana-root .arcana-skill-btn.btn-interact {
+  right: 158px;
+  bottom: 74px;
+  width: 52px;
+  height: 52px;
+  border-color: var(--arc-gold-bright);
+  background: linear-gradient(135deg, #4b3214, #1e1538);
+}
+
+.arcana-root .arcana-cooldown-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 4, 14, 0.76);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--arc-gold-bright);
+}
+
+/* ============================================================================
+   5. PORTRAIT-MODE WARNING OVERLAY (GDD 11.1)
+   ============================================================================ */
+
+.arcana-root .arcana-portrait-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 4, 16, 0.96);
+  z-index: 200;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 28px;
+  gap: 16px;
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  .arcana-root:not(.arcana-portrait-override) .arcana-portrait-overlay {
+    display: flex;
+  }
+}
+
+.arcana-root .arcana-rotate-icon {
+  font-size: 3.4rem;
+  color: var(--arc-gold-bright);
+  animation: arcana-float 2.2s ease-in-out infinite;
+}
+
+/* ============================================================================
+   6. MODALS: 3-CARD DRAFT, GRIMÓRIO, CO-OP, SETTINGS, PAUSE/VICTORY/DEFEAT
+   ============================================================================ */
+
+.arcana-root .arcana-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 3, 12, 0.84);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(14px + var(--arc-safe-top)) calc(18px + var(--arc-safe-right))
+    calc(14px + var(--arc-safe-bottom)) calc(18px + var(--arc-safe-left));
+  z-index: 80;
+  overflow-y: auto;
+}
+
+.arcana-root .arcana-modal-window {
+  width: 100%;
+  max-width: 880px;
+  max-height: 92dvh;
+  overflow-y: auto;
+  background: linear-gradient(160deg, rgba(24, 19, 48, 0.97) 0%, rgba(11, 9, 26, 0.98) 100%);
+  border: 1px solid var(--arc-border-gold);
+  border-radius: 18px;
+  padding: 20px 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 36px rgba(100, 223, 223, 0.16);
+}
+
+/* 3-Card Level-Up Draft Modal with Rarity Glow */
+.arcana-root .arcana-draft-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(190px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.arcana-root .arcana-upgrade-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(18, 15, 38, 0.94);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  text-align: left;
+}
+
+.arcana-root .arcana-upgrade-card:hover {
+  transform: translateY(-5px) scale(1.015);
+}
+
+.arcana-root .arcana-upgrade-card.rarity-common {
+  border-color: #94a3b8;
+  box-shadow: 0 0 14px rgba(148, 163, 184, 0.2);
+}
+
+.arcana-root .arcana-upgrade-card.rarity-rare {
+  border-color: #38bdf8;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.35), inset 0 0 12px rgba(56, 189, 248, 0.12);
+}
+
+.arcana-root .arcana-upgrade-card.rarity-epic {
+  border-color: #c084fc;
+  box-shadow: 0 0 22px rgba(192, 132, 252, 0.45), inset 0 0 14px rgba(192, 132, 252, 0.16);
+}
+
+.arcana-root .arcana-upgrade-card.rarity-legendary {
+  border-color: #fbbf24;
+  box-shadow: 0 0 26px rgba(251, 191, 36, 0.55), inset 0 0 16px rgba(251, 191, 36, 0.22);
+}
+
+.arcana-root .arcana-upgrade-card.rarity-mythic {
+  animation: arcana-mythic-shimmer 3s linear infinite;
+}
+
+/* Grimório Compendium Tabs & Grid */
+.arcana-root .arcana-tabs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.arcana-root .arcana-tab-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--arc-text-muted);
+  font-family: system-ui, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.arcana-root .arcana-tab-btn.active {
+  background: rgba(212, 175, 55, 0.22);
+  border-color: var(--arc-gold-bright);
+  color: var(--arc-gold-bright);
+}
+
+.arcana-root .arcana-grimorio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 10px;
+}
+
+.arcana-root .arcana-grimorio-entry {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 12, 32, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.arcana-root .arcana-grimorio-entry.locked {
+  opacity: 0.48;
+  filter: grayscale(0.8);
+}
+
+/* Settings Sliders & Form Controls */
+.arcana-root .arcana-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: system-ui, sans-serif;
+  font-size: 0.88rem;
+}
+
+.arcana-root .arcana-room-code-box {
+  font-family: monospace;
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: var(--arc-cyan-glow);
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: rgba(0, 245, 212, 0.1);
+  border: 1px dashed var(--arc-cyan-glow);
+  display: inline-block;
+}
+
+/* Responsive compact landscape adjustments for phones */
+@media (max-height: 500px) {
+  .arcana-root .arcana-main-menu {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    gap: 14px;
+  }
+  .arcana-root .arcana-btn,
+  .arcana-root .arcana-menu-btn {
+    padding: 8px 14px;
+    font-size: 0.84rem;
+  }
+  .arcana-root .arcana-joystick-zone {
+    width: 118px;
+    height: 118px;
+  }
+  .arcana-root .arcana-action-arc {
+    transform: scale(0.86);
+    transform-origin: bottom right;
+  }
+}
+
+@media (max-width: 760px) {
+  .arcana-root .arcana-main-menu,
+  .arcana-root .arcana-class-detail-layout,
+  .arcana-root .arcana-draft-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .arcana-root .arcana-class-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -4,3 +4,5 @@
 .mobile-game-hub{min-height:0;height:100dvh}.mobile-game-hub .title-menu{transform:none!important;margin:0;max-height:none}.mobile-game-hub .main-menu{grid-template-columns:1fr;left:auto;position:relative;transform:none}.mobile-game-hub .main-menu>.hub-mode{grid-column:auto;grid-row:auto}
 
 .hub-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.hub-mode-copy strong,.hub-mode-copy em{display:block}.mobile-game-hub .menu-scenery canvas{filter:saturate(.8) brightness(.65) blur(1px)}
+
+.mobile-game-hub .main-menu>.hub-arcana{background:linear-gradient(110deg,#2c1654f5,#14284be8);border-color:#7de2ff66;box-shadow:0 5px 0 #120829,0 8px 20px rgba(125,226,255,0.22)}.hub-arcana .hub-mode-art{color:#7de2ff;text-shadow:0 0 12px #7de2ff}
