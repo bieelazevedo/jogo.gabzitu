@@ -351,18 +351,30 @@ export class Renderer {
     private c: Ctx;
     private dpr = 1;
     private smooth = new Map<number, Point>();
+    private cachedRect = { left: 0, top: 0, width: 1000, height: 600 };
+    private lastResizeCheck = -1;
     constructor(public canvas: HTMLCanvasElement) { this.c = canvas.getContext('2d')!; }
-    resize(quality: Save['settings']['quality']) { const r = this.canvas.getBoundingClientRect(); this.dpr = Math.min(window.devicePixelRatio || 1, quality === 'low' ? 1 : quality === 'medium' ? 1.5 : 2); const w = Math.round(r.width * this.dpr), h = Math.round(r.height * this.dpr); if (this.canvas.width !== w || this.canvas.height !== h) {
-        this.canvas.width = w;
-        this.canvas.height = h;
-    } }
+    resize(quality: Save['settings']['quality'], now = performance.now()) {
+        if (now - this.lastResizeCheck < 250 && this.canvas.width > 0) return;
+        this.lastResizeCheck = now;
+        const r = this.canvas.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) this.cachedRect = { left: r.left, top: r.top, width: r.width, height: r.height };
+        this.dpr = Math.min(window.devicePixelRatio || 1, quality === 'low' ? 1 : quality === 'medium' ? 1.35 : 1.75);
+        const w = Math.round(this.cachedRect.width * this.dpr), h = Math.round(this.cachedRect.height * this.dpr);
+        if (w > 0 && h > 0 && (this.canvas.width !== w || this.canvas.height !== h)) {
+            this.canvas.width = w;
+            this.canvas.height = h;
+        }
+    }
     point(clientX: number, clientY: number): Point { const r = this.canvas.getBoundingClientRect(); return { x: (clientX - r.left) * W / r.width, y: (clientY - r.top) * H / r.height }; }
     screen(p: Point) { const r = this.canvas.getBoundingClientRect(); return { x: r.left + p.x * r.width / W, y: r.top + p.y * r.height / H }; }
     dispose() {}
     draw(s: State, selected: Selection, settings: Save['settings'], remote = false) {
         this.resize(settings.quality);
         const c = this.c, l = LEVELS[s.levelId - 1];
-        c.setTransform(this.canvas.width / W, 0, 0, this.canvas.height / H, 0, 0);
+        const shake = this.vfx.getShakeOffset(settings.reduced);
+        const sx = this.canvas.width / W, sy = this.canvas.height / H;
+        c.setTransform(sx, 0, 0, sy, shake.x * sx, shake.y * sy);
         c.clearRect(0, 0, W, H);
         c.drawImage(battleBackground(l,this.canvas.width/this.canvas.height),0,0,W,H);
         drawRouteHints(c,s,settings.reduced);
@@ -406,7 +418,7 @@ export class Renderer {
                     c.ellipse(p.x, p.y + 18, 23, 9, 0, 0, TAU);
                     c.stroke();
                 }
-                c.save();c.translate(p.x,Math.max(95,p.y));c.scale((this.canvas.height/H)/(this.canvas.width/W),1);drawCat(c, t.kind, 0, 0, 1.4, t.level, t.angle, settings.reduced ? 0 : t.kind==='uia'&&s.uia>0?1:t.shot,settings.reduced?0:s.time, t.branch,t.casts);c.restore();
+                c.save();c.translate(p.x,Math.max(95,p.y));c.scale((this.canvas.height/H)/(this.canvas.width/W),1);ellipse(c,0,22,32,12,'#0b181e66');round(c,-24,8,48,12,4,t.level===3?'#b88c3b':t.level===2?'#5d7885':'#6e6556');ellipse(c,0,8,24,8,t.level===3?'#f2cc6b':t.level===2?'#8faab8':'#968b79');drawCat(c, t.kind, 0, -2, 1.44, t.level, t.angle, settings.reduced ? 0 : t.kind==='uia'&&s.uia>0?1:t.shot,settings.reduced?0:s.time, t.branch,t.casts);c.restore();
             }
             else {
                 const e = obj.e;

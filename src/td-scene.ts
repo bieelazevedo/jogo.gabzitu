@@ -131,7 +131,7 @@ class EnemyUnit{
    if(look.crate){const crate=prop(assets,'crate_A_big');crate.scale.setScalar(2.2);crate.position.set(0,-.2,0);this.actor.bone('head')?.add(crate);}
    if(look.ghost)for(const m of this.actor.materials){m.transparent=true;m.opacity=.62;m.emissive.setHex(0x3a7cff);m.emissiveIntensity=.55;}
    this.materials=this.actor.materials;this.root.add(this.actor.root);this.actor.play(look.run?'Running_C':'Walking_D_Skeletons',{speed:.9+hash(e.id)*.2});this.height=2.4*look.scale;}
-  this.root.traverse(o=>{if(o instanceof T.Mesh)o.castShadow=true;});
+  this.root.traverse(o=>{if(o instanceof T.Mesh)o.castShadow=false;});
   this.shadow=blobShadow(1.4*Math.max(.6,look.scale*1.6));(this.shadow.material as T.MeshBasicMaterial).opacity=.55;this.root.add(this.shadow);
   this.root.position.set(at.x,0,at.z);this.last.copy(this.root.position);parent.add(this.root);
   if(look.ghost)this.shadow.visible=false;
@@ -198,7 +198,7 @@ export class TdRenderer{
   const hwS=w/2/this.scale,hhS=h/2/this.scale,mx=(b.x0+b.x1)/2,my=(b.y0+b.y1)/2;
   this.cx=hwS*2>=b.x1-b.x0?mx:Math.max(b.x0+hwS,Math.min(b.x1-hwS,this.cx));this.cy=hhS*2>=b.y1-b.y0?my:Math.max(b.y0+hhS,Math.min(b.y1-hhS,this.cy));
   this.ox=w/2-this.cx*this.scale;this.oy=h/2-this.cy*this.scale;
-  const ppw=this.scale*TD_SCALE,hw=w/2/ppw,hh=h/2/ppw,focus=simToWorld({x:this.cx,y:this.cy});
+  const stateKey=`${w}:${h}:${this.dpr}:${quality}:${this.zoom.toFixed(3)}:${this.cx.toFixed(1)}:${this.cy.toFixed(1)}:${this.levelId}`;if(stateKey===this.lastKey)return;this.lastKey=stateKey;const ppw=this.scale*TD_SCALE,hw=w/2/ppw,hh=h/2/ppw,focus=simToWorld({x:this.cx,y:this.cy});
   this.gl.shadowMap.enabled=quality!=='low';const span=Math.max(hw,hh/Math.sin(TD_PITCH))*1.15,sh=this.sun.shadow.camera;this.sun.shadow.mapSize.setScalar(matchMedia('(pointer:coarse)').matches?512:quality==='high'?2048:1024);sh.left=-span;sh.right=span;sh.top=span;sh.bottom=-span;sh.near=1;sh.far=90;sh.updateProjectionMatrix();
   this.sun.position.set(focus.x-14,30,focus.z+12);this.sun.target.position.set(focus.x,0,focus.z);this.sun.target.updateMatrixWorld();
   const cam=this.camera;cam.left=-hw;cam.right=hw;cam.top=hh;cam.bottom=-hh;cam.position.set(focus.x,60*Math.sin(TD_PITCH),focus.z+60*COS);cam.lookAt(focus.x,0,focus.z);cam.near=1;cam.far=160;cam.updateProjectionMatrix();
@@ -207,7 +207,7 @@ export class TdRenderer{
  /** Simulation point to client coordinates (for popovers anchored to towers). */
  screen(p:Point){const r=this.canvas.getBoundingClientRect();return {x:r.left+this.ox+p.x*this.scale,y:r.top+this.oy+p.y*this.scale};}
  pixelsPerUnit(){return this.scale;}
- private box={x0:-30,x1:1030,y0:-20,y1:620};private zoom=1;private cx=500;private cy=300;
+ private box={x0:-30,x1:1030,y0:-20,y1:620};private zoom=1;private cx=500;private cy=300;private lastKey='';private lastRectTime=-1;private cachedRect={left:0,top:0,width:1000,height:600};
  /** True when the last touch on the map panned or zoomed it (so lifting the finger is not a tap). */
  dragged=false;onView?:()=>void;private autoZoom=true;private hintUntil=0;
  private fitLevel(level:Level){const pts=[...level.spots,...level.paths.flat().map(p=>({x:Math.max(0,Math.min(1000,p.x)),y:p.y}))];

@@ -160,7 +160,7 @@ function renderGame() {
 /** Swaps the 2D battlefield for the 3D hex battlefield once its models are loaded; the 2D view stays as fallback. */
 function upgradeRenderer() {
     const flat = renderer, wrap = document.querySelector<HTMLElement>('.canvas-wrap');
-    if (!(flat instanceof Renderer) || !wrap || new URLSearchParams(location.search).has('2d'))
+    if (!(flat instanceof Renderer) || !wrap || !new URLSearchParams(location.search).has('3d'))
         return;
     void import('./td-scene').then(({ TdRenderer }) => {
         if (renderer !== flat || screen !== 'game')
