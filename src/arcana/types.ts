@@ -273,6 +273,10 @@ export interface ActiveProjectile {
   id: string;
   owner: 'player' | 'coop_ally' | 'enemy' | 'boss';
   kind:
+    | 'water_whip'
+    | 'fan_gale'
+    | 'solar_fist'
+    | 'terracotta_block'
     | 'pawn_lance'
     | 'bishop_diagonal'
     | 'rook_column'

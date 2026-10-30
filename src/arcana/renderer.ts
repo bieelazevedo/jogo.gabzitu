@@ -893,9 +893,36 @@ export class ArcanaRenderer {
 
     const positions = groundGeo.getAttribute('position');
     const colors = new Float32Array(positions.count * 3);
-    const tc1 = new T.Color(0xb55232); // Warm Terracotta (matching Image 1)
-    const tc2 = new T.Color(0x8a3820); // Deep Terracotta
-    const tc3 = new T.Color(0x191024); // Deep Twilight Slate
+    // 5 Elemental Biome Dynamic Ground Palettes
+    let cFloor1 = 0xb55232;
+    let cFloor2 = 0x8a3820;
+    let cFloor3 = 0x191024;
+
+    if (_campaign.id === 'cloister') {
+      // Biome II: Mirror Lake (Liquid Azure & Ice)
+      cFloor1 = 0x0f4c5c;
+      cFloor2 = 0x0a2e36;
+      cFloor3 = 0x031926;
+    } else if (_campaign.id === 'ash') {
+      // Biome III: Black Sun Forge (Volcanic Basalt & Magma)
+      cFloor1 = 0x541818;
+      cFloor2 = 0x2e0c0c;
+      cFloor3 = 0x140505;
+    } else if (_campaign.id === 'hourglasses') {
+      // Biome IV: Thousand Bells (Jade Pavers & Sky Slate)
+      cFloor1 = 0x2d6a4f;
+      cFloor2 = 0x1b4332;
+      cFloor3 = 0x081c15;
+    } else if (_campaign.id === 'rift' || _campaign.id === 'infinite') {
+      // Biome V: Primordial Nexus (Convergence)
+      cFloor1 = 0x3c096c;
+      cFloor2 = 0x240046;
+      cFloor3 = 0x10002b;
+    }
+
+    const tc1 = new T.Color(cFloor1);
+    const tc2 = new T.Color(cFloor2);
+    const tc3 = new T.Color(cFloor3);
     const tmp = new T.Color();
 
     for (let i = 0; i < positions.count; i++) {

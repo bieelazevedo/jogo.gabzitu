@@ -662,17 +662,21 @@ function firePlayerPrimary(state: ArcanaRunState, originX: number, originY: numb
     let pierce = player.computed.pierce;
 
     if (player.classId === 'chess') {
-      kind = isChessQueenEvo ? 'queen_beam' : 'pawn_lance';
-      color = isChessQueenEvo ? '#ffd166' : '#e8e0d5';
+      kind = isChessQueenEvo ? 'queen_beam' : 'water_whip';
+      color = isChessQueenEvo ? '#ffd166' : '#00f5d4';
       if (isChessQueenEvo) {
         dmg = Math.round(dmg * 1.3);
         radius *= 1.25;
       }
     } else if (player.classId === 'chrono') {
-      kind = 'chrono_shard';
-      color = '#7df9ff';
+      // Kael's Celestial Fan Gust
+      kind = 'fan_gale';
+      color = '#70e000';
+      radius *= 1.35; // Wide sweeping fan arc
+      pierce += 1;
     } else if (player.classId === 'chaos') {
-      kind = isChaosOmni || isChaosWildcard ? 'chaos_prism' : 'chaos_orb';
+      // Iskra's Martial Solar Fist
+      kind = isChaosOmni || isChaosWildcard ? 'chaos_prism' : 'solar_fist';
       element = chaosElem;
       color =
         chaosElem === 'fire'
@@ -688,8 +692,11 @@ function firePlayerPrimary(state: ArcanaRunState, originX: number, originY: numb
         radius *= 1.35;
       }
     } else if (player.classId === 'rune') {
-      kind = 'rune_glyph';
-      color = '#80ffdb';
+      // Borak's Terracotta Kinetic Rock Block
+      kind = 'terracotta_block';
+      color = '#ffd166';
+      dmg = Math.round(dmg * 1.25); // Heavy earth impact
+      radius *= 1.4;
     }
 
     state.projectiles.push({

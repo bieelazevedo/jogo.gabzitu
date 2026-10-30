@@ -155,11 +155,11 @@ export const ARCANA_CLASSES: Record<ArcanaClassId, ArcanaClassDef> = {
       pickupRadius: 130,
     },
     primaryAttack: {
-      name: 'Lâminas de Vento Cortante',
+      name: 'Batida do Leque Celestial',
       description:
-        'Dispara meias-luas supersónicas de ar comprimido que atravessam fileiras de inimigos e criam turbulência.',
+        'Bate o grande leque de combate de seda e jade com força para a frente, disparando rajadas expansivas de ar comprimido e folhas celestes.',
       cooldown: 0.38,
-      icon: '🌪',
+      icon: '🪭',
       tag: 'temporal',
     },
     specialSkill: {
@@ -355,11 +355,11 @@ export const ARCANA_CLASSES: Record<ArcanaClassId, ArcanaClassDef> = {
       pickupRadius: 120,
     },
     primaryAttack: {
-      name: 'Disparo de Rocha & Discos de Ferro',
+      name: 'Combo Sísmico: Soco & Chute de Terracota',
       description:
-        'Arranca lajes de granito e discos de metal do solo, arremessando-os com impacto perfurante e esmagador.',
+        'Desfere um soco de rocha pesada seguido de um chute marcial que arranca e projeta blocos de terracota estratificada com fendas de quartzo.',
       cooldown: 0.50,
-      icon: '🪨',
+      icon: '💎',
       tag: 'runic',
     },
     specialSkill: {
