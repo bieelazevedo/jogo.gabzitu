@@ -1508,7 +1508,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
 
             <!-- 5 Framed Skill Slots -->
             <!-- 1. Primary Attack -->
-            <button id="arc-joy-aim" class="ravenswatch-skill-slot" data-act="hud-primary" title="${cls.primaryAttack.name} [Rato]">
+            <button id="arc-btn-primary" class="ravenswatch-skill-slot" data-act="hud-primary" title="${cls.primaryAttack.name} [Rato]">
               <div style="width:28px;height:28px;color:#ffd166;">${getSkillVectorIcon(cls.primaryAttack.name)}</div>
               <div class="ravenswatch-keybind-pill">RATO</div>
             </button>
@@ -1552,6 +1552,11 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
 
           <!-- Bottom-Right placeholder for Minimap alignment (Minimap is rendered directly on 3D canvas) -->
           <div style="width:160px;height:10px;"></div>
+
+          <!-- Floating Mobile Virtual Movement Joystick (Bottom-Left) -->
+          <div id="arc-joy-move" class="arcana-joystick-zone" style="pointer-events:auto;position:absolute;bottom:24px;left:24px;width:124px;height:124px;border-radius:50%;background:radial-gradient(circle,rgba(0,245,212,0.18),rgba(14,9,30,0.85));border:2px solid rgba(0,245,212,0.45);display:flex;align-items:center;justify-content:center;touch-action:none;box-shadow:0 8px 24px rgba(0,0,0,0.85),inset 0 0 16px rgba(0,245,212,0.25);z-index:90;">
+            <div id="arc-joy-move-knob" class="arcana-joystick-knob" style="width:52px;height:52px;border-radius:50%;background:radial-gradient(circle,#80ffdb,#00bbf9);border:2px solid #fff;box-shadow:0 0 16px rgba(0,245,212,0.8);pointer-events:none;transform:translate(0,0);"></div>
+          </div>
         </div>
       `;
       uiLayer.appendChild(hud);
@@ -1777,7 +1782,6 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   function bindTouchJoysticks() {
     const moveZone = uiLayer.querySelector<HTMLElement>('#arc-joy-move');
     const moveKnob = uiLayer.querySelector<HTMLElement>('#arc-joy-move-knob');
-    const aimZone = uiLayer.querySelector<HTMLElement>('#arc-joy-aim');
 
     if (moveZone && moveKnob) {
       let pid: number | null = null;
@@ -1796,229 +1800,211 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         moveKnob.style.transform = `translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
         joyMoveVec = { x: dx / maxR, y: dy / maxR };
       };
+
       moveZone.addEventListener('pointerdown', e => {
         pid = e.pointerId;
-        moveZone.setPointerCapture(e.pointerId);
+        try { moveZone.setPointerCapture(e.pointerId); } catch {}
         updateMove(e.clientX, e.clientY);
-      });
+      }, { passive: true });
+
       moveZone.addEventListener('pointermove', e => {
         if (e.pointerId === pid) updateMove(e.clientX, e.clientY);
-      });
+      }, { passive: true });
+
       const resetMove = (e: PointerEvent) => {
         if (e.pointerId === pid) {
           pid = null;
+          try { moveZone.releasePointerCapture(e.pointerId); } catch {}
           moveKnob.style.transform = 'translate(0px,0px)';
           joyMoveVec = { x: 0, y: 0 };
         }
       };
-      moveZone.addEventListener('pointerup', resetMove);
-      moveZone.addEventListener('pointercancel', resetMove);
-    }
-
-    if (aimZone) {
-      let pid: number | null = null;
-      const updateAim = (clientX: number, clientY: number) => {
-        const r = aimZone.getBoundingClientRect();
-        const cx = r.left + r.width / 2;
-        const cy = r.top + r.height / 2;
-        const dx = clientX - cx;
-        const dy = clientY - cy;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 6) {
-          joyAimVec = { x: dx / dist, y: dy / dist, active: true };
-        }
-      };
-      aimZone.addEventListener('pointerdown', e => {
-        pid = e.pointerId;
-        aimZone.setPointerCapture(e.pointerId);
-        joyAimVec.active = true;
-        updateAim(e.clientX, e.clientY);
-      });
-      aimZone.addEventListener('pointermove', e => {
-        if (e.pointerId === pid) updateAim(e.clientX, e.clientY);
-      });
-      const resetAim = (e: PointerEvent) => {
-        if (e.pointerId === pid) {
-          pid = null;
-          joyAimVec.active = false;
-        }
-      };
-      aimZone.addEventListener('pointerup', resetAim);
-      aimZone.addEventListener('pointercancel', resetAim);
+      moveZone.addEventListener('pointerup', resetMove, { passive: true });
+      moveZone.addEventListener('pointercancel', resetMove, { passive: true });
     }
   }
 
   function bindUiActions() {
-    for (const btn of uiLayer.querySelectorAll<HTMLElement>('[data-act]')) {
-      btn.onclick = e => {
-        e.stopPropagation();
-        unlockAudioOnce();
-        audio.playSfx('ui_click');
-        const act = btn.dataset.act!;
-        const [key, val] = act.split(':');
+    function executeAction(act: string) {
+      unlockAudioOnce();
+      audio.playSfx('ui_click');
+      const [key, val] = act.split(':');
 
-        if (key === 'dismiss-portrait') {
-          portraitDismissed = true;
-          renderUi();
-        } else if (key === 'skip-intro') {
-          finishIntro();
-        } else if (key === 'exit-platform') {
-          cleanup();
-          options.onExit();
-        } else if (key === 'back-menu') {
-          currentScreen = 'menu';
-          audio.setTheme('menu');
-          renderUi();
-        } else if (key === 'open-class-select') {
-          currentScreen = 'class_select';
-          renderUi();
-        } else if (key === 'open-skill-tree') {
-          currentScreen = 'skill_tree';
-          renderUi();
-        } else if (key === 'tree-class') {
-          selectedClassId = val as ArcanaClassId;
-          selectedWebNodeId = null;
-          renderUi();
-        } else if (key === 'web-node') {
-          selectedWebNodeId = val;
-          renderUi();
-        } else if (key === 'unlock-web-node') {
-          const activeCls = runState ? runState.player.classId : selectedClassId;
-          const nodes = SKILL_WEB_NODES.filter(n => n.classId === activeCls);
-          const targetNode = nodes.find(n => n.id === val);
-          if (targetNode) {
-            unlockedWebNodes.add(targetNode.id);
-            recordDiscovery(profile, 'upgrade', targetNode.id);
+      if (key === 'dismiss-portrait') {
+        portraitDismissed = true;
+        renderUi();
+      } else if (key === 'skip-intro') {
+        finishIntro();
+      } else if (key === 'exit-platform') {
+        cleanup();
+        options.onExit();
+      } else if (key === 'back-menu') {
+        currentScreen = 'menu';
+        audio.setTheme('menu');
+        renderUi();
+      } else if (key === 'open-class-select') {
+        currentScreen = 'class_select';
+        renderUi();
+      } else if (key === 'open-skill-tree') {
+        currentScreen = 'skill_tree';
+        renderUi();
+      } else if (key === 'tree-class') {
+        selectedClassId = val as ArcanaClassId;
+        selectedWebNodeId = null;
+        renderUi();
+      } else if (key === 'web-node') {
+        selectedWebNodeId = val;
+        renderUi();
+      } else if (key === 'unlock-web-node') {
+        const activeCls = runState ? runState.player.classId : selectedClassId;
+        const nodes = SKILL_WEB_NODES.filter(n => n.classId === activeCls);
+        const targetNode = nodes.find(n => n.id === val);
+        if (targetNode) {
+          unlockedWebNodes.add(targetNode.id);
+          recordDiscovery(profile, 'upgrade', targetNode.id);
+          if (targetNode.upgradeId) {
+            recordDiscovery(profile, 'upgrade', targetNode.upgradeId);
+          }
+          if (runState) {
+            spentChiPointsInRun += 1;
+            const specId = ARCANA_CLASSES[activeCls].specializations[targetNode.branchIndex]?.id;
+            if (!runState.player.specializationId && specId) {
+              selectSpecialization(runState, specId);
+            }
             if (targetNode.upgradeId) {
-              recordDiscovery(profile, 'upgrade', targetNode.upgradeId);
+              runState.player.upgrades[targetNode.upgradeId] =
+                (runState.player.upgrades[targetNode.upgradeId] || 0) + 1;
             }
-            if (runState) {
-              spentChiPointsInRun += 1;
-              const specId = ARCANA_CLASSES[activeCls].specializations[targetNode.branchIndex]?.id;
-              if (!runState.player.specializationId && specId) {
-                selectSpecialization(runState, specId);
-              }
-              if (targetNode.upgradeId) {
-                runState.player.upgrades[targetNode.upgradeId] =
-                  (runState.player.upgrades[targetNode.upgradeId] || 0) + 1;
-              }
-              audio.playSfx('card_pick', runState.player.classId);
-            } else if (profile.eternalEssence >= 15) {
-              profile.eternalEssence = Math.max(0, profile.eternalEssence - 15);
-              saveArcanaProfile(profile);
-            }
+            audio.playSfx('card_pick', runState.player.classId);
+          } else if (profile.eternalEssence >= 15) {
+            profile.eternalEssence = Math.max(0, profile.eternalEssence - 15);
+            saveArcanaProfile(profile);
           }
-          renderUi();
-        } else if (key === 'quick-play') {
-          selectedClassId = val as ArcanaClassId;
-          clearRunCheckpoint(profile);
-          startNewAdventure({});
-        } else if (key === 'inspect-class') {
-          selectedClassId = val as ArcanaClassId;
-          currentScreen = 'class_select';
-          renderUi();
-        } else if (key === 'open-coop') {
-          currentScreen = 'coop_lobby';
-          renderUi();
-        } else if (key === 'coop-create') {
-          coop.createRoom(options.name || 'Guardião', selectedClassId);
-          renderUi();
-        } else if (key === 'coop-join') {
-          const inp = uiLayer.querySelector<HTMLInputElement>('#arcana-room-input');
-          const code = inp?.value.trim() || 'ARC-777';
-          coop.joinRoom(code, options.name || 'Convidado', selectedClassId);
-          startNewAdventure({});
-        } else if (key === 'coop-start-ai') {
-          coop.enableAiCompanion(selectedClassId);
-          startNewAdventure({});
-        } else if (key === 'open-grimoire') {
-          currentScreen = 'grimoire';
-          renderUi();
-        } else if (key === 'grim-tab') {
-          grimoireTab = val as typeof grimoireTab;
-          renderUi();
-        } else if (key === 'open-ascensions') {
-          currentScreen = 'ascensions';
-          renderUi();
-        } else if (key === 'pick-asc') {
-          selectedAscension = Number(val) || 0;
-          currentScreen = 'menu';
-          renderUi();
-        } else if (key === 'open-settings') {
-          currentScreen = 'settings';
-          renderUi();
-        } else if (key === 'set-quality') {
-          profile.settings.quality = val as QualityProfile;
-          renderer.setQuality(profile.settings.quality);
-          saveArcanaProfile(profile);
-          renderUi();
-        } else if (key === 'pick-class') {
-          selectedClassId = val as ArcanaClassId;
-          selectedWebNodeId = null;
-          menuBackdropState = createInitialRunState({ classId: selectedClassId, isTraining: true });
-          renderUi();
-        } else if (key === 'start-training') {
-          startNewAdventure({ isTraining: true });
-        } else if (key === 'start-tutorial') {
-          startNewAdventure({ isTutorial: true });
-        } else if (key === 'launch-campaign') {
-          clearRunCheckpoint(profile);
-          startNewAdventure({});
-        } else if (key === 'continue-run') {
-          if (profile.savedCheckpoint) {
-            startNewAdventure({ resumeCheckpoint: true });
-          }
-        } else if (key === 'toggle-pause') {
-          isPaused = !isPaused;
-          renderUi();
-        } else if (key === 'toggle-inrun-tree') {
-          showInRunSkillTree = !showInRunSkillTree;
-          renderUi();
-        } else if (key === 'choose-spec' && runState) {
-          selectSpecialization(runState, val);
-          showSpecChoiceModal = false;
-          audio.playSfx('card_pick', runState.player.classId);
-          renderUi();
-        } else if (key === 'pick-upgrade' && runState) {
-          applyUpgradeChoice(runState, val);
-          recordDiscovery(profile, 'upgrade', val);
-          audio.playSfx('card_pick', runState.player.classId);
-          triggerSpecModalIfNeeded();
-          renderUi();
-        } else if (key === 'hud-dash') {
-          input.mobilityPressed = true;
-        } else if (key === 'hud-special') {
-          input.specialPressed = true;
-        } else if (key === 'hud-ult') {
-          input.ultimatePressed = true;
-        } else if (key === 'hud-auto') {
-          input.autoAttackEnabled = !input.autoAttackEnabled;
-          renderUi();
-        } else if (key === 'hud-interact') {
-          input.interactPressed = true;
-        } else if (key === 'next-campaign' && runState) {
-          advanceToNextCampaign(runState);
-          recordDiscovery(profile, 'biome', runState.campaignId);
-          saveRunCheckpoint(profile, runState);
-          audio.setTheme(runState.campaignId);
-          renderUi();
-        } else if (key === 'training-levelup' && runState) {
-          runState.player.xp += runState.player.xpToNext;
-        } else if (key === 'training-boss' && runState) {
-          spawnCampaignBoss(runState);
-          renderUi();
-        } else if (key === 'restart-run') {
-          clearRunCheckpoint(profile);
-          startNewAdventure({});
-        } else if (key === 'save-and-menu') {
-          if (runState && runState.player.hp > 0 && !runState.isTrainingArena) {
-            saveRunCheckpoint(profile, runState);
-          }
-          currentScreen = 'menu';
-          audio.setTheme('menu');
-          renderUi();
         }
-      };
+        renderUi();
+      } else if (key === 'quick-play') {
+        selectedClassId = val as ArcanaClassId;
+        clearRunCheckpoint(profile);
+        startNewAdventure({});
+      } else if (key === 'inspect-class') {
+        selectedClassId = val as ArcanaClassId;
+        currentScreen = 'class_select';
+        renderUi();
+      } else if (key === 'open-coop') {
+        currentScreen = 'coop_lobby';
+        renderUi();
+      } else if (key === 'coop-create') {
+        coop.createRoom(options.name || 'Guardião', selectedClassId);
+        renderUi();
+      } else if (key === 'coop-join') {
+        const inp = uiLayer.querySelector<HTMLInputElement>('#arcana-room-input');
+        const code = inp?.value.trim() || 'ARC-777';
+        coop.joinRoom(code, options.name || 'Convidado', selectedClassId);
+        startNewAdventure({});
+      } else if (key === 'coop-start-ai') {
+        coop.enableAiCompanion(selectedClassId);
+        startNewAdventure({});
+      } else if (key === 'open-grimoire') {
+        currentScreen = 'grimoire';
+        renderUi();
+      } else if (key === 'grim-tab') {
+        grimoireTab = val as typeof grimoireTab;
+        renderUi();
+      } else if (key === 'open-ascensions') {
+        currentScreen = 'ascensions';
+        renderUi();
+      } else if (key === 'pick-asc') {
+        selectedAscension = Number(val) || 0;
+        currentScreen = 'menu';
+        renderUi();
+      } else if (key === 'start-run') {
+        clearRunCheckpoint(profile);
+        startNewAdventure({});
+      } else if (key === 'start-training') {
+        clearRunCheckpoint(profile);
+        startNewAdventure({ isTraining: true });
+      } else if (key === 'resume-run') {
+        startNewAdventure({ resumeCheckpoint: true });
+      } else if (key === 'abandon-run') {
+        clearRunCheckpoint(profile);
+        renderUi();
+      } else if (key === 'toggle-pause') {
+        isPaused = !isPaused;
+        renderUi();
+      } else if (key === 'toggle-inrun-tree') {
+        showInRunSkillTree = !showInRunSkillTree;
+        renderUi();
+      } else if (key === 'choose-spec' && runState) {
+        selectSpecialization(runState, val);
+        showSpecChoiceModal = false;
+        audio.playSfx('card_pick', runState.player.classId);
+        renderUi();
+      } else if (key === 'pick-upgrade' && runState) {
+        applyUpgradeChoice(runState, val);
+        recordDiscovery(profile, 'upgrade', val);
+        audio.playSfx('card_pick', runState.player.classId);
+        triggerSpecModalIfNeeded();
+        renderUi();
+      } else if (key === 'hud-dash') {
+        input.mobilityPressed = true;
+      } else if (key === 'hud-special') {
+        input.specialPressed = true;
+      } else if (key === 'hud-ult') {
+        input.ultimatePressed = true;
+      } else if (key === 'hud-primary') {
+        input.primaryHeld = true;
+      } else if (key === 'hud-auto') {
+        input.autoAttackEnabled = !input.autoAttackEnabled;
+        renderUi();
+      } else if (key === 'hud-interact') {
+        input.interactPressed = true;
+      } else if (key === 'next-campaign' && runState) {
+        advanceToNextCampaign(runState);
+        recordDiscovery(profile, 'biome', runState.campaignId);
+        saveRunCheckpoint(profile, runState);
+        audio.setTheme(runState.campaignId);
+        renderUi();
+      } else if (key === 'training-levelup' && runState) {
+        runState.player.xp += runState.player.xpToNext;
+      } else if (key === 'training-boss' && runState) {
+        spawnCampaignBoss(runState);
+        renderUi();
+      } else if (key === 'restart-run') {
+        clearRunCheckpoint(profile);
+        startNewAdventure({});
+      } else if (key === 'save-and-menu') {
+        if (runState && runState.player.hp > 0 && !runState.isTrainingArena) {
+          saveRunCheckpoint(profile, runState);
+        }
+        currentScreen = 'menu';
+        audio.setTheme('menu');
+        renderUi();
+      }
+    }
+
+    for (const btn of uiLayer.querySelectorAll<HTMLElement>('[data-act]')) {
+      const act = btn.dataset.act!;
+      if (act.startsWith('hud-')) {
+        // Fast instant dual-touch trigger for mobile (doesn't wait for pointer release)
+        btn.addEventListener('pointerdown', e => {
+          e.stopPropagation();
+          executeAction(act);
+        }, { passive: true });
+
+        if (act === 'hud-primary') {
+          const releasePrimary = (e: Event) => {
+            e.stopPropagation();
+            input.primaryHeld = false;
+          };
+          btn.addEventListener('pointerup', releasePrimary, { passive: true });
+          btn.addEventListener('pointercancel', releasePrimary, { passive: true });
+        }
+      } else {
+        btn.onclick = e => {
+          e.stopPropagation();
+          executeAction(act);
+        };
+      }
     }
 
     for (const rng of uiLayer.querySelectorAll<HTMLInputElement>('[data-setting-range]')) {
