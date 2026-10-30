@@ -807,10 +807,10 @@ function triggerClassSpecial(state: ArcanaRunState, baseAngle: number): void {
       );
     }
 
-    // Passive: Peças Coordenadas (at 10 stacks, all active chess pieces unleash a coordinated volley)
+    // Passive: Maré Cheia (aos 10 acúmulos, a maré desperta em erupção coordenada)
     if (player.chessCoordinationStacks >= 10) {
       player.chessCoordinationStacks = 0;
-      addFloatingText(state, 'XEQUE COORDENADO!', player.x, player.y - 36, '#ffd166', true, 1.25);
+      addFloatingText(state, 'MARÉ CHEIA!', player.x, player.y - 36, '#ffd166', true, 1.25);
       for (const c of state.constructs) {
         if (c.ownerClass === 'chess') {
           dealPlayerAreaDamage(
@@ -849,17 +849,17 @@ function triggerClassSpecial(state: ArcanaRunState, baseAngle: number): void {
     player.chronoSequenceStacks = Math.min(8, player.chronoSequenceStacks + 2);
     recomputePlayerStats(player);
   } else if (player.classId === 'chaos') {
-    // Roleta Arcana: rolls elemental cataclysm (or 2 with Aposta Tudo ou Nada)
+    // Roda dos Quatro Fogos: invoca cataclismos elementais
     const rolls = hasSpecialFlag(player, 'chaos_double_roulette') ? 2 : 1;
     const variants: Array<{ name: string; elem: ElementalTag; color: string }> = [
-      { name: 'Chuva de Meteoros', elem: 'fire', color: '#ff6b35' },
-      { name: 'Nova Glacial', elem: 'frost', color: '#7df9ff' },
-      { name: 'Tempestade em Cadeia', elem: 'lightning', color: '#ffbe0b' },
-      { name: 'Vórtice Abissal', elem: 'void', color: '#c77dff' },
+      { name: 'Chuva de Brasas', elem: 'fire', color: '#ff6b35' },
+      { name: 'Nova da Chama Azul', elem: 'frost', color: '#00bbf9' },
+      { name: 'Relâmpago em Cadeia', elem: 'lightning', color: '#ffbe0b' },
+      { name: 'Vórtice do Sol Negro', elem: 'void', color: '#c77dff' },
     ];
     for (let r = 0; r < rolls; r++) {
       const pick = variants[Math.floor(Math.random() * variants.length)];
-      addFloatingText(state, `🎲 ${pick.name}!`, player.x, player.y - 32 - r * 18, pick.color, true, 1.15);
+      addFloatingText(state, `🔥 ${pick.name}!`, player.x, player.y - 32 - r * 18, pick.color, true, 1.15);
       dealPlayerAreaDamage(
         state,
         targetX,
@@ -932,9 +932,9 @@ function triggerClassSpecial(state: ArcanaRunState, baseAngle: number): void {
 
     player.runeActiveSymbols.push(sym);
     if (player.runeActiveSymbols.length >= 3) {
-      // Lexicon Word of Power combo!
+      // Ressonância Sísmica dos Três Monólitos
       player.runeActiveSymbols = [];
-      addFloatingText(state, '📜 PALAVRA DE PODER!', player.x, player.y - 36, '#80ffdb', true, 1.25);
+      addFloatingText(state, '⚡ ABALO SÍSMICO!', player.x, player.y - 36, '#80ffdb', true, 1.25);
       dealPlayerAreaDamage(
         state,
         targetX,
@@ -1372,7 +1372,7 @@ export function stepArcanaSimulation(
   if (player.classId === 'chaos') {
     if (player.chaosInstability >= 100) {
       player.chaosInstability = 35;
-      addFloatingText(state, '🌀 SURTO CAÓTICO!', player.x, player.y - 38, '#ff4ecd', true, 1.3);
+      addFloatingText(state, '☀️ DETONAÇÃO SOLAR!', player.x, player.y - 38, '#ff4ecd', true, 1.3);
       dealPlayerAreaDamage(
         state,
         player.x,
@@ -2067,7 +2067,7 @@ export function stepArcanaSimulation(
         state.phase = 'B_EXPLORATION';
         state.statusBanner = {
           text: `Etapa 2/4 — Exploração de ${campaignDef.name}`,
-          subtext: 'Explora os Santuários Espirituais e derrota patrulhas para atrair o Guardião.',
+          subtext: 'Explora os Santuários Ancestrais e derrota as Cascas para atrair o Guardião Caído.',
           timer: 3.4,
           color: campaignDef.palette.accentRunes,
         };
@@ -2078,8 +2078,8 @@ export function stepArcanaSimulation(
       if (state.phase !== 'C_ESCALATION') {
         state.phase = 'C_ESCALATION';
         state.statusBanner = {
-          text: 'Etapa 3/4 — Invasão de Elite!',
-          subtext: 'Comandantes de Elite surgem no campo! Derrota-os para ganhar Relíquias.',
+          text: 'Etapa 3/4 — Invasão das Cascas de Elite!',
+          subtext: 'Paladinos Caídos e Comandantes do Oco surgem no campo! Derrota-os por Relíquias.',
           timer: 3.5,
           color: '#ffd166',
         };
@@ -2088,8 +2088,8 @@ export function stepArcanaSimulation(
       if (state.phase !== 'D_OMEN') {
         state.phase = 'D_OMEN';
         state.statusBanner = {
-          text: 'Etapa 4/4 — Presságio do Mestre Guardião!',
-          subtext: `${campaignDef.boss.name} está prestes a despertar no Coliseu Central!`,
+          text: 'Etapa 4/4 — Presságio do Guardião Caído!',
+          subtext: `${campaignDef.boss.name} está prestes a despertar na arena dos selos!`,
           timer: 3.8,
           color: campaignDef.boss.palette.danger,
         };

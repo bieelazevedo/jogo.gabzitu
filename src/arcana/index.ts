@@ -3,6 +3,7 @@
 // ============================================================================
 
 import './arcana.css';
+import { skillIcon } from '../night-skill-icons';
 import {
   ARCANA_CAMPAIGNS,
   ARCANA_CLASSES,
@@ -66,18 +67,18 @@ const RARITY_LABELS: Record<UpgradeRarity, string> = {
   common: 'Comum',
   rare: 'Raro',
   epic: 'Épico',
-  legendary: 'Sub-dobra Lendária',
-  mythic: 'Estado Avatar Mítico',
+  legendary: 'Vertente Lendária',
+  mythic: 'Ascensão Mítica',
 };
 
 const CATEGORY_LABELS: Record<UpgradeCategory, string> = {
   fundamental: 'Arte Marcial Base',
-  modifier: 'Forma de Dobra',
+  modifier: 'Forma Primordial',
   elemental: 'Sinergia Elemental',
-  class: 'Técnica de Sub-dobra',
+  class: 'Técnica de Vertente',
   relic: 'Relíquia Espiritual',
-  evolution: 'Sub-dobra Suprema',
-  mythic: 'Convergência Avatar',
+  evolution: 'Vertente Suprema',
+  mythic: 'Convergência dos Selos',
 };
 
 // Quadrant CSS background-position for /arcana-benders.jpg (2x2 pixel-art sheet)
@@ -88,9 +89,33 @@ const BENDER_PORTRAIT_BG_POS: Record<ArcanaClassId, string> = {
   chrono: '100% 100%', // Bottom-Right: Mestre do Ar
 };
 
-function renderBenderPortraitBadge(classId: ArcanaClassId, sizePx = 56, borderCol = '#ffd166'): string {
+export function getSkillVectorIcon(nameOrText: string): string {
+  const t = (nameOrText || '').toLowerCase();
+  if (t.includes('gelo') || t.includes('ice') || t.includes('glaciar') || t.includes('congelar')) return skillIcon('snowflake-1');
+  if (t.includes('sangue') || t.includes('blood') || t.includes('vampiro') || t.includes('drenar')) return skillIcon('bloody-sword');
+  if (t.includes('cura') || t.includes('vital') || t.includes('vida') || t.includes('regenera')) return skillIcon('heart-plus');
+  if (t.includes('água') || t.includes('mar') || t.includes('onda') || t.includes('turbilhão')) return skillIcon('magic-swirl');
+  if (t.includes('vento') || t.includes('ar') || t.includes('tornado') || t.includes('ciclone')) return skillIcon('tornado');
+  if (t.includes('voo') || t.includes('flecha') || t.includes('velocidade') || t.includes('impulso')) return skillIcon('arrow-flights');
+  if (t.includes('som') || t.includes('vácuo') || t.includes('eco') || t.includes('ressonância')) return skillIcon('ringed-beam');
+  if (t.includes('projeção') || t.includes('astral') || t.includes('espírito') || t.includes('fantasma')) return skillIcon('ghost');
+  if (t.includes('relâmpago') || t.includes('raio') || t.includes('trovão') || t.includes('elétrico')) return skillIcon('bolt-spell-cast');
+  if (t.includes('combustão') || t.includes('explosão') || t.includes('crânio') || t.includes('morte')) return skillIcon('dread-skull');
+  if (t.includes('fogo') || t.includes('chama') || t.includes('solar') || t.includes('inferno')) return skillIcon('sun');
+  if (t.includes('metal') || t.includes('ferro') || t.includes('aço') || t.includes('lâmina')) return skillIcon('crossed-swords');
+  if (t.includes('sísmica') || t.includes('terremoto') || t.includes('vibra')) return skillIcon('vibrating-shield');
+  if (t.includes('terra') || t.includes('rocha') || t.includes('pedra') || t.includes('geodo')) return skillIcon('axe-swing');
+  if (t.includes('lava') || t.includes('magma') || t.includes('vulcão')) return skillIcon('sun');
+  if (t.includes('escudo') || t.includes('barreira') || t.includes('proteção')) return skillIcon('magic-shield');
+  if (t.includes('dash') || t.includes('passo') || t.includes('esquiva') || t.includes('salto')) return skillIcon('heavy-arrow');
+  if (t.includes('portal') || t.includes('teleporte') || t.includes('fenda')) return skillIcon('teleport');
+  if (t.includes('avatar') || t.includes('convergência') || t.includes('supremo') || t.includes('mítico')) return skillIcon('crown');
+  return skillIcon('beams-aura');
+}
+
+function renderBenderPortraitBadge(classId: ArcanaClassId, sizePx = 64, borderCol = '#ffd166'): string {
   const pos = BENDER_PORTRAIT_BG_POS[classId];
-  return `<div style="width:${sizePx}px;height:${sizePx}px;border-radius:12px;border:2px solid ${borderCol};background-image:url('/arcana-benders.jpg');background-size:200% 200%;background-position:${pos};image-rendering:pixelated;box-shadow:0 0 14px ${borderCol}55;flex-shrink:0;"></div>`;
+  return `<div style="width:${sizePx}px;height:${sizePx}px;min-width:${sizePx}px;min-height:${sizePx}px;aspect-ratio:1/1;border-radius:12px;border:2.5px solid ${borderCol};background-image:url('/arcana-benders.jpg');background-size:200% 200%;background-position:${pos};box-shadow:0 0 16px ${borderCol}66;flex-shrink:0;"></div>`;
 }
 
 export function launchArcana(options: LaunchArcanaOptions): () => void {
@@ -99,7 +124,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   audio.applySettings(profile.settings);
 
   const coop = new ArcanaCoopSession();
-  coop.localName = options.name || 'Dominador';
+  coop.localName = options.name || 'Guardião';
 
   // Isolated root container
   const root = document.createElement('div');
@@ -359,7 +384,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
   }
 
   // ============================================================================
-  // TRUE RADIAL CONSTELLATION SKILL WEB ("TEIA DE HABILIDADES & SUB-DOBRAS")
+  // TRUE RADIAL CONSTELLATION SKILL WEB ("TEIA DE HABILIDADES & VERTENTES PRIMORDIAIS")
   // ============================================================================
 
   function getNodeCoordsPct(node: SkillWebNodeDef): { x: number; y: number } {
@@ -524,9 +549,11 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                 : '0 4px 10px rgba(0,0,0,0.65)'
             };z-index:4;"
           >
-            <span style="transform:${innerTransform};font-size:${
-              n.tier === 4 ? '21px' : '17px'
-            };filter:${unlocked ? 'drop-shadow(0 0 6px #fff)' : 'none'};">${n.icon}</span>
+            <div style="transform:${innerTransform};width:${n.tier === 4 ? '24px' : '19px'};height:${
+              n.tier === 4 ? '24px' : '19px'
+            };color:${unlocked ? '#ffd166' : unlockable ? cls.palette.accent : '#cfc4e8'};filter:${
+              unlocked ? 'drop-shadow(0 0 6px #ffd166)' : 'none'
+            };">${getSkillVectorIcon(n.name)}</div>
           </button>
         `;
       })
@@ -543,13 +570,13 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           <div style="display:flex;align-items:center;gap:12px;">
             ${renderBenderPortraitBadge(classId, 52, cls.palette.accent)}
             <div>
-              <span style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#80ffdb;">TEIA DE HABILIDADES & SUB-DOBRAS ELEMENTAIS</span>
+              <span style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#80ffdb;">TEIA DE HABILIDADES & VERTENTES PRIMORDIAIS</span>
               <h3 style="margin:2px 0 0;font-size:20px;color:#ffd166;">${cls.name} — ${cls.title}</h3>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <span style="padding:6px 12px;border-radius:99px;background:rgba(0,245,212,0.15);border:1px solid #00f5d4;font-size:12px;font-weight:800;color:#80ffdb;">
-              ✦ Pontos de Chi / Dobra: ${availableChiPoints}
+              ✦ Centelhas de Éter: ${availableChiPoints}
             </span>
             ${
               !interactiveInRun
@@ -626,7 +653,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                   </p>
 
                   <div style="font-size:11px;color:#b8add4;margin-bottom:12px;">
-                    <strong>Ligações na Teia:</strong> Conecta com ${selectedNode.connectsTo.length} nós de sub-dobra adjacentes.
+                    <strong>Ligações na Teia:</strong> Conecta com ${selectedNode.connectsTo.length} nós de vertente adjacentes.
                   </div>
 
                   <button
@@ -656,12 +683,12 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                   >
                     ${
                       selUnlocked
-                        ? '✓ Sub-dobra Ativa no Personagem'
+                        ? '✓ Vertente Ativa no Guardião'
                         : selCanUnlock && availableChiPoints > 0
-                        ? `⚡ Desbloquear Nó na Teia (1 Ponto de Chi)`
+                        ? `⚡ Desbloquear Nó na Teia (1 Centelha de Éter)`
                         : !selCanUnlock
                         ? 'Desbloqueia um Nó Conectado Primeiro'
-                        : 'Sobe de Nível para Ganhar +Pontos de Chi'
+                        : 'Sobe de Nível para Ganhar +Centelhas de Éter'
                     }
                   </button>
                 </div>
@@ -672,7 +699,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             <!-- 3 Sub-Bending Artery Summary -->
             <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;">
               <div style="font-size:11px;font-weight:800;color:#7de2ff;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">
-                3 Artérias de Sub-Dobra de ${cls.name}:
+                3 Vertentes Primordiais de ${cls.name}:
               </div>
               <div style="display:flex;flex-direction:column;gap:6px;">
                 ${cls.specializations
@@ -743,10 +770,10 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           ASCENSÃO ARCANA
         </h1>
         <p style="max-width:520px;color:#cfc4e8;font-size:14px;line-height:1.5;margin:0 0 24px;">
-          Domina Água, Ar, Fogo e Terra — e desperta Sub-dobras Lendárias (Sangue, Gelo, Voo, Vácuo, Relâmpago, Combustão, Metal e Lava).
+          Canaliza Maré, Tempestade, Cinza-Solar e Raiz-de-Ferro — e desperta Vertentes Ancestrais na luta contra a Corrupção do Oco.
         </p>
         <button data-act="skip-intro" style="padding:12px 28px;border-radius:99px;border:1px solid #ffd166;background:linear-gradient(135deg,#3d1e6d,#1b0d36);color:#ffd166;font-weight:800;font-size:14px;letter-spacing:1px;cursor:pointer;box-shadow:0 0 24px rgba(255,209,102,0.3);">
-          DESPERTAR OS ELEMENTOS ✦
+          DESPERTAR OS SELOS ✦
         </button>
       `;
       uiLayer.appendChild(intro);
@@ -757,158 +784,175 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       return;
     }
 
-    // 2. MAIN MENU — VISUAL-FIRST, PHOTO-RICH & ZERO CLUTTER
+    // 2. MAIN MENU — RAVENSWATCH SPLIT-STAGE CHARACTER LOBBY
     if (currentScreen === 'menu') {
       const hasSave = !!profile.savedCheckpoint;
       const savedClass = hasSave ? ARCANA_CLASSES[profile.savedCheckpoint!.classId] : null;
+      const curCls = ARCANA_CLASSES[selectedClassId];
       const menu = document.createElement('div');
       menu.style.cssText =
-        'position:absolute;inset:0;background:radial-gradient(circle at 50% 25%,rgba(22,12,48,0.68),rgba(6,3,16,0.94));display:flex;flex-direction:column;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));pointer-events:auto;overflow-y:auto;gap:12px;';
+        'position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));pointer-events:none;overflow:hidden;';
       menu.innerHTML = `
-        <header style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:26px;filter:drop-shadow(0 0 12px #00bbf9);">🌊🌪️🔥🪨</span>
+        <!-- Top Ornate Header -->
+        <header style="pointer-events:auto;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;z-index:20;">
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(10,6,22,0.85);padding:8px 16px;border-radius:14px;border:1.5px solid rgba(255,209,102,0.4);backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(0,0,0,0.6);">
+            <div style="width:32px;height:32px;color:#ffd166;">${skillIcon('crown')}</div>
             <div>
-              <div style="font-size:10px;letter-spacing:2.5px;color:#80ffdb;text-transform:uppercase;font-weight:800;">DOMINAÇÃO DOS 4 ELEMENTOS & SUB-DOBRAS</div>
-              <div style="font-size:18px;font-weight:900;color:#ffd166;">ASCENSÃO ARCANA</div>
+              <div style="font-size:10px;letter-spacing:2px;color:#80ffdb;text-transform:uppercase;font-weight:800;">DARK-FANTASY ROGUELITE · ESTILO RAVENSWATCH</div>
+              <div style="font-size:19px;font-weight:900;color:#ffd166;letter-spacing:1px;">ASCENSÃO ARCANA</div>
             </div>
           </div>
 
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             ${
               hasSave
-                ? `<button data-act="continue-run" style="padding:8px 14px;border-radius:10px;border:2px solid #00f5d4;background:rgba(0,245,212,0.22);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">
+                ? `<button data-act="continue-run" style="padding:9px 16px;border-radius:10px;border:2px solid #00f5d4;background:rgba(0,245,212,0.22);color:#fff;font-weight:800;font-size:12px;cursor:pointer;box-shadow:0 0 14px rgba(0,245,212,0.4);">
                     ▶ Continuar (${savedClass?.name} · Fase ${profile.savedCheckpoint!.campaignIndex + 1}/5)
                   </button>`
                 : ''
             }
-            <button data-act="open-skill-tree" style="padding:8px 14px;border-radius:10px;border:1.5px solid #ffd166;background:rgba(255,209,102,0.18);color:#ffd166;font-weight:800;font-size:12px;cursor:pointer;">
-              🕸️ Teia de Habilidades
+            <button data-act="open-skill-tree" style="padding:9px 16px;border-radius:10px;border:1.5px solid #ffd166;background:rgba(255,209,102,0.18);color:#ffd166;font-weight:800;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              <span style="width:16px;height:16px;display:inline-block;color:#ffd166;">${skillIcon('beams-aura')}</span> Teia de Vertentes
             </button>
-            <button data-act="open-coop" style="padding:8px 12px;border-radius:10px;border:1px solid rgba(125,226,255,0.35);background:rgba(20,14,38,0.88);color:#7de2ff;font-weight:800;font-size:12px;cursor:pointer;">
+            <button data-act="open-coop" style="padding:9px 14px;border-radius:10px;border:1px solid rgba(125,226,255,0.35);background:rgba(20,14,38,0.88);color:#7de2ff;font-weight:800;font-size:12px;cursor:pointer;">
               👥 Co-op (2J)
             </button>
-            <button data-act="open-grimoire" style="padding:8px 12px;border-radius:10px;border:1px solid rgba(199,125,255,0.35);background:rgba(20,14,38,0.88);color:#e0aaff;font-weight:800;font-size:12px;cursor:pointer;">
+            <button data-act="open-grimoire" style="padding:9px 14px;border-radius:10px;border:1px solid rgba(199,125,255,0.35);background:rgba(20,14,38,0.88);color:#e0aaff;font-weight:800;font-size:12px;cursor:pointer;">
               📖 Grimório
             </button>
-            <button data-act="open-ascensions" style="padding:8px 12px;border-radius:10px;border:1px solid rgba(255,190,11,0.35);background:rgba(20,14,38,0.88);color:#ffbe0b;font-weight:800;font-size:12px;cursor:pointer;">
+            <button data-act="open-ascensions" style="padding:9px 14px;border-radius:10px;border:1px solid rgba(255,190,11,0.35);background:rgba(20,14,38,0.88);color:#ffbe0b;font-weight:800;font-size:12px;cursor:pointer;">
               🔥 Ascensão ${selectedAscension}
             </button>
-            <button data-act="open-settings" style="padding:8px 11px;border-radius:10px;border:1px solid rgba(255,255,255,0.22);background:rgba(20,14,38,0.88);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">
+            <button data-act="open-settings" style="padding:9px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.22);background:rgba(20,14,38,0.88);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">
               ⚙
             </button>
-            <button data-act="exit-platform" style="padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.22);background:rgba(20,14,36,0.85);color:#e2dbf0;font-weight:700;font-size:12px;cursor:pointer;">
+            <button data-act="exit-platform" style="padding:9px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.22);background:rgba(20,14,36,0.85);color:#e2dbf0;font-weight:700;font-size:12px;cursor:pointer;">
               ← Sair
             </button>
           </div>
         </header>
 
-        <!-- HERO PICKER RIGHT ON THE START SCREEN: 4 Big Visual Elemental Cards -->
-        <div style="margin:auto 0;">
-          <div style="text-align:center;margin-bottom:12px;">
-            <span style="display:inline-block;padding:4px 12px;border-radius:99px;background:rgba(255,209,102,0.16);border:1px solid #ffd166;color:#ffd166;font-size:11px;font-weight:800;letter-spacing:1.5px;margin-bottom:4px;">
-              ESCOLHE O TEU ELEMENTO E CLICA EM JOGAR (1 CLIQUE!)
-            </span>
-            <h1 style="margin:0;font-size:clamp(22px,3.2vw,34px);color:#fff;text-shadow:0 0 24px rgba(125,226,255,0.4);">
-              Qual Elemento Vais Dominar?
-            </h1>
-          </div>
-
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:14px;">
-            ${(['chess', 'chrono', 'chaos', 'rune'] as ArcanaClassId[])
+        <!-- Main Body: Split-Stage Lobby -->
+        <div style="display:flex;gap:24px;flex:1;align-items:stretch;margin:14px 0;position:relative;overflow:hidden;">
+          <!-- Left Column: 4 Elemental Bender Cards (Zero distortion, 1:1 square portraits) -->
+          <div style="pointer-events:auto;width:380px;max-width:40vw;display:flex;flex-direction:column;gap:10px;z-index:20;overflow-y:auto;padding-right:6px;">
+            <div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:#80ffdb;text-transform:uppercase;">
+              ESCOLHE O TEU GUARDIÃO PRIMORDIAL:
+            </div>
+            ${(['chess', 'chaos', 'chrono', 'rune'] as ArcanaClassId[])
               .map(id => {
                 const c = ARCANA_CLASSES[id];
                 const active = id === selectedClassId;
-                const posMap: Record<ArcanaClassId, string> = {
-                  chess: '0% 0%',
-                  rune: '100% 0%',
-                  chaos: '0% 100%',
-                  chrono: '100% 100%',
-                };
                 return `
-                  <div style="border-radius:16px;border:2.5px solid ${
-                    active ? '#ffd166' : `${c.palette.glow}66`
-                  };background:linear-gradient(170deg,rgba(28,16,56,0.95),rgba(10,6,24,0.98));padding:12px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 10px 28px rgba(0,0,0,0.55),0 0 22px ${
-                    c.palette.glow
-                  }33;transition:transform 0.15s;">
-                    <div>
-                      <!-- Giant Pixel Art Portrait Banner -->
-                      <div data-act="quick-play:${id}" style="width:100%;height:155px;border-radius:12px;border:2px solid ${
-                        c.palette.accent
-                      };background-image:url('/arcana-benders.jpg');background-size:205% 205%;background-position:${
-                        posMap[id]
-                      };image-rendering:pixelated;position:relative;overflow:hidden;cursor:pointer;margin-bottom:10px;box-shadow:inset 0 -44px 36px rgba(8,4,20,0.92);">
-                        <div style="position:absolute;top:8px;left:8px;padding:3px 9px;border-radius:99px;background:rgba(8,4,20,0.85);border:1px solid ${
-                          c.palette.glow
-                        };font-size:10px;font-weight:900;color:${c.palette.accent};">
-                          ${c.primaryAttack.icon} ${c.title.toUpperCase()}
-                        </div>
-                        <div style="position:absolute;bottom:6px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-end;">
-                          <span style="font-size:18px;font-weight:900;color:#fff;text-shadow:0 2px 8px #000;">${c.name}</span>
-                          <span style="font-size:11px;color:#ffd166;font-weight:800;">♥ ${c.baseStats.maxHp} · ⚔ ${c.baseStats.baseDamage}</span>
-                        </div>
+                  <div
+                    data-act="pick-class:${id}"
+                    style="border-radius:16px;border:${active ? '2.5px solid #ffd166' : `1.5px solid ${c.palette.glow}44`};background:${
+                      active
+                        ? 'linear-gradient(135deg,rgba(38,22,68,0.96),rgba(18,10,36,0.98))'
+                        : 'rgba(14,8,28,0.88)'
+                    };padding:10px;display:flex;gap:12px;align-items:center;cursor:pointer;box-shadow:${
+                      active
+                        ? `0 0 24px ${c.palette.glow}66, inset 0 0 16px rgba(255,209,102,0.25)`
+                        : '0 6px 18px rgba(0,0,0,0.6)'
+                    };transition:transform 0.15s,box-shadow 0.15s,border-color 0.15s;transform:${
+                      active ? 'scale(1.02)' : 'scale(1)'
+                    };"
+                  >
+                    <!-- Exact 1:1 Square Portrait Medallion -->
+                    ${renderBenderPortraitBadge(id, 74, active ? '#ffd166' : c.palette.glow)}
+                    <div style="flex:1;min-width:0;">
+                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+                        <span style="font-size:15px;font-weight:900;color:${active ? '#ffd166' : '#fff'};">${c.name}</span>
+                        <span style="font-size:10px;padding:2px 6px;border-radius:6px;background:${c.palette.glow}22;border:1px solid ${c.palette.glow}66;color:${c.palette.accent};font-weight:800;">
+                          ${c.title}
+                        </span>
                       </div>
-
-                      <!-- Visual Sub-Bending Badges (3 Icons + Names) -->
-                      <div style="font-size:10px;color:#80ffdb;font-weight:800;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:5px;">
-                        Sub-Dobras na Teia:
+                      <div style="font-size:11px;color:#cfc4e8;margin-bottom:6px;display:flex;gap:8px;">
+                        <span>♥ ${c.baseStats.maxHp} HP</span>
+                        <span>⚔ ${c.baseStats.baseDamage} Dano</span>
                       </div>
-                      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
+                      <!-- 3 Vertentes Vector Badges -->
+                      <div style="display:flex;gap:4px;flex-wrap:wrap;">
                         ${c.specializations
                           .map(
                             sp => `
-                            <span style="padding:4px 8px;border-radius:8px;background:rgba(255,255,255,0.07);border:1px solid ${c.palette.glow}44;font-size:11px;font-weight:800;color:#fff;">
-                              ${sp.icon} ${sp.name.replace('Sub-dobra de ', '').replace('Sub-dobra do ', '')}
+                            <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid ${c.palette.glow}33;font-size:10px;font-weight:700;color:#e2dbf0;">
+                              <span style="width:12px;height:12px;display:inline-block;color:${c.palette.accent};">${getSkillVectorIcon(sp.name)}</span>
+                              ${sp.name.replace('Vertente da ', '').replace('Vertente do ', '').replace('Vertente de ', '')}
                             </span>`
                           )
                           .join('')}
                       </div>
-
-                      <!-- 4 Compact Visual Ability Pills -->
-                      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:12px;font-size:10px;color:#d6cce8;">
-                        <div style="padding:4px 6px;border-radius:6px;background:rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                          ${c.primaryAttack.icon} ${c.primaryAttack.name}
-                        </div>
-                        <div style="padding:4px 6px;border-radius:6px;background:rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                          ${c.specialSkill.icon} ${c.specialSkill.name}
-                        </div>
-                        <div style="padding:4px 6px;border-radius:6px;background:rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                          ${c.mobilitySkill.icon} ${c.mobilitySkill.name}
-                        </div>
-                        <div style="padding:4px 6px;border-radius:6px;background:rgba(255,255,255,0.04);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                          ${c.ultimateSkill.icon} ${c.ultimateSkill.name}
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Instant 1-Click Play + Inspect Buttons -->
-                    <div style="display:flex;gap:6px;">
-                      <button data-act="quick-play:${id}" style="flex:1;padding:11px 10px;border-radius:10px;border:2px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:13px;cursor:pointer;box-shadow:0 0 16px rgba(255,209,102,0.35);">
-                        ⚔ JOGAR AGORA
-                      </button>
-                      <button data-act="inspect-class:${id}" title="Ver Detalhes & Dojo" style="padding:11px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">
-                        🔍
-                      </button>
                     </div>
                   </div>
                 `;
               })
               .join('')}
           </div>
+
+          <!-- Right Area: Open 3D Viewport with Bottom Hero Control Bar -->
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;pointer-events:none;z-index:20;">
+            <!-- Bottom Showcase Dock -->
+            <div style="pointer-events:auto;background:radial-gradient(ellipse at 50% 50%,rgba(20,12,40,0.92),rgba(8,4,18,0.96));border:2px solid #ffd166;border-radius:20px;padding:16px 26px;display:flex;flex-direction:column;align-items:center;gap:12px;box-shadow:0 12px 40px rgba(0,0,0,0.8), 0 0 30px rgba(255,209,102,0.3);max-width:680px;width:100%;backdrop-filter:blur(8px);">
+              <div style="text-align:center;">
+                <div style="font-size:11px;color:#80ffdb;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">
+                  HERÓI 3D SELECIONADO: <span style="color:#ffd166;">${curCls.name.toUpperCase()}</span> (${curCls.title.toUpperCase()})
+                </div>
+              </div>
+
+              <!-- 4 Framed Skill Slots of Selected Hero -->
+              <div style="display:flex;gap:12px;align-items:center;">
+                <div class="ravenswatch-skill-slot" title="${curCls.primaryAttack.name}">
+                  <div style="width:30px;height:30px;color:#ffd166;">${getSkillVectorIcon(curCls.primaryAttack.name)}</div>
+                  <div class="ravenswatch-keybind-pill">RATO</div>
+                </div>
+                <div class="ravenswatch-skill-slot" title="${curCls.specialSkill.name}">
+                  <div style="width:30px;height:30px;color:#80ffdb;">${getSkillVectorIcon(curCls.specialSkill.name)}</div>
+                  <div class="ravenswatch-keybind-pill">E</div>
+                </div>
+                <div class="ravenswatch-skill-slot" title="${curCls.mobilitySkill.name}">
+                  <div style="width:30px;height:30px;color:#7de2ff;">${getSkillVectorIcon(curCls.mobilitySkill.name)}</div>
+                  <div class="ravenswatch-keybind-pill">ESPAÇO</div>
+                </div>
+                <div class="ravenswatch-skill-slot" title="${curCls.ultimateSkill.name}">
+                  <div style="width:30px;height:30px;color:#ff4ecd;">${getSkillVectorIcon(curCls.ultimateSkill.name)}</div>
+                  <div class="ravenswatch-keybind-pill">R</div>
+                </div>
+              </div>
+
+              <!-- Big Golden Button to Launch Expedition -->
+              <div style="display:flex;gap:12px;width:100%;">
+                <button
+                  data-act="quick-play:${selectedClassId}"
+                  class="fantasy-btn"
+                  style="flex:1;padding:14px 28px;border-radius:12px;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:16px;cursor:pointer;box-shadow:0 0 24px rgba(255,209,102,0.5);letter-spacing:1px;"
+                >
+                  ⚔ INICIAR EXPEDIÇÃO ARCANA (1 CLIQUE!)
+                </button>
+                <button
+                  data-act="start-training"
+                  title="Treinar combos e dano contra bonecos"
+                  style="padding:14px 18px;border-radius:12px;border:1px solid #80ffdb;background:rgba(128,255,219,0.15);color:#80ffdb;font-weight:800;font-size:13px;cursor:pointer;"
+                >
+                  🎯 Dojo de Treino
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 5-Nation Campaign Progression Roadmap Footer -->
-        <footer style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-radius:12px;background:rgba(14,9,30,0.85);border:1px solid rgba(125,226,255,0.2);font-size:11px;color:#cfc4e8;flex-wrap:wrap;gap:8px;">
+        <footer style="pointer-events:auto;display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-radius:12px;background:rgba(12,7,26,0.9);border:1px solid rgba(255,209,102,0.3);font-size:11px;color:#cfc4e8;flex-wrap:wrap;gap:8px;z-index:20;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <strong style="color:#ffd166;">Rota das 5 Nações:</strong>
-            <span>🌊 I. Polo Sul</span> →
-            <span>🌋 II. Cratera do Fogo</span> →
-            <span>🌪️ III. Templo do Ar</span> →
-            <span>⚙️ IV. Fortaleza de Zaofu</span> →
-            <span>🌌 V. Mundo Espiritual</span>
+            <strong style="color:#ffd166;">Campanha das 5 Nações:</strong>
+            <span>I. Polo Sul</span> →
+            <span>II. Cratera do Fogo</span> →
+            <span>III. Templo do Ar</span> →
+            <span>IV. Zaofu</span> →
+            <span>V. Mundo Espiritual</span>
           </div>
-          <div style="display:flex;gap:10px;align-items:center;">
-            <span>✦ Essência: <strong style="color:#80ffdb;">${profile.eternalEssence}</strong></span>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span>✦ Essência Arcana: <strong style="color:#80ffdb;">${profile.eternalEssence}</strong></span>
             <button data-act="start-tutorial" style="padding:4px 10px;border-radius:99px;border:1px solid #80ffdb;background:rgba(128,255,219,0.14);color:#80ffdb;font-weight:700;font-size:11px;cursor:pointer;">
               🎓 Tutorial Rápido
             </button>
@@ -935,7 +979,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       modal.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
           <div>
-            <div style="font-size:11px;letter-spacing:2px;color:#7de2ff;">DETALHES DO DOMINADOR & DOJO DE TREINO</div>
+            <div style="font-size:11px;letter-spacing:2px;color:#7de2ff;">DETALHES DO GUARDIÃO & CAMPO DE PROVAS</div>
             <h2 style="margin:0;font-size:22px;color:#ffd166;">Escolhe o Teu Elemento</h2>
           </div>
           <div style="display:flex;gap:8px;">
@@ -965,7 +1009,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                   ${renderBenderPortraitBadge(id, 54, active ? '#ffd166' : c.palette.primary)}
                   <div>
                     <div style="font-size:14px;font-weight:900;color:${active ? '#ffd166' : '#fff'};">${c.name}</div>
-                    <div style="font-size:10px;color:#80ffdb;font-weight:700;">${c.specializations.map(s => s.icon).join(' ')} 3 Sub-dobras</div>
+                    <div style="font-size:10px;color:#80ffdb;font-weight:700;">${c.specializations.map(s => s.icon).join(' ')} 3 Vertentes</div>
                   </div>
                 </button>
               `;
@@ -975,10 +1019,10 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
 
         <!-- Visual Showcase of Selected Bender -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;background:rgba(18,12,38,0.92);border:1.5px solid ${cls.palette.glow}66;border-radius:16px;padding:16px;">
-          <!-- Left: Giant Portrait + Sub-dobras -->
+          <!-- Left: Giant Portrait + Vertentes -->
           <div style="display:flex;flex-direction:column;gap:10px;">
             <div style="display:flex;gap:14px;align-items:center;">
-              <div style="width:128px;height:128px;border-radius:16px;border:3px solid ${cls.palette.accent};background-image:url('/arcana-benders.jpg');background-size:205% 205%;background-position:${posMap[selectedClassId]};image-rendering:pixelated;flex-shrink:0;box-shadow:0 0 24px ${cls.palette.glow}55;"></div>
+              <div style="width:128px;height:128px;border-radius:16px;border:3px solid ${cls.palette.accent};background-image:url('/arcana-benders.jpg');background-size:205% 205%;background-position:${posMap[selectedClassId]};flex-shrink:0;box-shadow:0 0 24px ${cls.palette.glow}55;"></div>
               <div>
                 <span style="font-size:11px;color:#80ffdb;font-weight:800;text-transform:uppercase;">${cls.title}</span>
                 <h3 style="margin:2px 0 6px;font-size:24px;color:#fff;">${cls.name}</h3>
@@ -990,14 +1034,14 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
               </div>
             </div>
 
-            <div style="font-size:12px;font-weight:800;color:#ffd166;">3 Caminhos de Sub-Dobra Desbloqueáveis:</div>
+            <div style="font-size:12px;font-weight:800;color:#ffd166;">3 Vertentes Ancestrais Desbloqueáveis:</div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
               ${cls.specializations
                 .map(
                   sp => `
                   <div style="padding:10px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid ${cls.palette.glow}44;text-align:center;">
                     <div style="font-size:24px;margin-bottom:4px;">${sp.icon}</div>
-                    <div style="font-size:11px;font-weight:900;color:#fff;">${sp.name.replace('Sub-dobra de ', '').replace('Sub-dobra do ', '')}</div>
+                    <div style="font-size:11px;font-weight:900;color:#fff;">${sp.name.replace('Vertente da ', '').replace('Vertente do ', '').replace('Vertente de ', '')}</div>
                     <div style="font-size:10px;color:#80ffdb;">${sp.subtitle}</div>
                   </div>`
                 )
@@ -1051,7 +1095,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             ← Voltar ao Menu
           </button>
           <button data-act="open-class-select" style="padding:8px 16px;border-radius:8px;border:1px solid #ffd166;background:rgba(255,209,102,0.2);color:#ffd166;font-weight:800;cursor:pointer;">
-            Escolher Dominador e Jogar →
+            Escolher Guardião e Jogar →
           </button>
         </div>
         ${renderSkillTreeContent(selectedClassId, false)}
@@ -1070,13 +1114,13 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         <div style="max-width:620px;width:100%;background:rgba(20,12,42,0.95);border:1px solid rgba(125,226,255,0.35);border-radius:16px;padding:22px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <div>
-              <span style="font-size:11px;color:#7de2ff;letter-spacing:2px;">COOPERATIVO ONLINE DE 2 DOMINADORES</span>
-              <h2 style="margin:2px 0 0;color:#ffd166;">Ordem do Lótus Branco</h2>
+              <span style="font-size:11px;color:#7de2ff;letter-spacing:2px;">COOPERATIVO ONLINE DE 2 GUARDIÕES</span>
+              <h2 style="margin:2px 0 0;color:#ffd166;">Pacto dos Guardiões</h2>
             </div>
             <button data-act="back-menu" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:#fff;cursor:pointer;">← Voltar</button>
           </div>
           <p style="font-size:13px;color:#cfc4e8;line-height:1.5;margin-bottom:16px;">
-            Combina elementos em dupla com outro jogador (via código de sala sincronizado) ou invoca um <strong>Mestre Elemental Aliado de IA</strong> que conjura sub-dobras em sinergia contigo!
+            Combina vertentes em dupla com outro jogador (via código de sala sincronizado) ou invoca um <strong>Guardião Aliado de IA</strong> que conjura técnicas em sinergia contigo!
           </p>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
@@ -1102,7 +1146,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           </div>
 
           <button data-act="coop-start-ai" style="width:100%;padding:14px;border-radius:12px;border:2px solid #00bbf9;background:linear-gradient(135deg,rgba(0,187,249,0.28),rgba(58,20,88,0.92));color:#fff;font-weight:800;font-size:15px;cursor:pointer;">
-            ⚡ Iniciar Aventura Cooperativa Agora (Com Mestre Aliado)
+            ⚡ Iniciar Aventura Cooperativa Agora (Com Guardião Aliado)
           </button>
         </div>
       `;
@@ -1181,8 +1225,8 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
       wrap.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
           <div>
-            <span style="font-size:11px;color:#e0aaff;letter-spacing:2px;">ENCICLOPÉDIA DAS QUATRO NAÇÕES</span>
-            <h2 style="margin:0;color:#ffd166;">Pergaminhos de Dominação & Sub-dobras</h2>
+            <span style="font-size:11px;color:#e0aaff;letter-spacing:2px;">ARQUIVOS PRIMORDIAIS DE AETHRA</span>
+            <h2 style="margin:0;color:#ffd166;">Pergaminhos de Vertentes & Selos</h2>
           </div>
           <button data-act="back-menu" style="padding:8px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(20,14,36,0.9);color:#fff;cursor:pointer;">← Voltar</button>
         </div>
@@ -1190,10 +1234,10 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           ${(
             [
               ['classes', '🕸️ Teia de Habilidades'],
-              ['upgrades', `📜 Técnicas & Sub-dobras (${ARCANA_UPGRADES.length})`],
+              ['upgrades', `📜 Técnicas & Vertentes (${ARCANA_UPGRADES.length})`],
               ['enemies', '👾 Inimigos (10)'],
-              ['bosses', '👑 Mestres Boss (6)'],
-              ['biomes', '🏛 Nações & Biomas (6)'],
+              ['bosses', '👑 Guardiões & Senhores Corrompidos (6)'],
+              ['biomes', '🏛 Reinos & Selos Primordiais (6)'],
             ] as const
           )
             .map(
@@ -1293,7 +1337,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           </label>
 
           <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;cursor:pointer;">
-            <span>Dobra Principal Automática por Padrão</span>
+            <span>Ataque Primordial Automático por Padrão</span>
             <input type="checkbox" ${s.autoAttackDefault ? 'checked' : ''} data-setting-check="autoAttackDefault" />
           </label>
           <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px;cursor:pointer;">
@@ -1320,172 +1364,185 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         'position:absolute;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:max(10px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));';
 
       hud.innerHTML = `
-        <!-- Top Bar: Elemental Master Card (Left), Campaign/Boss Bar (Center), Quick Actions (Right) -->
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
-          <!-- Player Elemental Status Card with Pixel Art Portrait -->
-          <div class="arcana-hud-interactive" style="pointer-events:auto;background:rgba(10,6,24,0.88);border:1.5px solid ${cls.palette.glow}66;border-radius:14px;padding:8px 12px;min-width:255px;backdrop-filter:blur(8px);display:flex;align-items:center;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,0.5);">
-            ${renderBenderPortraitBadge(p.classId, 48, cls.palette.accent)}
-            <div style="flex:1;min-width:0;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
-                <span style="font-weight:900;font-size:13px;color:#ffd166;">${cls.name} · <span id="arc-hud-lv">Nv.${p.level}</span></span>
-                <span id="arc-hud-frags" style="font-size:11px;color:#80ffdb;font-weight:800;">◈ ${p.arcaneFragments}</span>
-              </div>
-              <!-- HP Bar -->
-              <div style="width:100%;height:10px;background:#1c1130;border-radius:99px;overflow:hidden;margin-bottom:3px;border:1px solid rgba(255,255,255,0.18);">
-                <div id="arc-hud-hp-fill" style="height:100%;width:${Math.max(0, Math.min(100, (p.hp / p.maxHp) * 100))}%;background:linear-gradient(90deg,#ff2a54,#ff758f);transition:width 0.12s;"></div>
-              </div>
-              <div style="display:flex;justify-content:space-between;font-size:10px;color:#e2dbf0;margin-bottom:3px;">
-                <span id="arc-hud-hp-text">♥ ${Math.ceil(p.hp)} / ${Math.ceil(p.maxHp)}${p.shield > 0 ? ` (+${Math.ceil(p.shield)} 🛡)` : ''}</span>
-                <span id="arc-hud-passive" style="color:${cls.palette.glow};font-weight:800;"></span>
-              </div>
-              <!-- XP Bar -->
-              <div style="width:100%;height:5px;background:#140d24;border-radius:99px;overflow:hidden;">
-                <div id="arc-hud-xp-fill" style="height:100%;width:${Math.min(100, (p.xp / Math.max(1, p.xpToNext)) * 100)}%;background:linear-gradient(90deg,#00f5d4,#7de2ff);"></div>
-              </div>
-            </div>
+        <!-- Top Bar: Objective Tracker & Utilities -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;width:100%;">
+          <!-- Top-Left: Mini Campaign Progress Breadcrumb -->
+          <div style="pointer-events:auto;background:rgba(10,6,22,0.85);border:1px solid rgba(255,209,102,0.3);border-radius:12px;padding:6px 14px;backdrop-filter:blur(8px);display:flex;align-items:center;gap:6px;box-shadow:0 4px 16px rgba(0,0,0,0.6);">
+            ${(['runes', 'ash', 'cloister', 'hourglasses', 'rift'] as const)
+              .map((cid, idx) => {
+                const active = st.campaignId === cid;
+                const done = st.campaignIndex > idx && st.campaignId !== 'infinite';
+                const labels = ['I.Água', 'II.Fogo', 'III.Ar', 'IV.Terra', 'V.Espírito'];
+                return `<span style="padding:2px 8px;border-radius:6px;font-size:10px;font-weight:900;background:${
+                  active ? '#ffd166' : done ? 'rgba(0,245,212,0.22)' : 'rgba(255,255,255,0.05)'
+                };color:${active ? '#140926' : done ? '#80ffdb' : '#7a708e'};">${labels[idx]}</span>`;
+              })
+              .join('<span style="color:#5a5072;font-size:10px;">→</span>')}
           </div>
 
-          <!-- Center Campaign Stepper, Stage Progress Bar & Boss Header -->
-          <div style="display:flex;flex-direction:column;align-items:center;flex:1;max-width:490px;">
-            <!-- 5-Nation World Stepper -->
-            <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;flex-wrap:wrap;justify-content:center;">
-              ${(['runes', 'ash', 'cloister', 'hourglasses', 'rift'] as const)
-                .map((cid, idx) => {
-                  const active = st.campaignId === cid;
-                  const done = st.campaignIndex > idx && st.campaignId !== 'infinite';
-                  const labels = ['I.Água', 'II.Fogo', 'III.Ar', 'IV.Terra', 'V.Espírito'];
-                  return `<span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:900;background:${
-                    active
-                      ? '#ffd166'
-                      : done
-                      ? 'rgba(0,245,212,0.25)'
-                      : 'rgba(14,10,30,0.82)'
-                  };color:${active ? '#140926' : done ? '#80ffdb' : '#8a829e'};border:1px solid ${
-                    active ? '#ffd166' : done ? '#00f5d4' : 'rgba(255,255,255,0.14)'
-                  };">${done ? '✓ ' : ''}${labels[idx]}</span>`;
-                })
-                .join('<span style="color:#6c6380;font-size:10px;">→</span>')}
-              ${
-                st.campaignId === 'infinite'
-                  ? `<span style="padding:2px 8px;border-radius:99px;font-size:10px;font-weight:900;background:#ff007f;color:#fff;">∞ PÓS-JOGO INFINITO</span>`
-                  : ''
-              }
-            </div>
-
-            <!-- Current Stage & Progress Bar Toward Boss -->
-            <div style="width:100%;background:rgba(12,8,28,0.9);border:1px solid ${camp.palette.accentRunes};border-radius:10px;padding:5px 12px;margin-bottom:5px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;color:#fff;margin-bottom:3px;">
-                <span>${
-                  st.isTrainingArena
-                    ? '🎯 DOJO DE TREINO ELEMENTAL'
-                    : st.isTutorial
-                    ? '🎓 INICIAÇÃO DOS 4 ELEMENTOS'
-                    : `FASE ${Math.min(5, st.campaignIndex + 1)}/5: ${camp.name.toUpperCase()}`
-                }</span>
-                <span id="arc-hud-stage-pct" style="color:#ffd166;">Progresso até ao Boss: 0%</span>
+          <!-- Top-Right: Ravenswatch Quest Box & Clock & Pause/Tree Shortcuts -->
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:auto;">
+            <!-- Quest Box -->
+            <div style="background:rgba(12,8,26,0.92);border:1.5px solid #d4af37;border-radius:12px;padding:8px 16px;min-width:260px;box-shadow:0 6px 20px rgba(0,0,0,0.7);backdrop-filter:blur(8px);">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span style="font-size:10px;font-weight:800;letter-spacing:1px;color:#ffd166;text-transform:uppercase;">
+                  ${st.isTrainingArena ? '🎯 DOJO DE TREINO' : camp.name.toUpperCase()}
+                </span>
+                <span style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:900;color:#fff;">
+                  ⏱ <span id="arc-hud-timer">00:00</span>
+                </span>
               </div>
-              <div style="width:100%;height:6px;background:#1b1234;border-radius:99px;overflow:hidden;">
+              <div style="font-size:11px;font-weight:900;color:#f0e6d2;margin-bottom:4px;">
+                <span id="arc-hud-stage-pct">Progresso até ao Boss: 0%</span>
+              </div>
+              <div style="width:100%;height:6px;background:#1a102a;border-radius:99px;overflow:hidden;border:1px solid rgba(255,209,102,0.2);">
                 <div id="arc-hud-stage-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#00bbf9,#ffd166,#ff5400);transition:width 0.2s;"></div>
               </div>
             </div>
 
-            <div id="arc-hud-boss-wrap" style="width:100%;display:${st.boss ? 'block' : 'none'};background:rgba(20,6,28,0.92);border:1.5px solid #ff4d6d;border-radius:10px;padding:6px 10px;">
-              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;color:#ffd166;margin-bottom:3px;">
-                <span id="arc-hud-boss-name">${st.boss ? `👑 ${st.boss.def.name} (Fase ${st.boss.currentPhase})` : ''}</span>
+            <!-- Boss HP Header if Active -->
+            <div id="arc-hud-boss-wrap" style="width:100%;display:${st.boss ? 'block' : 'none'};background:rgba(28,6,20,0.95);border:1.5px solid #ff4d6d;border-radius:10px;padding:6px 12px;box-shadow:0 0 20px rgba(255,77,109,0.4);">
+              <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:900;color:#ffd166;margin-bottom:3px;">
+                <span id="arc-hud-boss-name">${st.boss ? `👑 ${st.boss.def.name}` : ''}</span>
                 <span id="arc-hud-boss-hp">${st.boss ? `${Math.ceil(st.boss.hp)} / ${st.boss.maxHp}` : ''}</span>
               </div>
-              <div style="width:100%;height:10px;background:#240818;border-radius:99px;overflow:hidden;">
+              <div style="width:100%;height:8px;background:#240818;border-radius:99px;overflow:hidden;">
                 <div id="arc-hud-boss-fill" style="height:100%;width:${st.boss ? Math.max(0, (st.boss.hp / st.boss.maxHp) * 100) : 100}%;background:linear-gradient(90deg,#ff0054,#ffbe0b);"></div>
               </div>
             </div>
-            <div id="arc-hud-banner" style="margin-top:5px;padding:6px 14px;border-radius:8px;background:rgba(16,10,36,0.92);border:1px solid #ffd166;font-size:12px;font-weight:800;color:#ffd166;display:none;text-align:center;"></div>
-          </div>
 
-          <!-- Top-Right Utility Buttons -->
-          <div class="arcana-hud-interactive" style="pointer-events:auto;display:flex;gap:6px;align-items:center;">
-            ${
-              st.isTrainingArena
-                ? `<button data-act="training-levelup" style="padding:7px 10px;border-radius:8px;border:1px solid #00f5d4;background:rgba(0,245,212,0.18);color:#80ffdb;font-size:11px;font-weight:800;cursor:pointer;">+ Subir Nível</button>
-                   <button data-act="training-boss" style="padding:7px 10px;border-radius:8px;border:1px solid #ff4d6d;background:rgba(255,77,109,0.2);color:#ff99ac;font-size:11px;font-weight:800;cursor:pointer;">Invocar Boss</button>`
-                : ''
-            }
-            <button data-act="toggle-inrun-tree" title="Teia de Habilidades & Sub-dobras (Tecla K)" style="padding:8px 12px;border-radius:10px;border:1.5px solid #ffd166;background:rgba(24,14,48,0.92);color:#ffd166;font-weight:900;font-size:12px;cursor:pointer;box-shadow:0 0 14px rgba(255,209,102,0.3);">
-              🕸️ Teia de Sub-dobras [K]
-            </button>
-            <button data-act="toggle-pause" title="Pausa (Esc)" style="padding:8px 11px;border-radius:10px;border:1px solid rgba(255,255,255,0.25);background:rgba(16,10,34,0.88);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">
-              Ⅱ
-            </button>
+            <!-- Quick Action Pills -->
+            <div style="display:flex;gap:6px;">
+              ${
+                st.isTrainingArena
+                  ? `<button data-act="training-levelup" style="padding:6px 10px;border-radius:8px;border:1px solid #00f5d4;background:rgba(0,245,212,0.2);color:#80ffdb;font-size:11px;font-weight:800;cursor:pointer;">+ Nível</button>
+                     <button data-act="training-boss" style="padding:6px 10px;border-radius:8px;border:1px solid #ff4d6d;background:rgba(255,77,109,0.2);color:#ff99ac;font-size:11px;font-weight:800;cursor:pointer;">Boss</button>`
+                  : ''
+              }
+              <button data-act="toggle-inrun-tree" title="Teia de Vertentes (K)" style="padding:6px 12px;border-radius:8px;border:1.5px solid #ffd166;background:rgba(20,12,38,0.9);color:#ffd166;font-weight:800;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+                <span style="width:14px;height:14px;display:inline-block;color:#ffd166;">${skillIcon('beams-aura')}</span> Teia [K]
+              </button>
+              <button data-act="toggle-pause" title="Pausa (Esc)" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(16,10,34,0.9);color:#fff;font-weight:800;font-size:11px;cursor:pointer;">
+                Ⅱ
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Tutorial Prompt Box -->
-        ${
-          st.tutorial.active
-            ? `<div style="align-self:center;max-width:460px;background:rgba(14,24,42,0.92);border:1px solid #80ffdb;border-radius:12px;padding:10px 16px;text-align:center;">
-                <div style="font-size:10px;color:#80ffdb;font-weight:800;letter-spacing:1.5px;">${
-                  TUTORIAL_STEPS[Math.min(st.tutorial.stepIndex, TUTORIAL_STEPS.length - 1)].badge
-                }</div>
-                <div style="font-size:14px;font-weight:800;color:#ffd166;margin:2px 0;">${
-                  TUTORIAL_STEPS[Math.min(st.tutorial.stepIndex, TUTORIAL_STEPS.length - 1)].title
-                }</div>
-                <div style="font-size:12px;color:#e2dbf0;">${
-                  TUTORIAL_STEPS[Math.min(st.tutorial.stepIndex, TUTORIAL_STEPS.length - 1)].instruction
-                }</div>
-              </div>`
-            : ''
-        }
+        <div id="arc-hud-banner" style="align-self:center;padding:8px 20px;border-radius:10px;background:rgba(18,10,40,0.94);border:1.5px solid #ffd166;font-size:13px;font-weight:900;color:#ffd166;display:none;text-align:center;box-shadow:0 0 24px rgba(255,209,102,0.4);pointer-events:none;"></div>
 
-        <!-- Bottom Controls: Left Virtual Move Stick + Center Powers Dock + Right Action Cluster -->
-        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:auto;">
-          <!-- Left Virtual Joystick -->
-          <div id="arc-joy-move" class="arcana-hud-interactive" style="pointer-events:auto;width:116px;height:116px;border-radius:50%;background:radial-gradient(circle,rgba(125,226,255,0.14),rgba(12,8,28,0.68));border:2px solid ${cls.palette.glow}66;position:relative;display:flex;align-items:center;justify-content:center;touch-action:none;">
-            <div id="arc-joy-move-knob" style="width:46px;height:46px;border-radius:50%;background:radial-gradient(circle,${cls.palette.glow},${cls.palette.primary});box-shadow:0 0 14px ${cls.palette.glow};transform:translate(0px,0px);pointer-events:none;"></div>
+        <!-- Center Contextual Interact Button (Appears near Shrines/Portals) -->
+        <div style="align-self:center;pointer-events:auto;margin-bottom:8px;">
+          <button id="arc-btn-interact" data-act="hud-interact" style="display:none;padding:12px 26px;border-radius:99px;border:2.5px solid #ffd166;background:linear-gradient(135deg,#3d1e6d,#140926);color:#ffd166;font-weight:900;font-size:14px;cursor:pointer;box-shadow:0 0 26px rgba(255,209,102,0.6);">
+            ✋ Interagir com Santuário [F]
+          </button>
+          ${
+            st.phase === 'F_CONCLUSION'
+              ? `<button data-act="next-campaign" style="padding:14px 28px;border-radius:99px;border:2px solid #00f5d4;background:linear-gradient(135deg,#00f5d4,#1b3b5c);color:#08121e;font-weight:900;font-size:15px;cursor:pointer;box-shadow:0 0 30px #00f5d4;">
+                  🌀 ATRAVESSAR O PORTAL DO PRÓXIMO SELO →
+                </button>`
+              : ''
+          }
+        </div>
+
+        <!-- Bottom Ravenswatch Dock: Left Status & Stats + Center Framed Skills -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;width:100%;pointer-events:none;">
+          <!-- Bottom-Left: Ravenswatch Diamond Level Crest + Angled Emerald Health Bar + 4 Stats -->
+          <div style="pointer-events:auto;display:flex;flex-direction:column;gap:6px;background:rgba(8,5,18,0.88);padding:12px 16px;border-radius:16px;border:1.5px solid rgba(255,209,102,0.35);backdrop-filter:blur(8px);box-shadow:0 8px 26px rgba(0,0,0,0.7);">
+            <!-- Active Vertente Badges Diagonally Floating -->
+            <div style="display:flex;gap:6px;margin-bottom:2px;">
+              ${cls.specializations
+                .map(
+                  sp => `
+                  <div title="${sp.name}" style="width:22px;height:22px;background:#1a102e;border:1.5px solid #ffd166;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 0 8px rgba(255,209,102,0.4);">
+                    <div style="transform:rotate(-45deg);width:14px;height:14px;color:#ffd166;">${getSkillVectorIcon(sp.name)}</div>
+                  </div>`
+                )
+                .join('')}
+              <div id="arc-hud-passive" style="font-size:10px;font-weight:800;color:#80ffdb;margin-left:6px;align-self:center;"></div>
+            </div>
+
+            <!-- Diamond Level Badge + Angled Emerald Health Bar -->
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div class="ravenswatch-level-diamond">
+                <span id="arc-hud-lv" class="ravenswatch-level-num">1</span>
+              </div>
+              <div>
+                <div class="ravenswatch-hp-container">
+                  <div id="arc-hud-hp-fill" class="ravenswatch-hp-fill" style="width:100%;"></div>
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff;text-shadow:0 1px 4px #000;">
+                    <span id="arc-hud-hp-text">${Math.ceil(p.hp)} / ${Math.ceil(p.maxHp)}</span>
+                  </div>
+                </div>
+                <!-- XP Micro Bar -->
+                <div style="width:220px;height:4px;background:#140d24;border-radius:2px;overflow:hidden;margin-top:4px;">
+                  <div id="arc-hud-xp-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#00f5d4,#ffd166);"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4 Ravenswatch Stat Counters -->
+            <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;color:#cfc4e8;padding-top:4px;border-top:1px solid rgba(255,255,255,0.1);">
+              <span title="Dano">⚔ <span id="arc-hud-stat-dmg">${Math.round(cls.baseStats.baseDamage * (1 + (p.level - 1) * 0.1))}</span></span>
+              <span title="Armadura">🛡 <span id="arc-hud-stat-def">${Math.round(p.shield)}</span></span>
+              <span title="Crítico">⚡ <span id="arc-hud-stat-crit">${Math.round(cls.baseStats.critChance * 100)}%</span></span>
+              <span title="Fragmentos Arcanos" style="color:#80ffdb;"><span id="arc-hud-frags">◈ ${p.arcaneFragments}</span></span>
+            </div>
           </div>
 
-          <!-- Center Contextual Interact + Elemental Powers Hotbar Dock -->
-          <div class="arcana-hud-interactive" style="pointer-events:auto;display:flex;flex-direction:column;align-items:center;gap:8px;">
-            <button id="arc-btn-interact" data-act="hud-interact" style="display:none;padding:10px 18px;border-radius:99px;border:2px solid #ffd166;background:linear-gradient(135deg,#3d1e6d,#140926);color:#ffd166;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 0 20px rgba(255,209,102,0.45);">
-              ✋ Interagir com Santuário [F]
+          <!-- Bottom-Center: Hero Portrait Crest + 5 Framed Square Skill Slots (Ravenswatch Hotbar) -->
+          <div style="pointer-events:auto;display:flex;align-items:center;gap:10px;background:rgba(8,5,18,0.92);padding:10px 18px;border-radius:18px;border:1.5px solid rgba(255,209,102,0.4);backdrop-filter:blur(8px);box-shadow:0 10px 30px rgba(0,0,0,0.8);">
+            <!-- Hero Crest -->
+            <div style="position:relative;margin-right:4px;">
+              ${renderBenderPortraitBadge(p.classId, 54, cls.palette.accent)}
+            </div>
+
+            <!-- 5 Framed Skill Slots -->
+            <!-- 1. Primary Attack -->
+            <button id="arc-joy-aim" class="ravenswatch-skill-slot" data-act="hud-primary" title="${cls.primaryAttack.name} [Rato]">
+              <div style="width:28px;height:28px;color:#ffd166;">${getSkillVectorIcon(cls.primaryAttack.name)}</div>
+              <div class="ravenswatch-keybind-pill">RATO</div>
             </button>
-            ${
-              st.phase === 'F_CONCLUSION'
-                ? `<button data-act="next-campaign" style="padding:12px 22px;border-radius:99px;border:2px solid #00f5d4;background:linear-gradient(135deg,#00f5d4,#1b3b5c);color:#08121e;font-weight:900;font-size:14px;cursor:pointer;box-shadow:0 0 26px #00f5d4;">
-                    🌀 ATRAVESSAR PORTAL DA PRÓXIMA NAÇÃO →
-                  </button>`
-                : ''
-            }
+
+            <!-- 2. Special Skill -->
+            <button id="arc-btn-special" class="ravenswatch-skill-slot" data-act="hud-special" title="${cls.specialSkill.name} [E]">
+              <div style="width:28px;height:28px;color:#80ffdb;">${getSkillVectorIcon(cls.specialSkill.name)}</div>
+              <div class="ravenswatch-keybind-pill">E</div>
+              <div id="arc-cd-special" style="position:absolute;font-size:10px;font-weight:900;color:#ffd166;"></div>
+            </button>
+
+            <!-- 3. Mobility Dash -->
+            <button id="arc-btn-dash" class="ravenswatch-skill-slot" data-act="hud-dash" title="${cls.mobilitySkill.name} [Espaço]">
+              <div style="width:28px;height:28px;color:#7de2ff;">${getSkillVectorIcon(cls.mobilitySkill.name)}</div>
+              <div class="ravenswatch-keybind-pill">ESPAÇO</div>
+              <div id="arc-cd-dash" style="position:absolute;font-size:10px;font-weight:900;color:#80ffdb;"></div>
+            </button>
+
+            <!-- 4. Vertente Active / Trait -->
+            <button class="ravenswatch-skill-slot" title="Técnica de Vertente Primordial [Q]">
+              <div style="width:28px;height:28px;color:#ff99c8;">${getSkillVectorIcon(cls.specializations[0]?.name || 'chi')}</div>
+              <div class="ravenswatch-keybind-pill">Q</div>
+            </button>
+
+            <!-- 5. Habilidade de Ascensão Primordial -->
+            <button id="arc-btn-ult" class="ravenswatch-skill-slot" data-act="hud-ult" title="${cls.ultimateSkill.name} [R]">
+              <div style="width:28px;height:28px;color:#ff4ecd;">${getSkillVectorIcon(cls.ultimateSkill.name)}</div>
+              <div class="ravenswatch-keybind-pill">R</div>
+              <div id="arc-cd-ult" style="position:absolute;font-size:10px;font-weight:900;color:#ff99d8;"></div>
+            </button>
+
+            <!-- Auto Attack Toggle -->
+            <button id="arc-btn-auto" data-act="hud-auto" style="margin-left:6px;padding:6px 10px;border-radius:8px;border:1px solid ${
+              input.autoAttackEnabled ? '#00f5d4' : 'rgba(255,255,255,0.2)'
+            };background:${
+              input.autoAttackEnabled ? 'rgba(0,245,212,0.22)' : 'rgba(16,10,32,0.85)'
+            };color:#fff;font-size:9px;font-weight:800;cursor:pointer;">
+              AUTO<br/>${input.autoAttackEnabled ? 'ON' : 'OFF'}
+            </button>
           </div>
 
-          <!-- Right Elemental Powers Cluster -->
-          <div class="arcana-hud-interactive" style="pointer-events:auto;display:flex;align-items:flex-end;gap:8px;">
-            <div style="display:grid;grid-template-columns:repeat(2,64px);gap:8px;">
-              <button id="arc-btn-dash" data-act="hud-dash" title="${cls.mobilitySkill.name} [Espaço]" style="width:64px;height:64px;border-radius:50%;border:2px solid #80ffdb;background:radial-gradient(circle,rgba(0,245,212,0.22),rgba(14,24,42,0.92));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 14px rgba(128,255,219,0.3);">
-                <span style="font-size:20px;">${cls.mobilitySkill.icon}</span>
-                <span id="arc-cd-dash" style="font-size:9px;color:#80ffdb;font-weight:800;">PASSO</span>
-              </button>
-              <button id="arc-btn-special" data-act="hud-special" title="${cls.specialSkill.name} [E]" style="width:64px;height:64px;border-radius:50%;border:2px solid #ffd166;background:radial-gradient(circle,rgba(255,209,102,0.25),rgba(28,16,48,0.92));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 14px rgba(255,209,102,0.35);">
-                <span style="font-size:20px;">${cls.specialSkill.icon}</span>
-                <span id="arc-cd-special" style="font-size:9px;color:#ffd166;font-weight:800;">SUB-DOBRA</span>
-              </button>
-              <button id="arc-btn-auto" data-act="hud-auto" style="width:64px;height:52px;border-radius:14px;border:1px solid ${
-                input.autoAttackEnabled ? '#00f5d4' : 'rgba(255,255,255,0.25)'
-              };background:${
-                input.autoAttackEnabled ? 'rgba(0,245,212,0.22)' : 'rgba(16,10,32,0.85)'
-              };color:#fff;font-size:10px;font-weight:800;cursor:pointer;">
-                AUTO: ${input.autoAttackEnabled ? 'ON' : 'OFF'}
-              </button>
-              <button id="arc-btn-ult" data-act="hud-ult" title="${cls.ultimateSkill.name} [R]" style="width:64px;height:64px;border-radius:50%;border:2px solid #ff4ecd;background:radial-gradient(circle,rgba(255,78,205,0.28),rgba(42,12,48,0.94));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 18px rgba(255,78,205,0.4);">
-                <span style="font-size:20px;">${cls.ultimateSkill.icon}</span>
-                <span id="arc-cd-ult" style="font-size:9px;color:#ff99d8;font-weight:800;">${Math.floor(p.ultimateCharge)}%</span>
-              </button>
-            </div>
-
-            <!-- Right Aim / Primary Bending Virtual Stick -->
-            <div id="arc-joy-aim" style="width:96px;height:96px;border-radius:50%;background:radial-gradient(circle,${cls.palette.primary}55,rgba(24,12,42,0.85));border:2.5px solid #ffd166;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;box-shadow:0 0 20px ${cls.palette.glow}44;">
-              <span style="font-size:24px;pointer-events:none;">${cls.primaryAttack.icon}</span>
-              <span style="font-size:9px;color:#ffd166;font-weight:900;pointer-events:none;">DOBRAR</span>
-            </div>
-          </div>
+          <!-- Bottom-Right placeholder for Minimap alignment (Minimap is rendered directly on 3D canvas) -->
+          <div style="width:160px;height:10px;"></div>
         </div>
       `;
       uiLayer.appendChild(hud);
@@ -1499,10 +1556,10 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           'position:absolute;inset:0;background:rgba(6,3,16,0.9);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;pointer-events:auto;z-index:10010;overflow-y:auto;';
         specModal.innerHTML = `
           <div style="max-width:840px;width:100%;text-align:center;">
-            <span style="font-size:11px;letter-spacing:3px;color:#80ffdb;text-transform:uppercase;">DESPERTAR DE SUB-DOBRA · NÍVEL ${p.level}</span>
-            <h2 style="margin:4px 0 6px;font-size:26px;color:#ffd166;">Escolhe a Tua Artéria de Sub-Dobra Elemental</h2>
+            <span style="font-size:11px;letter-spacing:3px;color:#80ffdb;text-transform:uppercase;">DESPERTAR DE VERTENTE · NÍVEL ${p.level}</span>
+            <h2 style="margin:4px 0 6px;font-size:26px;color:#ffd166;">Escolhe a Tua Vertente Primordial</h2>
             <p style="font-size:13px;color:#cfc4e8;margin:0 0 18px;">
-              Esta escolha desperta a tua Sub-dobra principal na Teia de Habilidades e desbloqueia técnicas avançadas nos níveis 5 e 8.
+              Esta escolha desperta a tua Vertente ancestral na Teia de Habilidades e desbloqueia técnicas avançadas nos níveis 5 e 8.
             </p>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:14px;">
               ${cls.specializations
@@ -1533,8 +1590,8 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           'position:absolute;inset:0;background:rgba(6,3,16,0.88);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;pointer-events:auto;z-index:10010;overflow-y:auto;';
         draftModal.innerHTML = `
           <div style="max-width:860px;width:100%;text-align:center;">
-            <div style="font-size:11px;letter-spacing:3px;color:#00f5d4;text-transform:uppercase;">DOMÍNIO ELEMENTAL · NÍVEL ${p.level}</div>
-            <h2 style="margin:4px 0 14px;font-size:24px;color:#ffd166;">Escolhe uma Nova Técnica ou Sub-Dobra</h2>
+            <div style="font-size:11px;letter-spacing:3px;color:#00f5d4;text-transform:uppercase;">DESPERTAR DO ÉTER · NÍVEL ${p.level}</div>
+            <h2 style="margin:4px 0 14px;font-size:24px;color:#ffd166;">Escolhe uma Nova Técnica ou Vertente</h2>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:14px;margin-bottom:14px;">
               ${st.currentUpgradeChoices
                 .map(card => {
@@ -1571,7 +1628,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
                 .join('')}
             </div>
             <button data-act="toggle-inrun-tree" style="padding:9px 18px;border-radius:99px;border:1.5px solid #ffd166;background:rgba(255,209,102,0.16);color:#ffd166;font-weight:800;cursor:pointer;">
-              🕸️ Abrir Teia de Habilidades & Alocar Pontos de Chi
+              🕸️ Abrir Teia de Habilidades & Alocar Centelhas de Éter
             </button>
           </div>
         `;
@@ -1587,7 +1644,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         treeOverlay.innerHTML = `
           <div style="max-width:980px;margin:0 auto;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-              <h2 style="margin:0;color:#ffd166;">🕸️ Teia de Habilidades & Sub-dobras da Jornada</h2>
+              <h2 style="margin:0;color:#ffd166;">🕸️ Teia de Habilidades & Vertentes da Jornada</h2>
               <button data-act="toggle-inrun-tree" style="padding:8px 16px;border-radius:8px;border:1px solid #00f5d4;background:rgba(0,245,212,0.2);color:#fff;font-weight:800;cursor:pointer;">
                 Fechar Teia [K / Esc]
               </button>
@@ -1610,13 +1667,13 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         vicModal.innerHTML = `
           <div style="max-width:580px;width:100%;background:linear-gradient(165deg,rgba(28,16,58,0.97),rgba(10,6,24,0.98));border:2.5px solid #00f5d4;border-radius:18px;padding:24px;text-align:center;box-shadow:0 0 42px rgba(0,245,212,0.35);">
             <div style="font-size:11px;letter-spacing:3px;color:#80ffdb;font-weight:900;text-transform:uppercase;margin-bottom:4px;">
-              ${isFifthCampaignDone ? '🏆 TODAS AS 5 NAÇÕES LIBERTADAS!' : `✦ FASE ${st.campaignIndex + 1} DE 5 CONCLUÍDA ✦`}
+              ${isFifthCampaignDone ? '🏆 TODOS OS 5 SELOS PRIMORDIAIS LIBERTADOS!' : `✦ FASE ${st.campaignIndex + 1} DE 5 CONCLUÍDA ✦`}
             </div>
             <h2 style="margin:0 0 8px;font-size:28px;color:#ffd166;">
               ${camp.name} Libertada!
             </h2>
             <p style="font-size:13px;color:#e2dbf0;line-height:1.5;margin:0 0 16px;">
-              Derrotaste <strong>${camp.boss.name}</strong> e restauraste o equilíbrio elemental desta Nação! Recebeste <strong>+25 Essência Espiritual</strong> e curaste a tua energia vital.
+              Derrotaste <strong>${camp.boss.name}</strong> e purificaste este Selo da Corrupção do Oco! Recebeste <strong>+25 Essência Espiritual</strong> e restauraste a tua vitalidade.
             </p>
 
             <!-- 5-Nation Visual Progress Map -->
@@ -1644,14 +1701,14 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
               isFifthCampaignDone
                 ? `
                 <div style="padding:12px;border-radius:12px;background:rgba(255,209,102,0.12);border:1px solid #ffd166;margin-bottom:16px;font-size:12px;color:#ffd166;">
-                  🎉 <strong>Parabéns, Avatar!</strong> Concluíste a Campanha Principal das 5 Nações! Podes regressar vitorioso ao Menu ou entrar opcionalmente no <strong>Modo Pós-Jogo: Ascensão Infinita</strong>.
+                  🎉 <strong>Glória ao Guardião!</strong> Libertaste os 5 Selos Primordiais de Aethra! Podes regressar vitorioso ao Menu ou enfrentar a prova final no <strong>Modo Pós-Jogo: Fenda Sem Estrelas (Ascensão Infinita)</strong>.
                 </div>
                 <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
                   <button data-act="save-and-menu" style="padding:13px 22px;border-radius:12px;border:2px solid #ffd166;background:linear-gradient(135deg,#ffd166,#f77f00);color:#140926;font-weight:900;font-size:14px;cursor:pointer;">
-                    🏆 Concluir Vitória das 5 Nações (Menu)
+                    🏆 Concluir Libertação dos 5 Selos (Menu)
                   </button>
                   <button data-act="next-campaign" style="padding:13px 20px;border-radius:12px;border:1.5px solid #ff007f;background:rgba(255,0,127,0.22);color:#ff99c8;font-weight:800;font-size:13px;cursor:pointer;">
-                    ∞ Entrar no Modo Pós-Jogo: Ascensão Infinita →
+                    ∞ Desafiar a Fenda Sem Estrelas (Ascensão Infinita) →
                   </button>
                 </div>
                 `
@@ -1683,7 +1740,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             dead ? '#ff4d6d' : '#ffd166'
           };border-radius:16px;padding:24px;text-align:center;display:flex;flex-direction:column;gap:12px;">
             <h2 style="margin:0;font-size:26px;color:${dead ? '#ff4d6d' : '#ffd166'};">
-              ${dead ? '☠ O Teu Espírito Elemental Caiu' : 'Ⅱ Jornada em Pausa'}
+              ${dead ? '☠ O Teu Guardião Sucumbiu ao Oco' : 'Ⅱ Jornada em Pausa'}
             </h2>
             <p style="font-size:13px;color:#cfc4e8;margin:0;">
               ${cls.name} · Nível ${p.level} · Abates: ${st.kills} · Relíquias: ◈ ${p.arcaneFragments}
@@ -1691,7 +1748,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
             ${
               !dead
                 ? `<button data-act="toggle-pause" style="padding:12px;border-radius:10px;border:1px solid #00f5d4;background:rgba(0,245,212,0.22);color:#fff;font-weight:800;cursor:pointer;">▶ Continuar Combate</button>`
-                : `<button data-act="restart-run" style="padding:12px;border-radius:10px;border:1px solid #ffd166;background:rgba(255,209,102,0.24);color:#ffd166;font-weight:800;cursor:pointer;">↻ Renascer no Ciclo Avatar</button>`
+                : `<button data-act="restart-run" style="padding:12px;border-radius:10px;border:1px solid #ffd166;background:rgba(255,209,102,0.24);color:#ffd166;font-weight:800;cursor:pointer;">↻ Renascer no Selo Primordial</button>`
             }
             <button data-act="toggle-inrun-tree" style="padding:10px;border-radius:10px;border:1px solid rgba(125,226,255,0.35);background:rgba(255,255,255,0.06);color:#7de2ff;font-weight:700;cursor:pointer;">
               🕸️ Abrir Teia de Habilidades
@@ -1855,7 +1912,7 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
           currentScreen = 'coop_lobby';
           renderUi();
         } else if (key === 'coop-create') {
-          coop.createRoom(options.name || 'Dominador', selectedClassId);
+          coop.createRoom(options.name || 'Guardião', selectedClassId);
           renderUi();
         } else if (key === 'coop-join') {
           const inp = uiLayer.querySelector<HTMLInputElement>('#arcana-room-input');
@@ -2030,9 +2087,9 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
     );
     setTxt(
       'arc-cd-special',
-      p.specialCooldown > 0 ? `${p.specialCooldown.toFixed(1)}s` : 'SUB-DOBRA'
+      p.specialCooldown > 0 ? `${p.specialCooldown.toFixed(1)}s` : 'VERTENTE'
     );
-    setTxt('arc-cd-ult', p.ultimateCharge >= 100 ? 'AVATAR!' : `${Math.floor(p.ultimateCharge)}%`);
+    setTxt('arc-cd-ult', p.ultimateCharge >= 100 ? 'ASCENSÃO!' : `${Math.floor(p.ultimateCharge)}%`);
 
     const bossWrap = document.getElementById('arc-hud-boss-wrap');
     if (bossWrap) {
@@ -2175,12 +2232,18 @@ export function launchArcana(options: LaunchArcanaOptions): () => void {
         }
       }
 
-      renderer.render(runState, dt);
+      renderer.render(runState, dt, !pausedModalOpen);
       updateHudFast();
     } else {
       menuBackdropState.elapsedCampaignSec += dt;
       menuBackdropState.player.animTime += dt;
-      renderer.render(menuBackdropState, dt);
+      const cycle = menuBackdropState.elapsedCampaignSec % 4.5;
+      menuBackdropState.player.animState =
+        cycle < 0.55 ? 'attack' : cycle > 2.2 && cycle < 2.8 ? 'cast' : 'idle';
+      menuBackdropState.player.facingX = Math.sin(menuBackdropState.elapsedCampaignSec * 0.45);
+      menuBackdropState.player.facingY = Math.cos(menuBackdropState.elapsedCampaignSec * 0.45);
+      menuBackdropState.player.classId = selectedClassId;
+      renderer.render(menuBackdropState, dt, false, currentScreen === 'menu');
     }
 
     rafId = requestAnimationFrame(frame);
